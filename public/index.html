@@ -6,17 +6,64 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link href="https://fonts.googleapis.com/css?family=Inter:400,600&display=swap" rel="stylesheet">
   <style>
-    :root { --main-bg: #f8f9fa; --panel-bg: #fff; --text-color: #222; --gray-text: #6c757d; --border-color: #dee2e6; --primary-color: #222; --primary-hover: #444; --danger-color: #d32f2f; } body { font-family: 'Inter', Arial, sans-serif; background: var(--main-bg); margin: 0; padding: 0; color: var(--text-color); } * { box-sizing: border-box; } .auth-bg { min-height: 100vh; display: flex; align-items: center; justify-content: center;} .auth-card { background: var(--panel-bg); padding: 36px 28px; border-radius: 18px; box-shadow: 0 2px 20px rgba(0,0,0,0.05); width: 340px; max-width: 96vw;} .auth-card h1 {font-size: 2rem; margin: 0 0 16px 0; text-align:center;} .auth-card input { width: 100%; margin-bottom: 12px; padding: 11px 10px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1.08rem; outline: none; } .auth-card button { width: 100%; background: var(--primary-color); color: #fff; border: none; font-weight: 600; transition:.2s; cursor:pointer; padding: 11px 10px; border-radius: 8px; font-size: 1.08rem;} .auth-card button:hover { background: var(--primary-hover); } .error-msg {color: #d32f2f; margin-bottom: 10px; min-height: 1.2em;} .crm-layout { display: flex; flex-direction: column; height: 100vh; } .crm-header { background: var(--panel-bg); padding: 0 2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); flex-shrink: 0; } .crm-header h1 { font-size: 1.2rem; } .crm-header button { background: none; border: 1px solid var(--border-color); color: var(--text-color); padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; transition: .2s; } .crm-header button:hover { background: var(--main-bg); } .crm-main { display: flex; flex-grow: 1; overflow: hidden; } .crm-nav { background: var(--panel-bg); border-right: 1px solid var(--border-color); padding: 1rem; width: 220px; flex-shrink: 0; } .crm-nav ul { list-style: none; padding: 0; margin: 0; } .crm-nav li { padding: 0.8rem 1rem; border-radius: 8px; font-weight: 600; cursor: pointer; margin-bottom: 0.5rem; } .crm-nav li.active { background: var(--primary-color); color: #fff; } .crm-nav li:not(.active):hover { background: var(--main-bg); } .crm-content { flex-grow: 1; padding: 2rem; overflow-y: auto; } .content-card { background: var(--panel-bg); padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); } .item-list { padding: 0; list-style: none; } .item-list li { display: flex; justify-content: space-between; align-items:center; padding: 1rem; border-bottom: 1px solid var(--border-color); } .item-list li:last-child { border-bottom: none; } .item-list .actions button { margin-left: 0.5rem; padding: 0.4rem 0.8rem; font-size: 0.8rem; border-radius: 6px; } .btn-edit { background: none; border: 1px solid var(--gray-text); color: var(--gray-text); } .btn-delete { background: none; border: 1px solid var(--danger-color); color: var(--danger-color); } .form-group { margin-bottom: 1rem; } .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; } .form-group input { width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; } form button { background: var(--primary-color); color: #fff; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; } .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; } .modal-panel { background: #fff; padding: 2rem; border-radius: 8px; width: 450px; max-width: 90vw; } .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; } .modal-header h2 { margin: 0; } .close-btn { font-size: 1.5rem; background: none; border: none; cursor: pointer; }
-    .services-layout { display: grid; grid-template-columns: 300px 1fr; gap: 2rem; align-items: start; } .category-list-item { cursor: pointer; } .category-list-item.selected { font-weight: bold; background-color: var(--main-bg); }
+    /* --- ОСНОВНІ СТИЛІ --- */
+    :root { --main-bg: #f8f9fa; --panel-bg: #fff; --text-color: #222; --gray-text: #6c757d; --border-color: #dee2e6; --primary-color: #222; --primary-hover: #444; --danger-color: #d32f2f; }
+    body { font-family: 'Inter', Arial, sans-serif; background: var(--main-bg); margin: 0; padding: 0; color: var(--text-color); }
+    * { box-sizing: border-box; }
+
+    /* --- СТИЛІ ДЛЯ АВТОРИЗАЦІЇ --- */
+    .auth-bg { min-height: 100vh; display: flex; align-items: center; justify-content: center;}
+    .auth-card { background: var(--panel-bg); padding: 36px 28px; border-radius: 18px; box-shadow: 0 2px 20px rgba(0,0,0,0.05); width: 340px; max-width: 96vw;}
+    .auth-card h1 {font-size: 2rem; margin: 0 0 16px 0; text-align:center;}
+    .auth-card input { width: 100%; margin-bottom: 12px; padding: 11px 10px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1.08rem; outline: none; }
+    .auth-card button { width: 100%; background: var(--primary-color); color: #fff; border: none; font-weight: 600; transition:.2s; cursor:pointer; padding: 11px 10px; border-radius: 8px; font-size: 1.08rem;}
+    .auth-card button:hover { background: var(--primary-hover); }
+    .error-msg {color: #d32f2f; margin-bottom: 10px; min-height: 1.2em;}
+
+    /* --- СТИЛІ ДЛЯ CRM-ІНТЕРФЕЙСУ --- */
+    .crm-layout { display: flex; flex-direction: column; height: 100vh; }
+    .crm-header { background: var(--panel-bg); padding: 0 2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); flex-shrink: 0; }
+    .crm-header h1 { font-size: 1.2rem; }
+    .crm-header button { background: none; border: 1px solid var(--border-color); color: var(--text-color); padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; transition: .2s; }
+    .crm-header button:hover { background: var(--main-bg); }
+    .crm-main { display: flex; flex-grow: 1; overflow: hidden; }
+    .crm-nav { background: var(--panel-bg); border-right: 1px solid var(--border-color); padding: 1rem; width: 220px; flex-shrink: 0; }
+    .crm-nav ul { list-style: none; padding: 0; margin: 0; }
+    .crm-nav li { padding: 0.8rem 1rem; border-radius: 8px; font-weight: 600; cursor: pointer; margin-bottom: 0.5rem; }
+    .crm-nav li.active { background: var(--primary-color); color: #fff; }
+    .crm-nav li:not(.active):hover { background: var(--main-bg); }
+    .crm-content { flex-grow: 1; padding: 2rem; overflow-y: auto; }
+    .content-card { background: var(--panel-bg); padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+    
+    .item-list { padding: 0; list-style: none; }
+    .item-list li { display: flex; justify-content: space-between; align-items:center; padding: 1rem; border-bottom: 1px solid var(--border-color); }
+    .item-list li:last-child { border-bottom: none; }
+    .item-list .actions button { margin-left: 0.5rem; padding: 0.4rem 0.8rem; font-size: 0.8rem; }
+    .btn-edit { background: none; border: 1px solid var(--gray-text); color: var(--gray-text); }
+    .btn-delete { background: none; border: 1px solid var(--danger-color); color: var(--danger-color); }
+    
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; }
+    .form-group input { width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; }
+    form button { background: var(--primary-color); color: #fff; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; }
+
+    /* --- СТИЛІ ДЛЯ МОДАЛЬНОГО ВІКНА --- */
+    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
+    .modal-panel { background: #fff; padding: 2rem; border-radius: 8px; width: 400px; max-width: 90vw; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    .modal-header h2 { margin: 0; }
+    .close-btn { font-size: 1.5rem; background: none; border: none; cursor: pointer; }
   </style>
 </head>
 <body>
+
 <div id="app"></div>
 
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-  import { getFirestore, collection, query, where, onSnapshot, addDoc, doc, deleteDoc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  // --- ІМПОРТИ ТА ІНІЦІАЛІЗАЦІЯ ---
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
+  import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
+  import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
 
   const firebaseConfig = { apiKey: "AIzaSyBoGeREvdgrVSm-S4f3cW0HyB7Us9yh_us", authDomain: "bykalancha.firebaseapp.com", projectId: "bykalancha", storageBucket: "bykalancha.appspot.com", messagingSenderId: "196166318613", appId: "1:196166318613:web:0067f9de531e290e43ec1c", measurementId: "G-V72ECFLKFE" };
 
@@ -24,64 +71,190 @@
   const auth = getAuth(app);
   const db = getFirestore(app);
   const appContainer = document.getElementById('app');
-  let state = { selectedCategoryId: null, categories: [] };
 
-  onAuthStateChanged(auth, user => {
-      if (user) {
-          onSnapshot(collection(db, 'serviceCategories'), snapshot => {
-              state.categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-              state.categories.sort((a, b) => a.name.localeCompare(b.name));
-          });
-          renderAppLayout(user);
-      } else {
-          renderLoginView();
-      }
-  });
+  // --- СЛУХАЧ АВТЕНТИФІКАЦІЇ ---
+  onAuthStateChanged(auth, user => user ? renderAppLayout(user) : renderLoginView());
+
+  // --- ФУНКЦІЇ ДЛЯ ВІДОБРАЖЕННЯ (View) ---
 
   function renderLoginView() {
-      appContainer.innerHTML = `<div class="auth-bg"><div class="auth-card"><h1>Вхід у CRM</h1><div id="login-error" class="error-msg"></div><input id="email" type="email" placeholder="Email" autocomplete="username" autofocus><input id="password" type="password" placeholder="Пароль" autocomplete="current-password"><button id="login-btn">Увійти</button></div></div>`;
-      document.getElementById('login-btn').onclick = handleLogin;
+    appContainer.innerHTML = `<div class="auth-bg"><div class="auth-card"><h1>Вхід у CRM</h1><div id="login-error" class="error-msg"></div><input id="email" type="email" placeholder="Email" autocomplete="username" autofocus><input id="password" type="password" placeholder="Пароль" autocomplete="current-password"><button id="login-btn">Увійти</button></div></div>`;
+    document.getElementById('login-btn').onclick = handleLogin;
   }
 
   function renderAppLayout(user) {
-      appContainer.innerHTML = `<div class="crm-layout"><header class="crm-header"><h1>Lashroom CRM</h1><div><span>${user.email}</span><button id="logout-btn">Вийти</button></div></header><main class="crm-main"><nav class="crm-nav" id="main-nav"><ul><li class="active" data-view="masters">Майстри</li><li data-view="services">Послуги</li><li data-view="appointments">Запис</li><li data-view="salary">Зарплата</li></ul></nav><div class="crm-content" id="crm-content"></div></main></div>`;
-      renderView('masters');
-      document.getElementById('logout-btn').onclick = () => signOut(auth);
-      document.getElementById('main-nav').onclick = (event) => {
-          const target = event.target.closest('li');
-          if (target) renderView(target.dataset.view);
-      };
+    appContainer.innerHTML = `<div class="crm-layout"><header class="crm-header"><h1>Lashroom CRM</h1><div><span>${user.email}</span><button id="logout-btn">Вийти</button></div></header><main class="crm-main"><nav class="crm-nav" id="main-nav"><ul><li class="active" data-view="masters">Майстри</li><li data-view="services">Послуги</li><li data-view="appointments">Запис</li><li data-view="salary">Зарплата</li></ul></nav><div class="crm-content" id="crm-content"></div></main></div>`;
+    renderView('masters');
+    document.getElementById('logout-btn').onclick = () => signOut(auth);
+    document.getElementById('main-nav').onclick = (event) => {
+        if (event.target.tagName === 'LI') {
+            const viewName = event.target.dataset.view;
+            renderView(viewName);
+        }
+    };
   }
 
   function renderView(viewName) {
-      document.querySelectorAll('#main-nav li').forEach(li => li.classList.remove('active'));
-      const activeLi = document.querySelector(`#main-nav li[data-view="${viewName}"]`);
-      if (activeLi) activeLi.classList.add('active');
+    document.querySelectorAll('#main-nav li').forEach(li => li.classList.remove('active'));
+    document.querySelector(`#main-nav li[data-view="${viewName}"]`).classList.add('active');
 
-      switch (viewName) {
-          case 'masters': renderMastersView(); break;
-          case 'services': renderServicesView(); break;
-          default: document.getElementById('crm-content').innerHTML = `<h2>Розділ в розробці...</h2>`;
-      }
+    switch (viewName) {
+        case 'masters':
+            renderMastersView();
+            break;
+        case 'services':
+            renderServicesView();
+            break;
+        default:
+            document.getElementById('crm-content').innerHTML = `<h2>Розділ в розробці...</h2>`;
+    }
   }
 
   function renderMastersView() {
-      document.getElementById('crm-content').innerHTML = `<h2>Вкладка "Майстри"</h2><p>Поки що тут пусто.</p>`;
-  }
-
-  function renderServicesView() {
-      document.getElementById('crm-content').innerHTML = `<h2>Вкладка "Послуги"</h2><p>Поки що тут пусто.</p>`;
-  }
-
-  async function handleLogin(e) {
-      e.preventDefault();
-      const email = document.getElementById('email').value.trim();
-      const password = document.getElementById('password').value;
-      try {
-          await signInWithEmailAndPassword(auth, email, password);
-      } catch (err) {
-          document.getElementById('login-error').innerText = "Неправильний email або пароль.";
+    const contentContainer = document.getElementById('crm-content');
+    contentContainer.innerHTML = `<div class="content-card"><h2>Додати нового майстра</h2><form id="add-master-form"><div class="form-group"><label for="new-master-name">Ім'я та прізвище</label><input type="text" id="new-master-name" required></div><div class="form-group"><label for="new-master-specialization">Спеціалізація</label><input type="text" id="new-master-specialization" required></div><button type="submit">Додати майстра</button></form></div><div class="content-card" style="margin-top: 2rem;"><h2>Список майстрів</h2><ul id="masters-list" class="item-list"><li>Завантаження...</li></ul></div><div class="modal-overlay" id="edit-modal"><div class="modal-panel"><div class="modal-header"><h2>Редагувати майстра</h2><button class="close-btn" id="close-modal-btn">&times;</button></div><form id="edit-master-form"><input type="hidden" id="edit-master-id"><div class="form-group"><label for="edit-master-name">Ім'я</label><input type="text" id="edit-master-name" required></div><div class="form-group"><label for="edit-master-specialization">Спеціалізація</label><input type="text" id="edit-master-specialization" required></div><button type="submit">Зберегти зміни</button></form></div></div>`;
+    document.getElementById('add-master-form').onsubmit = handleAddMaster;
+    const mastersListEl = document.getElementById('masters-list');
+    document.getElementById('close-modal-btn').onclick = () => document.getElementById('edit-modal').style.display = 'none';
+    document.getElementById('edit-master-form').onsubmit = handleUpdateMaster;
+    mastersListEl.onclick = (event) => {
+        if (event.target.classList.contains('btn-delete')) {
+            handleDeleteMaster(event.target.dataset.id);
+        }
+        if (event.target.classList.contains('btn-edit')) {
+            const id = event.target.dataset.id;
+            const name = event.target.dataset.name;
+            const spec = event.target.dataset.spec;
+            showEditModal(id, name, spec);
+        }
+    };
+    onSnapshot(collection(db, 'masters'), (snapshot) => {
+      if (snapshot.empty) {
+        mastersListEl.innerHTML = '<li>Немає жодного майстра.</li>';
+        return;
       }
+      mastersListEl.innerHTML = '';
+      snapshot.forEach(doc => {
+        const master = doc.data();
+        const li = document.createElement('li');
+        li.innerHTML = `<div><strong>${master.name}</strong><br><small>${master.specialization}</small></div><div class="actions"><button class="btn-edit" data-id="${doc.id}" data-name="${master.name}" data-spec="${master.specialization}">Редагувати</button><button class="btn-delete" data-id="${doc.id}">Видалити</button></div>`;
+        mastersListEl.appendChild(li);
+      });
+    });
+  }
+  
+  function renderServicesView() {
+    const contentContainer = document.getElementById('crm-content');
+    contentContainer.innerHTML = `
+      <div class="content-card">
+        <h2>Додати нову категорію послуг</h2>
+        <form id="add-category-form">
+          <div class="form-group">
+            <label for="new-category-name">Назва категорії</label>
+            <input type="text" id="new-category-name" required>
+          </div>
+          <button type="submit">Додати категорію</button>
+        </form>
+      </div>
+      <div class="content-card" style="margin-top: 2rem;">
+        <h2>Список категорій</h2>
+        <ul id="categories-list" class="item-list"><li>Завантаження...</li></ul>
+      </div>
+    `;
+
+    document.getElementById('add-category-form').onsubmit = handleAddCategory;
+    const categoriesListEl = document.getElementById('categories-list');
+
+    onSnapshot(collection(db, 'serviceCategories'), (snapshot) => {
+      if (snapshot.empty) {
+        categoriesListEl.innerHTML = '<li>Немає жодної категорії.</li>';
+        return;
+      }
+      categoriesListEl.innerHTML = '';
+      snapshot.forEach(doc => {
+        const category = doc.data();
+        const li = document.createElement('li');
+        li.innerHTML = `<span>${category.name}</span>`;
+        categoriesListEl.appendChild(li);
+      });
+    });
+  }
+
+  // --- ФУНКЦІЇ-ОБРОБНИКИ ПОДІЙ ---
+  
+  async function handleLogin() {
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (e) {
+      document.getElementById('login-error').innerText = "Неправильний email або пароль.";
+    }
+  }
+
+  async function handleAddMaster(event) {
+    event.preventDefault();
+    const nameInput = document.getElementById('new-master-name');
+    const specInput = document.getElementById('new-master-specialization');
+    const name = nameInput.value.trim();
+    const specialization = specInput.value.trim();
+    if (!name || !specialization) return alert('Будь ласка, заповніть усі поля.');
+    try {
+      await addDoc(collection(db, 'masters'), { name, specialization });
+      nameInput.value = '';
+      specInput.value = '';
+    } catch (e) {
+      console.error("Помилка при додаванні майстра: ", e);
+      alert('Не вдалося додати майстра.');
+    }
+  }
+
+  async function handleDeleteMaster(id) {
+    if (!confirm('Ви впевнені, що хочете видалити цього майстра?')) return;
+    try {
+      await deleteDoc(doc(db, 'masters', id));
+    } catch (e) {
+      console.error("Помилка при видаленні: ", e);
+      alert('Не вдалося видалити майстра.');
+    }
+  }
+
+  function showEditModal(id, name, specialization) {
+    document.getElementById('edit-master-id').value = id;
+    document.getElementById('edit-master-name').value = name;
+    document.getElementById('edit-master-specialization').value = specialization;
+    document.getElementById('edit-modal').style.display = 'flex';
+  }
+
+  async function handleUpdateMaster(event) {
+    event.preventDefault();
+    const id = document.getElementById('edit-master-id').value;
+    const name = document.getElementById('edit-master-name').value.trim();
+    const specialization = document.getElementById('edit-master-specialization').value.trim();
+    if (!name || !specialization) return alert('Поля не можуть бути порожніми.');
+    try {
+      const masterRef = doc(db, 'masters', id);
+      await updateDoc(masterRef, { name, specialization });
+      document.getElementById('edit-modal').style.display = 'none';
+    } catch(e) {
+      console.error("Помилка при оновленні: ", e);
+      alert('Не вдалося оновити дані.');
+    }
+  }
+
+  async function handleAddCategory(event) {
+    event.preventDefault();
+    const nameInput = document.getElementById('new-category-name');
+    const name = nameInput.value.trim();
+    if (!name) return alert('Назва категорії не може бути порожньою.');
+    
+    try {
+      await addDoc(collection(db, 'serviceCategories'), { name });
+      nameInput.value = '';
+    } catch (e) {
+      console.error("Помилка при додаванні категорії: ", e);
+      alert('Не вдалося додати категорію.');
+    }
   }
 </script>
 </body>
