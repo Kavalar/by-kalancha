@@ -7,9 +7,7 @@
   <link href="https://fonts.googleapis.com/css?family=Inter:400,600&display=swap" rel="stylesheet">
   <style>
     :root { --main-bg: #f8f9fa; --panel-bg: #fff; --text-color: #222; --gray-text: #6c757d; --border-color: #dee2e6; --primary-color: #222; --primary-hover: #444; --danger-color: #d32f2f; } body { font-family: 'Inter', Arial, sans-serif; background: var(--main-bg); margin: 0; padding: 0; color: var(--text-color); } * { box-sizing: border-box; } .auth-bg { min-height: 100vh; display: flex; align-items: center; justify-content: center;} .auth-card { background: var(--panel-bg); padding: 36px 28px; border-radius: 18px; box-shadow: 0 2px 20px rgba(0,0,0,0.05); width: 340px; max-width: 96vw;} .auth-card h1 {font-size: 2rem; margin: 0 0 16px 0; text-align:center;} .auth-card input { width: 100%; margin-bottom: 12px; padding: 11px 10px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1.08rem; outline: none; } .auth-card button { width: 100%; background: var(--primary-color); color: #fff; border: none; font-weight: 600; transition:.2s; cursor:pointer; padding: 11px 10px; border-radius: 8px; font-size: 1.08rem;} .auth-card button:hover { background: var(--primary-hover); } .error-msg {color: #d32f2f; margin-bottom: 10px; min-height: 1.2em;} .crm-layout { display: flex; flex-direction: column; height: 100vh; } .crm-header { background: var(--panel-bg); padding: 0 2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); flex-shrink: 0; } .crm-header h1 { font-size: 1.2rem; } .crm-header button { background: none; border: 1px solid var(--border-color); color: var(--text-color); padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; transition: .2s; } .crm-header button:hover { background: var(--main-bg); } .crm-main { display: flex; flex-grow: 1; overflow: hidden; } .crm-nav { background: var(--panel-bg); border-right: 1px solid var(--border-color); padding: 1rem; width: 220px; flex-shrink: 0; } .crm-nav ul { list-style: none; padding: 0; margin: 0; } .crm-nav li { padding: 0.8rem 1rem; border-radius: 8px; font-weight: 600; cursor: pointer; margin-bottom: 0.5rem; } .crm-nav li.active { background: var(--primary-color); color: #fff; } .crm-nav li:not(.active):hover { background: var(--main-bg); } .crm-content { flex-grow: 1; padding: 2rem; overflow-y: auto; } .content-card { background: var(--panel-bg); padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); } .item-list { padding: 0; list-style: none; } .item-list li { display: flex; justify-content: space-between; align-items:center; padding: 1rem; border-bottom: 1px solid var(--border-color); } .item-list li:last-child { border-bottom: none; } .item-list .actions button { margin-left: 0.5rem; padding: 0.4rem 0.8rem; font-size: 0.8rem; border-radius: 6px; } .btn-edit { background: none; border: 1px solid var(--gray-text); color: var(--gray-text); } .btn-delete { background: none; border: 1px solid var(--danger-color); color: var(--danger-color); } .form-group { margin-bottom: 1rem; } .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; } .form-group input { width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; } form button { background: var(--primary-color); color: #fff; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; } .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; } .modal-panel { background: #fff; padding: 2rem; border-radius: 8px; width: 450px; max-width: 90vw; } .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; } .modal-header h2 { margin: 0; } .close-btn { font-size: 1.5rem; background: none; border: none; cursor: pointer; }
-    .services-layout { display: grid; grid-template-columns: 300px 1fr; gap: 2rem; align-items: start; } .category-list-item { cursor: pointer; } .category-list-item.selected { font-weight: bold; background-color: var(--main-bg); } .price-display { text-align: right; } .price-display .old-price { text-decoration: line-through; color: var(--gray-text); margin-right: 0.5rem; font-size: 0.9em; } .price-display .new-price { font-weight: bold; } .form-row { display: flex; gap: 1rem; }
-    .category-checkbox-group { max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px; }
-    .category-checkbox-group label { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; font-weight: normal; }
+    .services-layout { display: grid; grid-template-columns: 300px 1fr; gap: 2rem; align-items: start; } .category-list-item { cursor: pointer; } .category-list-item.selected { font-weight: bold; background-color: var(--main-bg); }
   </style>
 </head>
 <body>
@@ -26,164 +24,65 @@
   const auth = getAuth(app);
   const db = getFirestore(app);
   const appContainer = document.getElementById('app');
-
-  let state = {
-    selectedCategoryId: null,
-    categories: []
-  };
+  let state = { selectedCategoryId: null, categories: [] };
 
   onAuthStateChanged(auth, user => {
-    if (user) {
-      onSnapshot(collection(db, 'serviceCategories'), snapshot => {
-        state.categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        state.categories.sort((a,b) => a.name.localeCompare(b.data().name));
-      });
-      renderAppLayout(user);
-    } else {
-      renderLoginView();
-    }
+      if (user) {
+          onSnapshot(collection(db, 'serviceCategories'), snapshot => {
+              state.categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+              state.categories.sort((a, b) => a.name.localeCompare(b.name));
+          });
+          renderAppLayout(user);
+      } else {
+          renderLoginView();
+      }
   });
 
   function renderLoginView() {
-    appContainer.innerHTML = `<div class="auth-bg"><div class="auth-card"><h1>Вхід у CRM</h1><div id="login-error" class="error-msg"></div><input id="email" type="email" placeholder="Email" autocomplete="username" autofocus><input id="password" type="password" placeholder="Пароль" autocomplete="current-password"><button id="login-btn">Увійти</button></div></div>`;
-    document.getElementById('login-btn').onclick = handleLogin;
+      appContainer.innerHTML = `<div class="auth-bg"><div class="auth-card"><h1>Вхід у CRM</h1><div id="login-error" class="error-msg"></div><input id="email" type="email" placeholder="Email" autocomplete="username" autofocus><input id="password" type="password" placeholder="Пароль" autocomplete="current-password"><button id="login-btn">Увійти</button></div></div>`;
+      document.getElementById('login-btn').onclick = handleLogin;
   }
 
   function renderAppLayout(user) {
-    appContainer.innerHTML = `<div class="crm-layout"><header class="crm-header"><h1>Lashroom CRM</h1><div><span>${user.email}</span><button id="logout-btn">Вийти</button></div></header><main class="crm-main"><nav class="crm-nav" id="main-nav"><ul><li class="active" data-view="masters">Майстри</li><li data-view="services">Послуги</li><li data-view="appointments">Запис</li><li data-view="salary">Зарплата</li></ul></nav><div class="crm-content" id="crm-content"></div></main></div>`;
-    renderView('masters');
-    document.getElementById('logout-btn').onclick = () => signOut(auth);
-    document.getElementById('main-nav').onclick = (event) => {
-        const target = event.target.closest('li');
-        if (target) renderView(target.dataset.view);
-    };
+      appContainer.innerHTML = `<div class="crm-layout"><header class="crm-header"><h1>Lashroom CRM</h1><div><span>${user.email}</span><button id="logout-btn">Вийти</button></div></header><main class="crm-main"><nav class="crm-nav" id="main-nav"><ul><li class="active" data-view="masters">Майстри</li><li data-view="services">Послуги</li><li data-view="appointments">Запис</li><li data-view="salary">Зарплата</li></ul></nav><div class="crm-content" id="crm-content"></div></main></div>`;
+      renderView('masters');
+      document.getElementById('logout-btn').onclick = () => signOut(auth);
+      document.getElementById('main-nav').onclick = (event) => {
+          const target = event.target.closest('li');
+          if (target) renderView(target.dataset.view);
+      };
   }
 
   function renderView(viewName) {
-    document.querySelectorAll('#main-nav li').forEach(li => li.classList.remove('active'));
-    document.querySelector(`#main-nav li[data-view="${viewName}"]`).classList.add('active');
-    switch (viewName) {
-        case 'masters': renderMastersView(); break;
-        case 'services': renderServicesView(); break;
-        default: document.getElementById('crm-content').innerHTML = `<h2>Розділ в розробці...</h2>`;
-    }
+      document.querySelectorAll('#main-nav li').forEach(li => li.classList.remove('active'));
+      const activeLi = document.querySelector(`#main-nav li[data-view="${viewName}"]`);
+      if (activeLi) activeLi.classList.add('active');
+
+      switch (viewName) {
+          case 'masters': renderMastersView(); break;
+          case 'services': renderServicesView(); break;
+          default: document.getElementById('crm-content').innerHTML = `<h2>Розділ в розробці...</h2>`;
+      }
   }
 
   function renderMastersView() {
-    const contentContainer = document.getElementById('crm-content');
-    contentContainer.innerHTML = `<div class="content-card"><h2>Додати нового майстра</h2><form id="add-master-form"><div class="form-group"><label for="new-master-name">Ім'я та прізвище</label><input type="text" id="new-master-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="new-master-tier">Ранг</label><input type="text" id="new-master-tier" placeholder="напр. Топ-майстер"></div><div class="form-group" style="flex:1;"><label for="new-master-modifier">Націнка (%)</label><input type="number" id="new-master-modifier" value="0" min="0"></div></div><div class="form-group"><label>Спеціалізації (Категорії послуг)</label><div id="new-master-categories" class="category-checkbox-group">Завантаження категорій...</div></div><button type="submit">Додати майстра</button></form></div><div class="content-card" style="margin-top: 2rem;"><h2>Список майстрів</h2><ul id="masters-list" class="item-list"><li>Завантаження...</li></ul></div><div class="modal-overlay" id="edit-master-modal"><div class="modal-panel"><div class="modal-header"><h2>Редагувати майстра</h2><button class="close-btn">&times;</button></div><form id="edit-master-form"><input type="hidden" id="edit-master-id"><div class="form-group"><label for="edit-master-name">Ім'я та прізвище</label><input type="text" id="edit-master-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="edit-master-tier">Ранг</label><input type="text" id="edit-master-tier"></div><div class="form-group" style="flex:1;"><label for="edit-master-modifier">Націнка (%)</label><input type="number" id="edit-master-modifier" min="0"></div></div><div class="form-group"><label>Спеціалізації</label><div id="edit-master-categories" class="category-checkbox-group"></div></div><button type="submit">Зберегти зміни</button></form></div></div>`;
-    populateCategoryCheckboxes('new-master-categories');
-    document.getElementById('add-master-form').onsubmit = handleAddMaster;
-    document.querySelector('#edit-master-modal .close-btn').onclick = () => document.getElementById('edit-master-modal').style.display = 'none';
-    document.getElementById('edit-master-form').onsubmit = handleUpdateMaster;
-    const mastersListEl = document.getElementById('masters-list');
-    mastersListEl.onclick = (event) => {
-        const target = event.target.closest('button');
-        if (!target) return;
-        if (target.classList.contains('btn-delete')) handleDeleteMaster(target.dataset.id);
-        if (target.classList.contains('btn-edit')) showEditMasterModal(target.dataset.id);
-    };
-    onSnapshot(collection(db, 'masters'), (snapshot) => {
-      mastersListEl.innerHTML = snapshot.empty ? '<li>Немає жодного майстра.</li>' : '';
-      snapshot.forEach(doc => {
-        const master = doc.data();
-        const categories = (master.categoryIds || []).map(id => state.categories.find(c => c.id === id)?.name || '').filter(Boolean).join(', ');
-        const li = document.createElement('li');
-        li.innerHTML = `<div><strong>${master.name}</strong> ${master.tier ? `(${master.tier})` : ''} ${master.priceModifier > 0 ? `<strong style="color:var(--danger-color)">+${master.priceModifier}%</strong>` : ''}<br><small>${categories || 'Без спеціалізації'}</small></div><div class="actions"><button class="btn-edit" data-id="${doc.id}">Редагувати</button><button class="btn-delete" data-id="${doc.id}">Видалити</button></div>`;
-        mastersListEl.appendChild(li);
-      });
-    });
-  }
-  
-  function populateCategoryCheckboxes(elementId, checkedIds = []) {
-      const container = document.getElementById(elementId);
-      if (!container) return;
-      container.innerHTML = state.categories.length ? '' : 'Спочатку додайте категорії на вкладці "Послуги"';
-      state.categories.forEach(category => {
-          const isChecked = checkedIds.includes(category.id);
-          container.innerHTML += `<label><input type="checkbox" value="${category.id}" ${isChecked ? 'checked' : ''}>${category.name}</label>`;
-      });
+      document.getElementById('crm-content').innerHTML = `<h2>Вкладка "Майстри"</h2><p>Поки що тут пусто.</p>`;
   }
 
   function renderServicesView() {
-    selectedCategoryId = null;
-    const contentContainer = document.getElementById('crm-content');
-    contentContainer.innerHTML = `<div class="services-layout"><div class="content-card"><h2>Категорії</h2><form id="add-category-form" class="form-group"><input type="text" id="new-category-name" placeholder="Нова категорія..." required><button type="submit" style="width:100%; margin-top:0.5rem;">Додати</button></form><ul id="categories-list" class="item-list"><li>Завантаження...</li></ul></div><div id="services-container"><div class="content-card"><p>Оберіть категорію зліва.</p></div></div></div><div class="modal-overlay" id="edit-category-modal"><div class="modal-panel"><div class="modal-header"><h2>Редагувати категорію</h2><button class="close-btn">&times;</button></div><form id="edit-category-form"><input type="hidden" id="edit-category-id"><div class="form-group"><label for="edit-category-name">Назва категорії</label><input type="text" id="edit-category-name" required></div><div class="form-group"><label for="edit-category-discount">Акційна знижка (%)</label><input type="number" id="edit-category-discount" min="0" max="100" value="0"></div><button type="submit">Зберегти зміни</button></form></div></div><div class="modal-overlay" id="edit-service-modal"><div class="modal-panel"><div class="modal-header"><h2 id="service-modal-title">Послуга</h2><button class="close-btn">&times;</button></div><form id="edit-service-form"><input type="hidden" id="edit-service-id"><div class="form-group"><label for="edit-service-name">Назва</label><input type="text" id="edit-service-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="edit-service-duration">Тривалість (хв)</label><input type="number" id="edit-service-duration" required></div><div class="form-group" style="flex:1;"><label for="edit-service-price">Ціна (zł)</label><input type="number" id="edit-service-price" required></div></div><div class="form-group"><label for="edit-service-discount">Персональна знижка (%)</label><input type="number" id="edit-service-discount" min="0" max="100" value="0"></div><button type="submit">Зберегти</button></form></div></div>`;
-    setupCategoriesLogic();
+      document.getElementById('crm-content').innerHTML = `<h2>Вкладка "Послуги"</h2><p>Поки що тут пусто.</p>`;
   }
 
-  function setupCategoriesLogic() {
-    document.getElementById('add-category-form').onsubmit = handleAddCategory;
-    document.querySelector('#edit-category-modal .close-btn').onclick = () => document.getElementById('edit-category-modal').style.display = 'none';
-    document.getElementById('edit-category-form').onsubmit = handleUpdateCategory;
-    const categoriesListEl = document.getElementById('categories-list');
-    categoriesListEl.onclick = (event) => {
-        const categoryItem = event.target.closest('.category-list-item');
-        if (event.target.classList.contains('btn-delete')) handleDeleteCategory(event.target.dataset.id);
-        else if (event.target.classList.contains('btn-edit')) showEditCategoryModal(event.target.dataset.id, event.target.dataset.name, event.target.dataset.discount);
-        else if (categoryItem) renderServicesForCategory(categoryItem.dataset.id);
-    };
-    onSnapshot(collection(db, 'serviceCategories'), (snapshot) => {
-      categoriesListEl.innerHTML = snapshot.empty ? '<li>Немає категорій.</li>' : '';
-      snapshot.docs.sort((a,b) => a.data().name.localeCompare(b.data().name)).forEach(doc => {
-        const category = doc.data();
-        const li = document.createElement('li');
-        li.className = 'category-list-item';
-        li.dataset.id = doc.id;
-        if (doc.id === selectedCategoryId) li.classList.add('selected');
-        li.innerHTML = `<span>${category.name} ${category.discount ? `<strong style="color:var(--danger-color);">-`+category.discount+'%</strong>' : ''}</span><div class="actions"><button class="btn-edit" data-id="${doc.id}" data-name="${category.name}" data-discount="${category.discount || 0}">✏️</button><button class="btn-delete" data-id="${doc.id}">🗑️</button></div>`;
-        categoriesListEl.appendChild(li);
-      });
-    });
+  async function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      try {
+          await signInWithEmailAndPassword(auth, email, password);
+      } catch (err) {
+          document.getElementById('login-error').innerText = "Неправильний email або пароль.";
+      }
   }
-
-  function renderServicesForCategory(categoryId) {
-    selectedCategoryId = categoryId;
-    document.querySelectorAll('.category-list-item').forEach(li => li.classList.remove('selected'));
-    const categoryElement = document.querySelector(`.category-list-item[data-id="${categoryId}"]`);
-    if(categoryElement) categoryElement.classList.add('selected');
-    const servicesContainer = document.getElementById('services-container');
-    const categoryName = categoryElement ? categoryElement.querySelector('span').textContent : '...';
-    servicesContainer.innerHTML = `<div class="content-card"><div style="display:flex; justify-content:space-between; align-items:center;"><h2>Послуги: ${categoryName}</h2><button id="add-service-btn">Додати послугу</button></div><ul id="services-list" class="item-list"><li>Завантаження...</li></ul></div>`;
-    document.getElementById('add-service-btn').onclick = () => showServiceModal();
-    const servicesListEl = document.getElementById('services-list');
-    servicesListEl.onclick = (event) => {
-        const target = event.target.closest('button');
-        if (!target) return;
-        const serviceData = target.dataset;
-        if (target.classList.contains('btn-delete-service')) handleDeleteService(serviceData.id);
-        if (target.classList.contains('btn-edit-service')) showServiceModal(serviceData.id, serviceData);
-    };
-    const q = query(collection(db, 'services'), where("categoryId", "==", categoryId));
-    onSnapshot(q, (snapshot) => {
-      const categoryDiscount = categoryElement ? parseFloat(categoryElement.querySelector('.btn-edit').dataset.discount) || 0 : 0;
-      servicesListEl.innerHTML = snapshot.empty ? '<li>Немає послуг в цій категорії.</li>' : '';
-      snapshot.docs.sort((a,b) => a.data().name.localeCompare(b.data().name)).forEach(doc => {
-        const service = doc.data();
-        const finalDiscount = (service.discount > 0) ? service.discount : categoryDiscount;
-        const discountedPrice = service.price * (1 - finalDiscount / 100);
-        const li = document.createElement('li');
-        li.innerHTML = `<div><strong>${service.name}</strong><br><small>${service.duration} хв. ${service.discount > 0 ? `(Знижка ${service.discount}%)` : ''}</small></div><div class="price-display">${finalDiscount > 0 ? `<span class="old-price">${service.price} zł</span>` : ''}<span class="new-price">${discountedPrice.toFixed(0)} zł</span></div><div class="actions"><button class="btn-edit-service" data-id="${doc.id}" data-name="${service.name}" data-duration="${service.duration}" data-price="${service.price}" data-discount="${service.discount || 0}">✏️</button><button class="btn-delete-service" data-id="${doc.id}">🗑️</button></div>`;
-        servicesListEl.appendChild(li);
-      });
-    });
-  }
-
-  // --- EVENT HANDLERS ---
-  async function handleLogin(e) { e.preventDefault(); const email = document.getElementById('email').value.trim(); const password = document.getElementById('password').value; try { await signInWithEmailAndPassword(auth, email, password); } catch (err) { document.getElementById('login-error').innerText = "Неправильний email або пароль."; } }
-  async function handleAddMaster(event) { event.preventDefault(); const name = document.getElementById('new-master-name').value.trim(); const tier = document.getElementById('new-master-tier').value.trim(); const priceModifier = parseFloat(document.getElementById('new-master-modifier').value) || 0; const categoryIds = Array.from(document.querySelectorAll('#new-master-categories input:checked')).map(el => el.value); if (!name) return alert('Введіть ім\'я майстра.'); try { await addDoc(collection(db, 'masters'), { name, tier, priceModifier, categoryIds }); event.target.reset(); } catch (e) { console.error("Помилка:", e); alert('Не вдалося додати майстра.'); } }
-  async function handleDeleteMaster(id) { if (!confirm('Видалити майстра?')) return; try { await deleteDoc(doc(db, 'masters', id)); } catch (e) { console.error("Помилка:", e); alert('Не вдалося видалити.'); } }
-  async function showEditMasterModal(id) { const docSnap = await getDoc(doc(db, 'masters', id)); if (!docSnap.exists()) return alert('Майстра не знайдено!'); const master = docSnap.data(); const modal = document.getElementById('edit-master-modal'); document.getElementById('edit-master-id').value = id; document.getElementById('edit-master-name').value = master.name; document.getElementById('edit-master-tier').value = master.tier || ''; document.getElementById('edit-master-modifier').value = master.priceModifier || 0; populateCategoryCheckboxes('edit-master-categories', master.categoryIds || []); modal.style.display = 'flex'; }
-  async function handleUpdateMaster(event) { event.preventDefault(); const id = document.getElementById('edit-master-id').value; const name = document.getElementById('edit-master-name').value.trim(); const tier = document.getElementById('edit-master-tier').value.trim(); const priceModifier = parseFloat(document.getElementById('edit-master-modifier').value) || 0; const categoryIds = Array.from(document.querySelectorAll('#edit-master-categories input:checked')).map(el => el.value); if (!name) return alert('Ім\'я не може бути порожнім.'); try { await updateDoc(doc(db, 'masters', id), { name, tier, priceModifier, categoryIds }); document.getElementById('edit-master-modal').style.display = 'none'; } catch(e) { console.error("Помилка:", e); alert('Не вдалося оновити.'); } }
-  async function handleAddCategory(event) { event.preventDefault(); const nameInput = document.getElementById('new-category-name'); const name = nameInput.value.trim(); if (!name) return; try { await addDoc(collection(db, 'serviceCategories'), { name, discount: 0 }); nameInput.value = ''; } catch (e) { alert('Не вдалося додати.'); } }
-  async function handleDeleteCategory(id) { if (!confirm('Видалити категорію?')) return; try { await deleteDoc(doc(db, 'serviceCategories', id)); } catch (e) { alert('Не вдалося видалити.'); } }
-  function showEditCategoryModal(id, name, discount) { const modal = document.getElementById('edit-category-modal'); document.getElementById('edit-category-id').value = id; document.getElementById('edit-category-name').value = name; document.getElementById('edit-category-discount').value = discount || 0; modal.style.display = 'flex'; }
-  async function handleUpdateCategory(event) { event.preventDefault(); const id = document.getElementById('edit-category-id').value; const name = document.getElementById('edit-category-name').value.trim(); const discount = parseFloat(document.getElementById('edit-category-discount').value) || 0; if (!name) return alert('Назва не може бути порожньою.'); try { await updateDoc(doc(db, 'serviceCategories', id), { name, discount }); document.getElementById('edit-category-modal').style.display = 'none'; } catch(e) { alert('Не вдалося оновити.'); } }
-  function showServiceModal(id = null, data = {}) { const modal = document.getElementById('edit-service-modal'); modal.querySelector('h2').textContent = id ? 'Редагувати послугу' : 'Додати нову послугу'; document.getElementById('edit-service-id').value = id || ''; document.getElementById('edit-service-name').value = data.name || ''; document.getElementById('edit-service-duration').value = data.duration || ''; document.getElementById('edit-service-price').value = data.price || ''; document.getElementById('edit-service-discount').value = data.discount || 0; document.getElementById('edit-service-form').onsubmit = id ? handleUpdateService : handleAddService; modal.style.display = 'flex'; document.querySelector('#edit-service-modal .close-btn').onclick = () => modal.style.display = 'none'; }
-  async function handleAddService(event) { event.preventDefault(); if (!selectedCategoryId) return alert('Спочатку оберіть категорію!'); const name = document.getElementById('edit-service-name').value.trim(); const duration = parseInt(document.getElementById('edit-service-duration').value); const price = parseFloat(document.getElementById('edit-service-price').value); const discount = parseFloat(document.getElementById('edit-service-discount').value) || 0; if (!name || !duration || !(price>=0)) return alert('Заповніть усі поля.'); try { await addDoc(collection(db, 'services'), { name, duration, price, discount, categoryId: selectedCategoryId }); document.getElementById('edit-service-modal').style.display = 'none'; } catch (e) { alert('Не вдалося додати.'); } }
-  async function handleUpdateService(event) { event.preventDefault(); const id = document.getElementById('edit-service-id').value; const name = document.getElementById('edit-service-name').value.trim(); const duration = parseInt(document.getElementById('edit-service-duration').value); const price = parseFloat(document.getElementById('edit-service-price').value); const discount = parseFloat(document.getElementById('edit-service-discount').value) || 0; if (!name || !duration || !(price>=0)) return alert('Заповніть усі поля.'); try { await updateDoc(doc(db, 'services', id), { name, duration, price, discount }); document.getElementById('edit-service-modal').style.display = 'none'; } catch(e) { alert('Не вдалося оновити.'); } }
-  async function handleDeleteService(id) { if (!confirm('Видалити послугу?')) return; try { await deleteDoc(doc(db, 'services', id)); } catch (e) { alert('Не вдалося видалити.'); } }
-
 </script>
 </body>
 </html>
