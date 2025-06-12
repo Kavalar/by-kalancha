@@ -179,7 +179,19 @@
         const categoryId = categorySelect.value;
         const servicesInCategory = state.services.filter(s => s.categoryId === categoryId);
         serviceSelect.innerHTML = '<option value="">Оберіть послугу</option>' + servicesInCategory.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-        const mastersForCategory = state.masters.filter(m => m.categoryIds && m.categoryIds.includes(categoryId));
+        const selectedCategoryName = state.categories.find(c => c.id === categoryId)?.name;
+
+        const mastersForCategory = state.masters.filter(m => {
+    // 1. Перевірка за новим полем `categoryIds` (пріоритет)
+    if (m.categoryIds && Array.isArray(m.categoryIds)) {
+        return m.categoryIds.includes(categoryId);
+    }
+    // 2. Якщо немає, перевірка за старим полем `specialization` (для сумісності)
+    if (m.specialization && Array.isArray(m.specialization) && selectedCategoryName) {
+        return m.specialization.includes(selectedCategoryName);
+    }
+    return false;
+});
         masterSelect.innerHTML = '<option value="">Оберіть майстра</option>' + mastersForCategory.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
         updateFinalPrice();
     };
