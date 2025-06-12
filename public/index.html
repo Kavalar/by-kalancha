@@ -10,7 +10,6 @@
   <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/core/locales/uk.global.js'></script>
 
   <style>
-    /* ... Ваші стилі залишаються без змін ... */
     :root { --main-bg: #f8f9fa; --panel-bg: #fff; --text-color: #222; --gray-text: #6c757d; --border-color: #dee2e6; --primary-color: #222; --primary-hover: #444; --danger-color: #d32f2f; --success-color: #2e7d32;} body { font-family: 'Inter', Arial, sans-serif; background: var(--main-bg); margin: 0; padding: 0; color: var(--text-color); } * { box-sizing: border-box; } .auth-bg { min-height: 100vh; display: flex; align-items: center; justify-content: center;} .auth-card { background: var(--panel-bg); padding: 36px 28px; border-radius: 18px; box-shadow: 0 2px 20px rgba(0,0,0,0.05); width: 340px; max-width: 96vw;} .auth-card h1 {font-size: 2rem; margin: 0 0 16px 0; text-align:center;} .auth-card input { width: 100%; margin-bottom: 12px; padding: 11px 10px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1.08rem; outline: none; } .auth-card button { width: 100%; background: var(--primary-color); color: #fff; border: none; font-weight: 600; transition:.2s; cursor:pointer; padding: 11px 10px; border-radius: 8px; font-size: 1.08rem;} .auth-card button:hover { background: var(--primary-hover); } .error-msg {color: #d32f2f; margin-bottom: 10px; min-height: 1.2em;} .crm-layout { display: flex; flex-direction: column; height: 100vh; } .crm-header { background: var(--panel-bg); padding: 0 2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); flex-shrink: 0; } .crm-header h1 { font-size: 1.2rem; } .crm-header button { background: none; border: 1px solid var(--border-color); color: var(--text-color); padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; transition: .2s; } .crm-header button:hover { background: var(--main-bg); } .crm-main { display: flex; flex-grow: 1; overflow: hidden; } .crm-nav { background: var(--panel-bg); border-right: 1px solid var(--border-color); padding: 1rem; width: 220px; flex-shrink: 0; } .crm-nav ul { list-style: none; padding: 0; margin: 0; } .crm-nav li { padding: 0.8rem 1rem; border-radius: 8px; font-weight: 600; cursor: pointer; margin-bottom: 0.5rem; } .crm-nav li.active { background: var(--primary-color); color: #fff; } .crm-nav li:not(.active):hover { background: var(--main-bg); } .crm-content { flex-grow: 1; padding: 2rem; overflow-y: auto; } .content-card { background: var(--panel-bg); padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); } .item-list { padding: 0; list-style: none; } .item-list li { display: flex; justify-content: space-between; align-items:center; padding: 1rem; border-bottom: 1px solid var(--border-color); } .item-list li:last-child { border-bottom: none; } .item-list .actions button { margin-left: 0.5rem; padding: 0.4rem 0.8rem; font-size: 0.8rem; border-radius: 6px; } .btn-edit { background: none; border: 1px solid var(--gray-text); color: var(--gray-text); } .btn-delete { background: none; border: 1px solid var(--danger-color); color: var(--danger-color); } .form-group { margin-bottom: 1rem; } .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; } .form-group input, .form-group select { width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; background: #fff; } form button { background: var(--primary-color); color: #fff; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; } .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; } .modal-panel { background: #fff; padding: 2rem; border-radius: 8px; width: 450px; max-width: 90vw; } .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; } .modal-header h2 { margin: 0; } .close-btn { font-size: 1.5rem; background: none; border: none; cursor: pointer; }
     .services-layout { display: grid; grid-template-columns: 300px 1fr; gap: 2rem; align-items: start; } .category-list-item { cursor: pointer; } .category-list-item.selected { font-weight: bold; background-color: var(--main-bg); } .price-display { text-align: right; } .price-display .old-price { text-decoration: line-through; color: var(--gray-text); margin-right: 0.5rem; font-size: 0.9em; } .price-display .new-price { font-weight: bold; } .form-row { display: flex; gap: 1rem; align-items: flex-end;}
     .category-checkbox-group { max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px; }
@@ -25,6 +24,7 @@
     #calendar { height: 80vh; }
     .fc-event { font-size: 0.8em; cursor: pointer; }
     .fc-event-main-frame { text-wrap: wrap; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; } th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid var(--border-color); } th { background-color: var(--main-bg); }
   </style>
 </head>
 <body>
@@ -48,7 +48,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-  import { getFirestore, collection, query, where, onSnapshot, addDoc, doc, deleteDoc, updateDoc, getDocs, getDoc, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { getFirestore, collection, query, where, onSnapshot, addDoc, doc, deleteDoc, updateDoc, getDocs, getDoc, Timestamp, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const firebaseConfig = { apiKey: "AIzaSyBoGeREvdgrVSm-S4f3cW0HyB7Us9yh_us", authDomain: "bykalancha.firebaseapp.com", projectId: "bykalancha", storageBucket: "bykalancha.appspot.com", messagingSenderId: "196166318613", appId: "1:196166318613:web:0067f9de531e290e43ec1c", measurementId: "G-V72ECFLKFE" };
 
@@ -59,6 +59,7 @@
 
   let state = {
     user: null, selectedCategoryId: null, categories: [], services: [], masters: [], appointments: [],
+    settings: { salaryTiers: [] },
     currentView: 'calendar',
     preselectedAppointment: null
   };
@@ -70,15 +71,9 @@
       if (listenersAreActive) return;
       appContainer.innerHTML = '<h1>Завантаження даних...</h1>';
       
-      // НОВЕ: Завантажуємо роль користувача
       const userDocRef = doc(db, "users", user.uid);
       const userDocSnap = await getDoc(userDocRef);
-
-      state.user = {
-          uid: user.uid,
-          email: user.email,
-          role: userDocSnap.exists() ? userDocSnap.data().role : 'master' // За замовчуванням 'master'
-      };
+      state.user = { uid: user.uid, email: user.email, role: userDocSnap.exists() ? userDocSnap.data().role : 'master' };
 
       await initializeAppData();
       renderAppLayout(state.user);
@@ -91,15 +86,23 @@
 
   async function initializeAppData() {
     try {
-        const [categoriesSnap, servicesSnap, mastersSnap, appointmentsSnap] = await Promise.all([
+        const [categoriesSnap, servicesSnap, mastersSnap, appointmentsSnap, settingsSnap] = await Promise.all([
             getDocs(collection(db, 'serviceCategories')), getDocs(collection(db, 'services')),
-            getDocs(collection(db, 'masters')), getDocs(collection(db, 'appointments'))
+            getDocs(collection(db, 'masters')), getDocs(collection(db, 'appointments')),
+            getDoc(doc(db, 'settings', 'salaryRules'))
         ]);
         
         state.categories = categoriesSnap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => a.name.localeCompare(b.name));
         state.services = servicesSnap.docs.map(d => ({id: d.id, ...d.data()}));
         state.masters = mastersSnap.docs.map(d => ({id: d.id, ...d.data()}));
         state.appointments = appointmentsSnap.docs.map(d => ({id: d.id, ...d.data()}));
+
+        if (settingsSnap.exists()) {
+            state.settings.salaryTiers = settingsSnap.data().tiers || [];
+        } else if (state.user.role === 'admin') {
+            await setDoc(doc(db, 'settings', 'salaryRules'), { tiers: [{ threshold: 0, rate: 35 }] });
+            state.settings.salaryTiers = [{ threshold: 0, rate: 35 }];
+        }
     } catch (error) {
         console.error("Помилка ініціалізації даних:", error);
         appContainer.innerHTML = '<h1>Не вдалося завантажити дані. Перезавантажте сторінку.</h1>';
@@ -107,6 +110,11 @@
   }
 
   function setupRealtimeListeners() {
+    if (listenersAreActive) return;
+    onSnapshot(doc(db, 'settings', 'salaryRules'), (doc) => {
+        state.settings.salaryTiers = doc.exists() ? (doc.data().tiers || []) : [];
+        if (state.user) renderView(state.currentView);
+    });
     const collections = { serviceCategories: 'categories', services: 'services', masters: 'masters', appointments: 'appointments' };
     Object.entries(collections).forEach(([col, stateKey]) => {
       onSnapshot(collection(db, col), snapshot => {
@@ -125,7 +133,6 @@
   }
 
   function renderAppLayout(user) {
-    // НОВЕ: Динамічне формування меню в залежності від ролі
     const isAdmin = user.role === 'admin';
     const adminTabs = `
         <li data-view="salary">Зарплата</li>
@@ -143,6 +150,9 @@
   }
 
   function renderView(viewName) {
+    if (state.user.role !== 'admin' && (viewName === 'salary' || viewName === 'settings')) {
+        viewName = 'calendar';
+    }
     state.currentView = viewName;
     const navList = document.querySelector('#main-nav ul');
     if (!navList) return;
@@ -156,7 +166,7 @@
         case 'services': renderServicesView(); break;
         case 'masters': renderMastersView(); break;
         case 'salary': renderSalaryView(); break;
-        case 'settings': renderSettingsView(); break; // НОВЕ
+        case 'settings': renderSettingsView(); break;
         default: 
           const content = document.getElementById('crm-content');
           if(content) content.innerHTML = `<h2>Невідомий розділ</h2>`;
@@ -164,15 +174,72 @@
   }
   // #endregion
 
-  // #region Settings View (НОВИЙ РОЗДІЛ)
+  // #region Settings View
   function renderSettingsView() {
     const content = document.getElementById('crm-content');
-    // Поки що це просто заглушка, ми наповнимо її на наступному кроці
+    const tiers = state.settings.salaryTiers.sort((a,b) => a.threshold - b.threshold);
+    
+    let tableRows = tiers.map((tier, index) => `
+        <tr>
+            <td>Від ${tier.threshold} zł</td>
+            <td>${tier.rate}%</td>
+            <td><button class="btn-delete btn-delete-tier" data-index="${index}">Видалити</button></td>
+        </tr>
+    `).join('');
+
     content.innerHTML = `<div class="content-card">
-        <h2>Налаштування</h2>
-        <p>Цей розділ призначений для адміністраторів.</p>
-        <p>На наступному кроці тут з'явиться можливість керувати відсотками для розрахунку зарплат.</p>
+        <h2>Налаштування відсотків зарплати</h2>
+        <table>
+            <thead><tr><th>Сума від (поріг)</th><th>Відсоток</th><th>Дія</th></tr></thead>
+            <tbody id="salary-tiers-table">${tableRows}</tbody>
+        </table>
+        <hr style="margin: 2rem 0;">
+        <h3>Додати новий рівень</h3>
+        <form id="add-tier-form" class="form-row">
+            <div class="form-group" style="flex:1;">
+                <label for="new-tier-threshold">Сума від (zł)</label>
+                <input type="number" id="new-tier-threshold" min="0" required>
+            </div>
+            <div class="form-group" style="flex:1;">
+                <label for="new-tier-rate">Відсоток (%)</label>
+                <input type="number" id="new-tier-rate" min="0" max="100" required>
+            </div>
+            <div class="form-group">
+                <button type="submit">Додати</button>
+            </div>
+        </form>
     </div>`;
+
+    document.getElementById('add-tier-form').onsubmit = handleAddSalaryTier;
+    document.getElementById('salary-tiers-table').onclick = (e) => {
+        if(e.target.classList.contains('btn-delete-tier')) {
+            handleDeleteSalaryTier(parseInt(e.target.dataset.index));
+        }
+    };
+  }
+  async function handleAddSalaryTier(event) {
+    event.preventDefault();
+    const threshold = parseInt(document.getElementById('new-tier-threshold').value);
+    const rate = parseInt(document.getElementById('new-tier-rate').value);
+
+    const newTiers = [...state.settings.salaryTiers, { threshold, rate }];
+    try {
+        await setDoc(doc(db, 'settings', 'salaryRules'), { tiers: newTiers });
+        event.target.reset();
+    } catch(e) {
+        console.error("Помилка додавання рівня:", e);
+        alert('Не вдалося додати рівень.');
+    }
+  }
+  async function handleDeleteSalaryTier(index) {
+    if (!confirm('Ви впевнені, що хочете видалити цей рівень?')) return;
+    const newTiers = state.settings.salaryTiers.filter((_, i) => i !== index);
+    try {
+        await setDoc(doc(db, 'settings', 'salaryRules'), { tiers: newTiers });
+    } catch(e) {
+        console.error("Помилка видалення рівня:", e);
+        alert('Не вдалося видалити рівень.');
+    }
   }
   // #endregion
 
@@ -187,7 +254,7 @@
 
     const colorPalette = ['#3788d8', '#e25141', '#4caf50', '#ff9800', '#9c27b0', '#795548', '#607d8b'];
     
-    const calendar = new FullCalendar.Calendar(calendarEl, {
+    let calendar = new FullCalendar.Calendar(calendarEl, {
       locale: 'uk',
       initialView: 'timeGridWeek', 
       headerToolbar: { left: 'prev,next today', center: 'title', right: 'timeGridWeek,timeGridDay' },
@@ -238,8 +305,7 @@
     };
   }
   // #endregion
-  
-  // Тут йдуть решта функцій без змін
+
   // #region Appointments View
   function renderAppointmentsView() {
     const content = document.getElementById('crm-content');
@@ -362,7 +428,7 @@
     } catch(e) { console.error("Помилка: ", e); alert('Не вдалося провести оплату.'); }
   }
   // #endregion
-  
+
   // #region Masters View
   function renderMastersView() {
     const content = document.getElementById('crm-content');
@@ -407,27 +473,27 @@
     content.innerHTML = `<div class="services-layout"><div class="content-card"><h2>Категорії</h2><form id="add-category-form" class="form-group"><input type="text" id="new-category-name" placeholder="Нова категорія..." required><button type="submit" style="width:100%; margin-top:0.5rem;">Додати</button></form><ul id="categories-list" class="item-list"></ul></div><div id="services-container"><div class="content-card"><p>Оберіть категорію зліва.</p></div></div></div><div class="modal-overlay" id="edit-category-modal"><div class="modal-panel"><div class="modal-header"><h2>Редагувати категорію</h2><button class="close-btn">&times;</button></div><form id="edit-category-form"><input type="hidden" id="edit-category-id"><div class="form-group"><label for="edit-category-name">Назва категорії</label><input type="text" id="edit-category-name" required></div><div class="form-group"><label for="edit-category-discount">Акційна знижка (%)</label><input type="number" id="edit-category-discount" min="0" max="100" value="0"></div><button type="submit">Зберегти зміни</button></form></div></div><div class="modal-overlay" id="edit-service-modal"><div class="modal-panel"><div class="modal-header"><h2 id="service-modal-title">Послуга</h2><button class="close-btn">&times;</button></div><form id="edit-service-form"><input type="hidden" id="edit-service-id"><div class="form-group"><label for="edit-service-name">Назва</label><input type="text" id="edit-service-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="edit-service-duration">Тривалість (хв)</label><input type="number" id="edit-service-duration" required min="0"></div><div class="form-group" style="flex:1;"><label for="edit-service-price">Ціна (zł)</label><input type="number" id="edit-service-price" required min="0"></div></div><div class="form-group"><label for="edit-service-discount">Персональна знижка (%)</label><input type="number" id="edit-service-discount" min="0" max="100" value="0"></div><button type="submit">Зберегти</button></form></div></div>`;
     setupCategoriesLogic();
     if (state.selectedCategoryId) {
-        const servicesContainer = document.getElementById('services-container');
-        const category = state.categories.find(c => c.id === state.selectedCategoryId);
-        const categoryName = category ? category.name : '';
-        servicesContainer.innerHTML = `<div class="content-card"><div style="display:flex; justify-content:space-between; align-items:center;"><h2>Послуги: ${categoryName}</h2><button id="add-service-btn">Додати послугу</button></div><ul id="services-list" class="item-list"></ul></div>`;
-        document.getElementById('add-service-btn').onclick = () => showServiceModal();
-        const servicesListEl = document.getElementById('services-list');
-        const filteredServices = state.services.filter(s => s.categoryId === state.selectedCategoryId).sort((a,b)=>a.name.localeCompare(b.name));
-        servicesListEl.innerHTML = filteredServices.length > 0 ? '' : '<li>Немає послуг в цій категорії.</li>';
-        filteredServices.forEach(service => {
-            const finalDiscount = (service.discount > 0) ? service.discount : (category?.discount || 0);
-            const discountedPrice = service.price * (1 - finalDiscount / 100);
-            const li = document.createElement('li');
-            li.innerHTML = `<div><strong>${service.name}</strong><br><small>${service.duration || 'N/A'} хв. ${service.discount > 0 ? `(Знижка ${service.discount}%)` : ''}</small></div><div class="price-display">${finalDiscount > 0 ? `<span class="old-price">${service.price} zł</span>` : ''}<span class="new-price">${discountedPrice.toFixed(0)} zł</span></div><div class="actions"><button class="btn-edit-service" data-id="${service.id}" data-name="${service.name}" data-duration="${service.duration}" data-price="${service.price}" data-discount="${service.discount || 0}">✏️</button><button class="btn-delete-service" data-id="${service.id}">🗑️</button></div>`;
-            servicesListEl.appendChild(li);
-        });
-        servicesListEl.onclick = (event) => {
-            const target = event.target.closest('button');
-            if (!target) return;
-            if (target.classList.contains('btn-delete-service')) handleDeleteService(target.dataset.id);
-            if (target.classList.contains('btn-edit-service')) showServiceModal(target.dataset.id, target.dataset);
-        };
+      const servicesContainer = document.getElementById('services-container');
+      const category = state.categories.find(c => c.id === state.selectedCategoryId);
+      const categoryName = category ? category.name : '';
+      servicesContainer.innerHTML = `<div class="content-card"><div style="display:flex; justify-content:space-between; align-items:center;"><h2>Послуги: ${categoryName}</h2><button id="add-service-btn">Додати послугу</button></div><ul id="services-list" class="item-list"></ul></div>`;
+      document.getElementById('add-service-btn').onclick = () => showServiceModal();
+      const servicesListEl = document.getElementById('services-list');
+      const filteredServices = state.services.filter(s => s.categoryId === state.selectedCategoryId).sort((a,b)=>a.name.localeCompare(b.name));
+      servicesListEl.innerHTML = filteredServices.length > 0 ? '' : '<li>Немає послуг в цій категорії.</li>';
+      filteredServices.forEach(service => {
+          const finalDiscount = (service.discount > 0) ? service.discount : (category?.discount || 0);
+          const discountedPrice = service.price * (1 - finalDiscount / 100);
+          const li = document.createElement('li');
+          li.innerHTML = `<div><strong>${service.name}</strong><br><small>${service.duration || 'N/A'} хв. ${service.discount > 0 ? `(Знижка ${service.discount}%)` : ''}</small></div><div class="price-display">${finalDiscount > 0 ? `<span class="old-price">${service.price} zł</span>` : ''}<span class="new-price">${discountedPrice.toFixed(0)} zł</span></div><div class="actions"><button class="btn-edit-service" data-id="${service.id}" data-name="${service.name}" data-duration="${service.duration}" data-price="${service.price}" data-discount="${service.discount || 0}">✏️</button><button class="btn-delete-service" data-id="${service.id}">🗑️</button></div>`;
+          servicesListEl.appendChild(li);
+      });
+      servicesListEl.onclick = (event) => {
+          const target = event.target.closest('button');
+          if (!target) return;
+          if (target.classList.contains('btn-delete-service')) handleDeleteService(target.dataset.id);
+          if (target.classList.contains('btn-edit-service')) showServiceModal(target.dataset.id, target.dataset);
+      };
     }
   }
   function setupCategoriesLogic() {
@@ -476,7 +542,9 @@
     endDate.setHours(23, 59, 59, 999);
     const reportContainer = document.getElementById('salary-report');
     reportContainer.innerHTML = '<p>Розрахунок...</p>';
-    const SALARY_PERCENTAGE = 0.40;
+    
+    const salaryTiers = state.settings.salaryTiers.sort((a,b) => b.threshold - a.threshold);
+
     const paidAppointments = state.appointments.filter(app => app.status === 'completed' && app.completedAt && app.completedAt.toDate() >= startDate && app.completedAt.toDate() <= endDate);
     if (paidAppointments.length === 0) { reportContainer.innerHTML = '<p>За обраний період не знайдено оплачених записів.</p>'; return; }
     const masterTotals = {};
@@ -493,8 +561,10 @@
     reportContainer.innerHTML = '';
     for (const masterId in masterTotals) {
         const data = masterTotals[masterId];
-        const salary = data.totalEarned * SALARY_PERCENTAGE;
-        const cardHTML = `<div class="salary-report-card"><h3>${data.name}</h3><p><span>Всього зароблено:</span> <strong>${data.totalEarned.toFixed(0)} zł</strong></p><p><span>- Готівкою:</span> <span>${data.cash.toFixed(0)} zł</span></p><p><span>- Карткою:</span> <span>${data.card.toFixed(0)} zł</span></p><p class="total-salary"><span>Зарплата до виплати (${(SALARY_PERCENTAGE * 100).toFixed(0)}%):</span> <strong>${salary.toFixed(0)} zł</strong></p></div>`;
+        const applicableTier = salaryTiers.find(tier => data.totalEarned >= tier.threshold);
+        const salaryRate = applicableTier ? applicableTier.rate : 0;
+        const salary = data.totalEarned * (salaryRate / 100);
+        const cardHTML = `<div class="salary-report-card"><h3>${data.name}</h3><p><span>Всього зароблено:</span> <strong>${data.totalEarned.toFixed(0)} zł</strong></p><p><span>- Готівкою:</span> <span>${data.cash.toFixed(0)} zł</span></p><p><span>- Карткою:</span> <span>${data.card.toFixed(0)} zł</span></p><p class="total-salary"><span>Зарплата до виплати (${salaryRate}%):</span> <strong>${salary.toFixed(0)} zł</strong></p></div>`;
         reportContainer.innerHTML += cardHTML;
     }
   }
