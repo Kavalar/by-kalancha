@@ -77,11 +77,9 @@
     if (user) {
       if (listenersAreActive) return;
       appContainer.innerHTML = '<h1>Завантаження даних...</h1>';
-      
       const userDocRef = doc(db, "users", user.uid);
       const userDocSnap = await getDoc(userDocRef);
       state.user = { uid: user.uid, email: user.email, role: userDocSnap.exists() ? userDocSnap.data().role : 'master' };
-
       renderAppLayout(state.user);
       setupRealtimeListeners();
     } else {
@@ -89,7 +87,7 @@
       listenersAreActive = false;
     }
   });
-
+  
   function setupRealtimeListeners() {
     if (listenersAreActive) return;
     const collections = { 
@@ -106,8 +104,9 @@
     
     if (state.user.role === 'admin') {
       onSnapshot(doc(db, 'settings', 'salaryRules'), (doc) => {
-          state.settings.salaryTiers = doc.exists() ? (doc.data().tiers || []) : [{ threshold: 0, rate: 35 }];
-          if (state.user && state.currentView === 'settings') renderView('settings');
+          state.settings.salaryTiers = doc.exists() ? (doc.data().tiers || []) : [];
+          // ВИПРАВЛЕНО: Уніфікована логіка оновлення
+          if (state.user) renderView(state.currentView);
       });
     }
     listenersAreActive = true;
@@ -164,62 +163,49 @@
     const content = document.getElementById('crm-content');
     content.innerHTML = `<div class="content-card"><div id="calendar-container"><div class="form-group"><label for="calendar-master-filter">Показати розклад для:</label><select id="calendar-master-filter"><option value="all">Всі майстри</option>${state.masters.map(m => `<option value="${m.id}" ${state.calendarSelectedMasterId === m.id ? 'selected' : ''}>${m.name}</option>`).join('')}</select></div><div id="calendar"></div></div></div>`;
     
-    setTimeout(() => {
-        const calendarEl = document.getElementById('calendar');
-        const masterFilter = document.getElementById('calendar-master-filter');
-        if (!calendarEl || !masterFilter) return;
+    const calendarEl = document.getElementById('calendar');
+    const masterFilter = document.getElementById('calendar-master-filter');
+    if (!calendarEl || !masterFilter) return;
 
-        const colorPalette = ['#3788d8', '#e25141', '#4caf50', '#ff9800', '#9c27b0', '#795548', '#607d8b'];
-        
-        const calendar = new FullCalendar.Calendar(calendarEl, {
-          locale: 'uk', initialView: 'timeGridWeek', 
-          headerToolbar: { left: 'prev,next today', center: 'title', right: 'timeGridWeek,timeGridDay' },
-          editable: false, selectable: true,
-          events: function(fetchInfo, successCallback, failureCallback) {
-            const filteredAppointments = state.calendarSelectedMasterId === 'all' 
-                ? state.appointments 
-                : state.appointments.filter(app => app.masterId === state.calendarSelectedMasterId);
-            const events = filteredAppointments.map(app => {
-                const service = state.services.find(s => s.id === app.serviceId);
-                const masterIndex = state.masters.findIndex(m => m.id === app.masterId);
-                const endTime = new Date(app.dateTime.toDate().getTime() + (app.duration || 60) * 60000);
-                return {
-                  id: app.id, title: `${app.clientName} (${service?.name || ''})`,
-                  start: app.dateTime.toDate(), end: endTime,
-                  backgroundColor: colorPalette[masterIndex % colorPalette.length],
-                  borderColor: colorPalette[masterIndex % colorPalette.length],
-                };
-            });
-            successCallback(events);
-          },
-          eventClick: function(info) {
-            const appointment = state.appointments.find(a => a.id === info.event.id);
-            if (!appointment) return;
-            if (appointment.status === 'completed') {
-                const service = state.services.find(s => s.id === appointment.serviceId);
-                const master = state.masters.find(m => m.id === appointment.masterId);
-                alert(`Деталі запису:\n\nКлієнт: ${appointment.clientName}\nПослуга: ${service?.name || ''}\nМайстер: ${master?.name || ''}\nСтатус: Оплачено (${appointment.paymentType === 'card' ? 'Картка' : 'Готівка'})`);
-            } else {
-                document.getElementById('payment-appointment-id').value = info.event.id;
-                document.getElementById('payment-modal-amount').innerText = `${appointment.finalPrice.toFixed(0)} zł`;
-                document.getElementById('payment-modal').style.display = 'flex';
-            }
-          },
-          select: function(selectionInfo) {
-            state.preselectedAppointment = { dateTime: selectionInfo.start };
-            if (state.calendarSelectedMasterId !== 'all') {
-                state.preselectedAppointment.masterId = state.calendarSelectedMasterId;
-            }
-            renderView('appointments');
-          }
+    const colorPalette = ['#3788d8', '#e25141', '#4caf50', '#ff9800', '#9c27b0', '#795548', '#607d8b'];
+    
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+      locale: 'uk', initialView: 'timeGridWeek', 
+      headerToolbar: { left: 'prev,next today', center: 'title', right: 'timeGridWeek,timeGridDay' },
+      editable: false, selectable: true,
+      events: function(fetchInfo, successCallback, failureCallback) {
+        const filteredAppointments = state.calendarSelectedMasterId === 'all' 
+            ? state.appointments 
+            : state.appointments.filter(app => app.masterId === state.calendarSelectedMasterId);
+        const events = filteredAppointments.map(app => {
+            const service = state.services.find(s => s.id === app.serviceId);
+            const masterIndex = state.masters.findIndex(m => m.id === app.masterId);
+            const endTime = new Date(app.dateTime.toDate().getTime() + (app.duration || 60) * 60000);
+            return { id: app.id, title: `${app.clientName} (${service?.name || ''})`, start: app.dateTime.toDate(), end: endTime, backgroundColor: colorPalette[masterIndex % colorPalette.length], borderColor: colorPalette[masterIndex % colorPalette.length]};
         });
-        calendar.render();
-
-        masterFilter.onchange = (e) => {
-            state.calendarSelectedMasterId = e.target.value;
-            renderView('calendar');
-        };
-    }, 10);
+        successCallback(events);
+      },
+      eventClick: function(info) {
+        const appointment = state.appointments.find(a => a.id === info.event.id);
+        if (!appointment) return;
+        if (appointment.status === 'completed') {
+            const service = state.services.find(s => s.id === appointment.serviceId);
+            const master = state.masters.find(m => m.id === appointment.masterId);
+            alert(`Деталі запису:\n\nКлієнт: ${appointment.clientName}\nПослуга: ${service?.name || ''}\nМайстер: ${master?.name || ''}\nСтатус: Оплачено (${appointment.paymentType === 'card' ? 'Картка' : 'Готівка'})`);
+        } else {
+            document.getElementById('payment-appointment-id').value = info.event.id;
+            document.getElementById('payment-modal-amount').innerText = `${appointment.finalPrice.toFixed(0)} zł`;
+            document.getElementById('payment-modal').style.display = 'flex';
+        }
+      },
+      select: function(selectionInfo) {
+        state.preselectedAppointment = { dateTime: selectionInfo.start };
+        if (state.calendarSelectedMasterId !== 'all') { state.preselectedAppointment.masterId = state.calendarSelectedMasterId; }
+        renderView('appointments');
+      }
+    });
+    calendar.render();
+    masterFilter.onchange = (e) => { state.calendarSelectedMasterId = e.target.value; renderView('calendar'); };
   }
   // #endregion
 
