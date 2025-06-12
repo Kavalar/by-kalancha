@@ -10,6 +10,7 @@
   <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/core/locales/uk.global.js'></script>
 
   <style>
+    /* ... Ваші стилі залишаються без змін ... */
     :root { --main-bg: #f8f9fa; --panel-bg: #fff; --text-color: #222; --gray-text: #6c757d; --border-color: #dee2e6; --primary-color: #222; --primary-hover: #444; --danger-color: #d32f2f; --success-color: #2e7d32;} body { font-family: 'Inter', Arial, sans-serif; background: var(--main-bg); margin: 0; padding: 0; color: var(--text-color); } * { box-sizing: border-box; } .auth-bg { min-height: 100vh; display: flex; align-items: center; justify-content: center;} .auth-card { background: var(--panel-bg); padding: 36px 28px; border-radius: 18px; box-shadow: 0 2px 20px rgba(0,0,0,0.05); width: 340px; max-width: 96vw;} .auth-card h1 {font-size: 2rem; margin: 0 0 16px 0; text-align:center;} .auth-card input { width: 100%; margin-bottom: 12px; padding: 11px 10px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1.08rem; outline: none; } .auth-card button { width: 100%; background: var(--primary-color); color: #fff; border: none; font-weight: 600; transition:.2s; cursor:pointer; padding: 11px 10px; border-radius: 8px; font-size: 1.08rem;} .auth-card button:hover { background: var(--primary-hover); } .error-msg {color: #d32f2f; margin-bottom: 10px; min-height: 1.2em;} .crm-layout { display: flex; flex-direction: column; height: 100vh; } .crm-header { background: var(--panel-bg); padding: 0 2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); flex-shrink: 0; } .crm-header h1 { font-size: 1.2rem; } .crm-header button { background: none; border: 1px solid var(--border-color); color: var(--text-color); padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; transition: .2s; } .crm-header button:hover { background: var(--main-bg); } .crm-main { display: flex; flex-grow: 1; overflow: hidden; } .crm-nav { background: var(--panel-bg); border-right: 1px solid var(--border-color); padding: 1rem; width: 220px; flex-shrink: 0; } .crm-nav ul { list-style: none; padding: 0; margin: 0; } .crm-nav li { padding: 0.8rem 1rem; border-radius: 8px; font-weight: 600; cursor: pointer; margin-bottom: 0.5rem; } .crm-nav li.active { background: var(--primary-color); color: #fff; } .crm-nav li:not(.active):hover { background: var(--main-bg); } .crm-content { flex-grow: 1; padding: 2rem; overflow-y: auto; } .content-card { background: var(--panel-bg); padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); } .item-list { padding: 0; list-style: none; } .item-list li { display: flex; justify-content: space-between; align-items:center; padding: 1rem; border-bottom: 1px solid var(--border-color); } .item-list li:last-child { border-bottom: none; } .item-list .actions button { margin-left: 0.5rem; padding: 0.4rem 0.8rem; font-size: 0.8rem; border-radius: 6px; } .btn-edit { background: none; border: 1px solid var(--gray-text); color: var(--gray-text); } .btn-delete { background: none; border: 1px solid var(--danger-color); color: var(--danger-color); } .form-group { margin-bottom: 1rem; } .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; } .form-group input, .form-group select { width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; background: #fff; } form button { background: var(--primary-color); color: #fff; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; } .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; } .modal-panel { background: #fff; padding: 2rem; border-radius: 8px; width: 450px; max-width: 90vw; } .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; } .modal-header h2 { margin: 0; } .close-btn { font-size: 1.5rem; background: none; border: none; cursor: pointer; }
     .services-layout { display: grid; grid-template-columns: 300px 1fr; gap: 2rem; align-items: start; } .category-list-item { cursor: pointer; } .category-list-item.selected { font-weight: bold; background-color: var(--main-bg); } .price-display { text-align: right; } .price-display .old-price { text-decoration: line-through; color: var(--gray-text); margin-right: 0.5rem; font-size: 0.9em; } .price-display .new-price { font-weight: bold; } .form-row { display: flex; gap: 1rem; align-items: flex-end;}
     .category-checkbox-group { max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px; }
@@ -68,8 +69,19 @@
     if (user) {
       if (listenersAreActive) return;
       appContainer.innerHTML = '<h1>Завантаження даних...</h1>';
+      
+      // НОВЕ: Завантажуємо роль користувача
+      const userDocRef = doc(db, "users", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      state.user = {
+          uid: user.uid,
+          email: user.email,
+          role: userDocSnap.exists() ? userDocSnap.data().role : 'master' // За замовчуванням 'master'
+      };
+
       await initializeAppData();
-      renderAppLayout(user);
+      renderAppLayout(state.user);
       setupRealtimeListeners();
     } else {
       renderLoginView();
@@ -113,13 +125,19 @@
   }
 
   function renderAppLayout(user) {
-    appContainer.innerHTML = `<div class="crm-layout"><header class="crm-header"><h1>Lashroom CRM</h1><div><span>${user.email}</span><button id="logout-btn">Вийти</button></div></header><main class="crm-main"><nav class="crm-nav" id="main-nav"><ul><li data-view="calendar">Календар</li><li data-view="appointments">Запис</li><li data-view="services">Послуги</li><li data-view="masters">Майстри</li><li data-view="salary">Зарплата</li></ul></nav><div class="crm-content" id="crm-content"></div></main></div>`;
+    // НОВЕ: Динамічне формування меню в залежності від ролі
+    const isAdmin = user.role === 'admin';
+    const adminTabs = `
+        <li data-view="salary">Зарплата</li>
+        <li data-view="settings">Налаштування</li>
+    `;
+    appContainer.innerHTML = `<div class="crm-layout"><header class="crm-header"><h1>Lashroom CRM</h1><div><span>${user.email} (${user.role})</span><button id="logout-btn">Вийти</button></div></header><main class="crm-main"><nav class="crm-nav" id="main-nav"><ul><li data-view="calendar">Календар</li><li data-view="appointments">Запис</li><li data-view="services">Послуги</li><li data-view="masters">Майстри</li>${isAdmin ? adminTabs : ''}</ul></nav><div class="crm-content" id="crm-content"></div></main></div>`;
+    
     document.getElementById('logout-btn').onclick = () => { listenersAreActive = false; signOut(auth); };
     document.getElementById('main-nav').onclick = (event) => {
         const target = event.target.closest('li');
         if (target) renderView(target.dataset.view);
     };
-    // Глобальне налаштування кнопки закриття модального вікна оплати
     document.getElementById('payment-modal').querySelector('.close-btn').onclick = () => { document.getElementById('payment-modal').style.display = 'none'; };
     renderView(state.currentView);
   }
@@ -138,17 +156,30 @@
         case 'services': renderServicesView(); break;
         case 'masters': renderMastersView(); break;
         case 'salary': renderSalaryView(); break;
+        case 'settings': renderSettingsView(); break; // НОВЕ
         default: 
           const content = document.getElementById('crm-content');
-          if(content) content.innerHTML = `<h2>Розділ в розробці...</h2>`;
+          if(content) content.innerHTML = `<h2>Невідомий розділ</h2>`;
     }
+  }
+  // #endregion
+
+  // #region Settings View (НОВИЙ РОЗДІЛ)
+  function renderSettingsView() {
+    const content = document.getElementById('crm-content');
+    // Поки що це просто заглушка, ми наповнимо її на наступному кроці
+    content.innerHTML = `<div class="content-card">
+        <h2>Налаштування</h2>
+        <p>Цей розділ призначений для адміністраторів.</p>
+        <p>На наступному кроці тут з'явиться можливість керувати відсотками для розрахунку зарплат.</p>
+    </div>`;
   }
   // #endregion
 
   // #region Calendar View
   function renderCalendarView() {
     const content = document.getElementById('crm-content');
-    content.innerHTML = `<div class="content-card"><div id="calendar-container"><div class="form-group"><label for="calendar-master-filter">Показати розклад для:</label><select id="calendar-master-filter"><option value="all">Всі майстри</option>${state.masters.map(m => `<option value="${m.id}">${m.name}</option>`).join('')}</select></div><div id="calendar">Завантаження...</div></div></div>`;
+    content.innerHTML = `<div class="content-card"><div id="calendar-container"><div class="form-group"><label for="calendar-master-filter">Показати розклад для:</label><select id="calendar-master-filter"><option value="all">Всі майстри</option>${state.masters.map(m => `<option value="${m.id}">${m.name}</option>`).join('')}</select></div><div id="calendar"></div></div></div>`;
     
     const calendarEl = document.getElementById('calendar');
     const masterFilter = document.getElementById('calendar-master-filter');
@@ -167,6 +198,7 @@
         const filteredAppointments = selectedMaster === 'all' 
             ? state.appointments 
             : state.appointments.filter(app => app.masterId === selectedMaster);
+
         const events = filteredAppointments.map(app => {
             const service = state.services.find(s => s.id === app.serviceId);
             const masterIndex = state.masters.findIndex(m => m.id === app.masterId);
@@ -206,7 +238,8 @@
     };
   }
   // #endregion
-
+  
+  // Тут йдуть решта функцій без змін
   // #region Appointments View
   function renderAppointmentsView() {
     const content = document.getElementById('crm-content');
@@ -219,8 +252,8 @@
       state.preselectedAppointment = null;
     }
   }
-
   function setupAppointmentsLogic() {
+    document.getElementById('payment-form').onsubmit = handleConfirmPayment;
     document.getElementById('add-appointment-form').onsubmit = handleAddAppointment;
     populateAppointmentFormDropdowns();
     const categorySelect = document.getElementById('appointment-category');
@@ -260,14 +293,12 @@
         }
     }
   }
-
   function populateAppointmentFormDropdowns() {
     const categorySelect = document.getElementById('appointment-category');
     if (categorySelect) {
       categorySelect.innerHTML = '<option value="">Оберіть категорію</option>' + state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
     }
   }
-
   function updateFinalPrice() {
       const serviceId = document.getElementById('appointment-service').value;
       const masterId = document.getElementById('appointment-master').value;
@@ -288,7 +319,6 @@
       priceDisplay.innerText = `Сума до оплати: ${price.toFixed(0)} zł`;
       return price;
   }
-  
   async function handleAddAppointment(event) {
     event.preventDefault();
     const serviceId = document.getElementById('appointment-service').value;
@@ -322,7 +352,6 @@
         updateFinalPrice();
     } catch (e) { console.error("Помилка: ", e); alert('Не вдалося створити запис.'); }
   }
-
   async function handleConfirmPayment(event) {
     event.preventDefault();
     const appointmentId = document.getElementById('payment-appointment-id').value;
@@ -333,7 +362,7 @@
     } catch(e) { console.error("Помилка: ", e); alert('Не вдалося провести оплату.'); }
   }
   // #endregion
-
+  
   // #region Masters View
   function renderMastersView() {
     const content = document.getElementById('crm-content');
