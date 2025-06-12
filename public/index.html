@@ -61,7 +61,7 @@
     categories: [],
     services: [],
     masters: [],
-    currentView: 'appointments' // НОВЕ: відстежуємо поточну вкладку
+    currentView: 'appointments'
   };
 
   onAuthStateChanged(auth, user => {
@@ -70,7 +70,6 @@
       onSnapshot(collection(db, 'serviceCategories'), snapshot => {
         state.categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         state.categories.sort((a,b) => a.name.localeCompare(b.name));
-        // НОВЕ: Оновлюємо список, якщо користувач на вкладці записів
         if(state.currentView === 'appointments') populateAppointmentFormDropdowns();
       });
       onSnapshot(collection(db, 'services'), snapshot => {
@@ -85,294 +84,59 @@
     }
   });
 
-  function renderLoginView() { /* ... без змін ... */ }
-
-  function renderAppLayout(user) {
-    appContainer.innerHTML = `<div class="crm-layout"><header class="crm-header"><h1>Lashroom CRM</h1><div><span>${user.email}</span><button id="logout-btn">Вийти</button></div></header><main class="crm-main"><nav class="crm-nav" id="main-nav"><ul><li data-view="appointments">Запис</li><li data-view="services">Послуги</li><li data-view="masters">Майстри</li><li data-view="salary">Зарплата</li></ul></nav><div class="crm-content" id="crm-content"></div></main></div>`;
-    renderView(state.currentView);
-    document.getElementById('logout-btn').onclick = () => signOut(auth);
-    document.getElementById('main-nav').onclick = (event) => {
-        const target = event.target.closest('li');
-        if (target) renderView(target.dataset.view);
-    };
-  }
-
-  function renderView(viewName) {
-    state.currentView = viewName; // НОВЕ: оновлюємо стан поточної вкладки
-    document.querySelectorAll('#main-nav li').forEach(li => li.classList.remove('active'));
-    const activeLi = document.querySelector(`#main-nav li[data-view="${viewName}"]`);
-    if(activeLi) activeLi.classList.add('active');
-    
-    switch (viewName) {
-        case 'appointments': renderAppointmentsView(); break;
-        /* ... решта без змін ... */
-    }
-  }
-
-  // #region Appointments View
-  function renderAppointmentsView() {
-    const content = document.getElementById('crm-content');
-    content.innerHTML = `
-      <div class="content-card">
-        <h2>Новий запис</h2>
-        <form id="add-appointment-form">
-          <div class="form-group">
-            <label for="client-name">Ім'я клієнта</label>
-            <input type="text" id="client-name" required>
-          </div>
-          <div class="form-group">
-            <label for="appointment-datetime">Дата і час</label>
-            <input type="datetime-local" id="appointment-datetime" required>
-          </div>
-          <div class="form-row">
-            <div class="form-group" style="flex:1;">
-              <label for="appointment-category">Категорія послуг</label>
-              <select id="appointment-category" required><option value="">Завантаження...</option></select>
-            </div>
-            <div class="form-group" style="flex:1;">
-              <label for="appointment-service">Послуга</label>
-              <select id="appointment-service" required><option value="">Оберіть категорію</option></select>
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="appointment-master">Майстер</label>
-            <select id="appointment-master" required><option value="">Оберіть категорію</option></select>
-          </div>
-          <div class="form-row">
-              <div class="form-group" style="flex:2;">
-                  <label for="manual-discount-value">Додаткова знижка</label>
-                  <input type="number" id="manual-discount-value" placeholder="0" min="0">
-              </div>
-              <div class="form-group" style="flex:1;">
-                  <label for="manual-discount-type">Тип</label>
-                  <select id="manual-discount-type"><option value="percent">%</option><option value="fixed">zł</option></select>
-              </div>
-          </div>
-          <div id="final-price-display">Сума до оплати: 0 zł</div>
-          <button type="submit" style="margin-top: 1rem;">Створити запис</button>
-        </form>
-      </div>
-      <div class="content-card" style="margin-top: 2rem;">
-        <h2>Список записів</h2>
-        <ul id="appointments-list" class="item-list"><li>Завантаження...</li></ul>
-      </div>
-    `;
-    setupAppointmentsLogic();
-  }
+  // ... (renderLoginView, renderAppLayout, renderView без змін)
 
   function setupAppointmentsLogic() {
-    // НОВЕ: Ініціалізуємо модальне вікно оплати
-    const paymentModal = document.getElementById('complete-payment-modal');
-    paymentModal.querySelector('.close-btn').onclick = () => paymentModal.style.display = 'none';
-    document.getElementById('complete-payment-form').onsubmit = handleConfirmPayment;
-
-    // Запускаємо початкове заповнення
-    populateAppointmentFormDropdowns();
-
+    // ...
     const categorySelect = document.getElementById('appointment-category');
     const serviceSelect = document.getElementById('appointment-service');
     const masterSelect = document.getElementById('appointment-master');
-    const discountValueInput = document.getElementById('manual-discount-value');
-    const discountTypeSelect = document.getElementById('manual-discount-type');
+    // ...
     
     categorySelect.onchange = () => {
         const categoryId = categorySelect.value;
+        
+        // Фільтрація послуг
         const servicesInCategory = state.services.filter(s => s.categoryId === categoryId);
         serviceSelect.innerHTML = '<option value="">Оберіть послугу</option>' + servicesInCategory.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+
+        // =================================================================
+        // ЗМІНА ТУТ: Універсальна фільтрація майстрів
+        // =================================================================
         const selectedCategoryName = state.categories.find(c => c.id === categoryId)?.name;
 
         const mastersForCategory = state.masters.filter(m => {
-    // 1. Перевірка за новим полем `categoryIds` (пріоритет)
-    if (m.categoryIds && Array.isArray(m.categoryIds)) {
-        return m.categoryIds.includes(categoryId);
-    }
-    // 2. Якщо немає, перевірка за старим полем `specialization` (для сумісності)
-    if (m.specialization && Array.isArray(m.specialization) && selectedCategoryName) {
-        return m.specialization.includes(selectedCategoryName);
-    }
-    return false;
-});
-        masterSelect.innerHTML = '<option value="">Оберіть майстра</option>' + mastersForCategory.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
-        updateFinalPrice();
-    };
-
-    serviceSelect.onchange = updateFinalPrice;
-    masterSelect.onchange = updateFinalPrice;
-    discountValueInput.oninput = updateFinalPrice;
-    discountTypeSelect.onchange = updateFinalPrice;
-
-    document.getElementById('add-appointment-form').onsubmit = handleAddAppointment;
-
-    // ЗМІНА: Відображення списку записів з урахуванням статусу
-    const q = query(collection(db, 'appointments'));
-    onSnapshot(q, (snapshot) => {
-        const listEl = document.getElementById('appointments-list');
-        listEl.innerHTML = snapshot.empty ? '<li>Немає записів.</li>' : '';
+            // 1. Пріоритетний спосіб: перевірка по `categoryIds` (масив ID)
+            // Це новий, правильний спосіб, який використовується формою "Майстри"
+            if (m.categoryIds && Array.isArray(m.categoryIds)) {
+                return m.categoryIds.includes(categoryId);
+            }
+            // 2. Запасний спосіб: перевірка по `specialization` (масив імен) для старих даних
+            if (m.specialization && Array.isArray(m.specialization) && selectedCategoryName) {
+                return m.specialization.includes(selectedCategoryName);
+            }
+            return false; // Майстер не підходить
+        });
         
-        snapshot.docs
-            .sort((a,b) => b.data().dateTime.toMillis() - a.data().dateTime.toMillis()) // сортуємо від новіших до старіших
-            .forEach(doc => {
-                const appointment = {id: doc.id, ...doc.data()};
-                const service = state.services.find(s => s.id === appointment.serviceId)?.name || 'Послуга';
-                const master = state.masters.find(m => m.id === appointment.masterId)?.name || 'Майстер';
-                const date = appointment.dateTime.toDate().toLocaleString('uk-UA', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'});
-                
-                let statusHtml = '';
-                // ЗМІНА: Кнопки та статус в залежності від оплати
-                if (appointment.status === 'completed') {
-                    const paymentIcon = appointment.paymentType === 'card' ? '💳' : '💵';
-                    statusHtml = `<span class="status-badge status-completed">Оплачено ${paymentIcon}</span>`;
-                } else {
-                    statusHtml = `
-                        <button class="btn-complete-payment" data-id="${appointment.id}" data-price="${appointment.finalPrice.toFixed(0)}">Провести оплату</button>
-                    `;
-                }
-
-                const li = document.createElement('li');
-                li.innerHTML = `
-                    <div>
-                        <strong>${appointment.clientName}</strong> - ${service}<br>
-                        <small>${date} - ${master}</small>
-                    </div>
-                    <div class="actions">
-                        <strong>${appointment.finalPrice.toFixed(0)} zł</strong>
-                        ${statusHtml}
-                        <button class="btn-delete" data-id="${doc.id}">🗑️</button>
-                    </div>`;
-                listEl.appendChild(li);
-        });
-    });
-
-    document.getElementById('appointments-list').onclick = (e) => {
-        if (e.target.classList.contains('btn-delete')) {
-            if (confirm('Видалити цей запис?')) deleteDoc(doc(db, 'appointments', e.target.dataset.id));
-        }
-        // НОВЕ: Обробник для кнопки оплати
-        if (e.target.classList.contains('btn-complete-payment')) {
-            const appointmentId = e.target.dataset.id;
-            const finalPrice = e.target.dataset.price;
-            document.getElementById('payment-appointment-id').value = appointmentId;
-            document.getElementById('payment-modal-amount').innerText = `${finalPrice} zł`;
-            document.getElementById('complete-payment-modal').style.display = 'flex';
-        }
-    }
-  }
-
-  // НОВЕ: Функція для заповнення списків, щоб уникнути проблеми з асинхронністю
-  function populateAppointmentFormDropdowns() {
-    const categorySelect = document.getElementById('appointment-category');
-    if (categorySelect && state.categories.length > 0) {
-        categorySelect.innerHTML = '<option value="">Оберіть категорію</option>' + state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-    }
-  }
-
-  function updateFinalPrice() {
-      const serviceId = document.getElementById('appointment-service').value;
-      const masterId = document.getElementById('appointment-master').value;
-      const manualDiscountValue = parseFloat(document.getElementById('manual-discount-value').value) || 0;
-      const manualDiscountType = document.getElementById('manual-discount-type').value;
-
-      const priceDisplay = document.getElementById('final-price-display');
-      if (!serviceId || !masterId) {
-          priceDisplay.innerText = `Сума до оплати: 0 zł`;
-          return 0;
-      }
-
-      const service = state.services.find(s => s.id === serviceId);
-      const category = state.categories.find(c => c.id === service.categoryId);
-      const master = state.masters.find(m => m.id === masterId);
-      let price = service.price;
-
-      const discountPercent = service.discount > 0 ? service.discount : (category.discount || 0);
-      price *= (1 - discountPercent / 100);
-      const markupPercent = master.priceModifier || 0;
-      price *= (1 + markupPercent / 100);
-      
-      // ЗМІНА: Застосовуємо ручну знижку в залежності від її типу
-      if (manualDiscountType === 'percent') {
-          price *= (1 - manualDiscountValue / 100);
-      } else { // 'fixed'
-          price -= manualDiscountValue;
-      }
-
-      priceDisplay.innerText = `Сума до оплати: ${price.toFixed(0)} zł`;
-      return price;
-  }
-  
-  async function handleAddAppointment(event) {
-    event.preventDefault();
-    const finalPrice = updateFinalPrice();
-    // ... решта полів
-    const appointment = {
-        clientName: document.getElementById('client-name').value,
-        dateTime: Timestamp.fromDate(new Date(document.getElementById('appointment-datetime').value)),
-        serviceId: document.getElementById('appointment-service').value,
-        masterId: document.getElementById('appointment-master').value,
-        manualDiscount: {
-            value: parseFloat(document.getElementById('manual-discount-value').value) || 0,
-            type: document.getElementById('manual-discount-type').value
-        },
-        finalPrice: finalPrice,
-        status: 'upcoming', // НОВЕ: Статус за замовчуванням
-        paymentType: null, // НОВЕ: Тип оплати поки невідомий
-        createdAt: Timestamp.now()
-    };
-    
-    try {
-        await addDoc(collection(db, 'appointments'), appointment);
-        alert('Запис успішно створено!');
-        event.target.reset();
-        document.getElementById('appointment-service').innerHTML = '<option value="">Оберіть категорію</option>';
-        document.getElementById('appointment-master').innerHTML = '<option value="">Оберіть категорію</option>';
+        // Оновлення списку майстрів
+        masterSelect.innerHTML = '<option value="">Оберіть майстра</option>' + mastersForCategory.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+        
         updateFinalPrice();
-    } catch (e) {
-        console.error("Помилка при додаванні запису: ", e);
-        alert('Не вдалося створити запис.');
-    }
+    };
+
+    // ... (решта функції setupAppointmentsLogic без змін)
   }
 
-  // НОВЕ: Функція для підтвердження оплати
-  async function handleConfirmPayment(event) {
-    event.preventDefault();
-    const appointmentId = document.getElementById('payment-appointment-id').value;
-    const paymentType = document.getElementById('payment-modal-type').value;
+  // ... (всі інші функції залишаються без змін)
 
-    try {
-        await updateDoc(doc(db, 'appointments', appointmentId), {
-            status: 'completed',
-            paymentType: paymentType,
-            completedAt: Timestamp.now()
-        });
-        document.getElementById('complete-payment-modal').style.display = 'none';
-    } catch(e) {
-        console.error("Помилка при оновленні запису: ", e);
-        alert('Не вдалося провести оплату.');
-    }
-  }
 
-  // #endregion
+  // PASTE ALL OTHER JS FUNCTIONS FROM THE PREVIOUS STEP HERE
+  // Важливо: сюди треба вставити решту JS функцій з попередньої відповіді,
+  // оскільки зміни торкнулися лише одного місця в `setupAppointmentsLogic`.
+  // Функції: renderLoginView, renderAppLayout, renderView, renderAppointmentsView,
+  // populateAppointmentFormDropdowns, updateFinalPrice, handleAddAppointment,
+  // handleConfirmPayment, renderSalaryView, handleCalculateSalary, renderMastersView, etc.
 
-  // #region Salary View
-  function renderSalaryView() { /* ... без змін ... */ }
-
-  async function handleCalculateSalary() {
-    // ...
-    const SALARY_PERCENTAGE = 0.40;
-
-    try {
-        // ЗМІНА: вибираємо тільки оплачені записи
-        const q = query(collection(db, 'appointments'), 
-            where("status", "==", "completed"),
-            where("completedAt", ">=", Timestamp.fromDate(startDate)),
-            where("completedAt", "<=", Timestamp.fromDate(endDate))
-        );
-        // ... решта логіки розрахунку без змін ...
-    } catch (e) {
-        console.error("Помилка розрахунку ЗП: ", e);
-        reportContainer.innerHTML = '<p>Сталася помилка. Перевірте консоль.</p>';
-    }
-  }
-  // #endregion
-
-  // ... (Решта ваших функцій для вкладок "Послуги", "Майстри" і т.д. без змін)
 </script>
+</body>
+</html>
