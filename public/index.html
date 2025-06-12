@@ -61,7 +61,9 @@
     user: null, selectedCategoryId: null, categories: [], services: [], masters: [], appointments: [],
     settings: { salaryTiers: [] },
     currentView: 'calendar',
-    preselectedAppointment: null
+    preselectedAppointment: null,
+    calendarSelectedMasterId: 'all',
+    editingTierIndex: null,
   };
 
   let listenersAreActive = false;
@@ -113,7 +115,7 @@
     if (listenersAreActive) return;
     onSnapshot(doc(db, 'settings', 'salaryRules'), (doc) => {
         state.settings.salaryTiers = doc.exists() ? (doc.data().tiers || []) : [];
-        if (state.user) renderView(state.currentView);
+        if (state.user && state.currentView === 'settings') renderView('settings');
     });
     const collections = { serviceCategories: 'categories', services: 'services', masters: 'masters', appointments: 'appointments' };
     Object.entries(collections).forEach(([col, stateKey]) => {
@@ -134,12 +136,8 @@
 
   function renderAppLayout(user) {
     const isAdmin = user.role === 'admin';
-    const adminTabs = `
-        <li data-view="salary">Зарплата</li>
-        <li data-view="settings">Налаштування</li>
-    `;
+    const adminTabs = `<li data-view="salary">Зарплата</li><li data-view="settings">Налаштування</li>`;
     appContainer.innerHTML = `<div class="crm-layout"><header class="crm-header"><h1>Lashroom CRM</h1><div><span>${user.email} (${user.role})</span><button id="logout-btn">Вийти</button></div></header><main class="crm-main"><nav class="crm-nav" id="main-nav"><ul><li data-view="calendar">Календар</li><li data-view="appointments">Запис</li><li data-view="services">Послуги</li><li data-view="masters">Майстри</li>${isAdmin ? adminTabs : ''}</ul></nav><div class="crm-content" id="crm-content"></div></main></div>`;
-    
     document.getElementById('logout-btn').onclick = () => { listenersAreActive = false; signOut(auth); };
     document.getElementById('main-nav').onclick = (event) => {
         const target = event.target.closest('li');
@@ -183,7 +181,10 @@
         <tr>
             <td>Від ${tier.threshold} zł</td>
             <td>${tier.rate}%</td>
-            <td><button class="btn-delete btn-delete-tier" data-index="${index}">Видалити</button></td>
+            <td class="actions">
+                <button class="btn-edit btn-edit-tier" data-index="${index}">Редагувати</button>
+                <button class="btn-delete btn-delete-tier" data-index="${index}">Видалити</button>
+            </td>
         </tr>
     `).join('');
 
@@ -194,59 +195,84 @@
             <tbody id="salary-tiers-table">${tableRows}</tbody>
         </table>
         <hr style="margin: 2rem 0;">
-        <h3>Додати новий рівень</h3>
-        <form id="add-tier-form" class="form-row">
+        <h3 id="tier-form-title">Додати новий рівень</h3>
+        <form id="tier-form" class="form-row">
             <div class="form-group" style="flex:1;">
-                <label for="new-tier-threshold">Сума від (zł)</label>
-                <input type="number" id="new-tier-threshold" min="0" required>
+                <label for="tier-threshold">Сума від (zł)</label>
+                <input type="number" id="tier-threshold" min="0" required>
             </div>
             <div class="form-group" style="flex:1;">
-                <label for="new-tier-rate">Відсоток (%)</label>
-                <input type="number" id="new-tier-rate" min="0" max="100" required>
+                <label for="tier-rate">Відсоток (%)</label>
+                <input type="number" id="tier-rate" min="0" max="100" required>
             </div>
             <div class="form-group">
-                <button type="submit">Додати</button>
+                <button type="submit" id="tier-submit-btn">Додати</button>
+                 <button type="button" id="tier-cancel-btn" style="display:none; margin-left: 1rem; background-color: var(--gray-text)">Скасувати</button>
             </div>
         </form>
     </div>`;
 
-    document.getElementById('add-tier-form').onsubmit = handleAddSalaryTier;
+    document.getElementById('tier-form').onsubmit = handleSaveSalaryTier;
+    document.getElementById('tier-cancel-btn').onclick = () => {
+        state.editingTierIndex = null;
+        renderView('settings');
+    };
     document.getElementById('salary-tiers-table').onclick = (e) => {
         if(e.target.classList.contains('btn-delete-tier')) {
             handleDeleteSalaryTier(parseInt(e.target.dataset.index));
         }
+        if(e.target.classList.contains('btn-edit-tier')) {
+            handleEditSalaryTier(parseInt(e.target.dataset.index));
+        }
     };
   }
-  async function handleAddSalaryTier(event) {
-    event.preventDefault();
-    const threshold = parseInt(document.getElementById('new-tier-threshold').value);
-    const rate = parseInt(document.getElementById('new-tier-rate').value);
+  
+  function handleEditSalaryTier(index) {
+    state.editingTierIndex = index;
+    const tier = state.settings.salaryTiers[index];
+    document.getElementById('tier-form-title').innerText = 'Редагувати рівень';
+    document.getElementById('tier-threshold').value = tier.threshold;
+    document.getElementById('tier-rate').value = tier.rate;
+    document.getElementById('tier-submit-btn').innerText = 'Зберегти зміни';
+    document.getElementById('tier-cancel-btn').style.display = 'inline-block';
+  }
 
-    const newTiers = [...state.settings.salaryTiers, { threshold, rate }];
+  async function handleSaveSalaryTier(event) {
+    event.preventDefault();
+    const threshold = parseInt(document.getElementById('tier-threshold').value);
+    const rate = parseInt(document.getElementById('tier-rate').value);
+    
+    let newTiers = [...state.settings.salaryTiers];
+
+    if (state.editingTierIndex !== null) {
+        newTiers[state.editingTierIndex] = { threshold, rate };
+    } else {
+        newTiers.push({ threshold, rate });
+    }
+    
+    state.editingTierIndex = null;
+    
     try {
         await setDoc(doc(db, 'settings', 'salaryRules'), { tiers: newTiers });
-        event.target.reset();
     } catch(e) {
-        console.error("Помилка додавання рівня:", e);
-        alert('Не вдалося додати рівень.');
+        console.error("Помилка збереження рівня:", e);
+        alert('Не вдалося зберегти рівень.');
     }
   }
+
   async function handleDeleteSalaryTier(index) {
     if (!confirm('Ви впевнені, що хочете видалити цей рівень?')) return;
     const newTiers = state.settings.salaryTiers.filter((_, i) => i !== index);
     try {
         await setDoc(doc(db, 'settings', 'salaryRules'), { tiers: newTiers });
-    } catch(e) {
-        console.error("Помилка видалення рівня:", e);
-        alert('Не вдалося видалити рівень.');
-    }
+    } catch(e) { console.error("Помилка видалення рівня:", e); alert('Не вдалося видалити рівень.'); }
   }
   // #endregion
 
   // #region Calendar View
   function renderCalendarView() {
     const content = document.getElementById('crm-content');
-    content.innerHTML = `<div class="content-card"><div id="calendar-container"><div class="form-group"><label for="calendar-master-filter">Показати розклад для:</label><select id="calendar-master-filter"><option value="all">Всі майстри</option>${state.masters.map(m => `<option value="${m.id}">${m.name}</option>`).join('')}</select></div><div id="calendar"></div></div></div>`;
+    content.innerHTML = `<div class="content-card"><div id="calendar-container"><div class="form-group"><label for="calendar-master-filter">Показати розклад для:</label><select id="calendar-master-filter"><option value="all">Всі майстри</option>${state.masters.map(m => `<option value="${m.id}" ${state.calendarSelectedMasterId === m.id ? 'selected' : ''}>${m.name}</option>`).join('')}</select></div><div id="calendar"></div></div></div>`;
     
     const calendarEl = document.getElementById('calendar');
     const masterFilter = document.getElementById('calendar-master-filter');
@@ -254,18 +280,14 @@
 
     const colorPalette = ['#3788d8', '#e25141', '#4caf50', '#ff9800', '#9c27b0', '#795548', '#607d8b'];
     
-    let calendar = new FullCalendar.Calendar(calendarEl, {
-      locale: 'uk',
-      initialView: 'timeGridWeek', 
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+      locale: 'uk', initialView: 'timeGridWeek', 
       headerToolbar: { left: 'prev,next today', center: 'title', right: 'timeGridWeek,timeGridDay' },
-      editable: false, 
-      selectable: true,
+      editable: false, selectable: true,
       events: function(fetchInfo, successCallback, failureCallback) {
-        const selectedMaster = masterFilter.value;
-        const filteredAppointments = selectedMaster === 'all' 
+        const filteredAppointments = state.calendarSelectedMasterId === 'all' 
             ? state.appointments 
-            : state.appointments.filter(app => app.masterId === selectedMaster);
-
+            : state.appointments.filter(app => app.masterId === state.calendarSelectedMasterId);
         const events = filteredAppointments.map(app => {
             const service = state.services.find(s => s.id === app.serviceId);
             const masterIndex = state.masters.findIndex(m => m.id === app.masterId);
@@ -282,7 +304,6 @@
       eventClick: function(info) {
         const appointment = state.appointments.find(a => a.id === info.event.id);
         if (!appointment) return;
-        
         if (appointment.status === 'completed') {
             const service = state.services.find(s => s.id === appointment.serviceId);
             const master = state.masters.find(m => m.id === appointment.masterId);
@@ -295,13 +316,17 @@
       },
       select: function(selectionInfo) {
         state.preselectedAppointment = { dateTime: selectionInfo.start };
+        if (state.calendarSelectedMasterId !== 'all') {
+            state.preselectedAppointment.masterId = state.calendarSelectedMasterId;
+        }
         renderView('appointments');
       }
     });
     calendar.render();
 
-    masterFilter.onchange = () => {
-        calendar.refetchEvents();
+    masterFilter.onchange = (e) => {
+        state.calendarSelectedMasterId = e.target.value;
+        renderView('calendar');
     };
   }
   // #endregion
@@ -312,9 +337,12 @@
     content.innerHTML = `<div class="content-card"><h2>Новий запис</h2><form id="add-appointment-form"><div class="form-group"><label for="client-name">Ім'я клієнта</label><input type="text" id="client-name" required></div><div class="form-group"><label for="appointment-datetime">Дата і час</label><input type="datetime-local" id="appointment-datetime" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="appointment-category">Категорія послуг</label><select id="appointment-category" required><option value="">Завантаження...</option></select></div><div class="form-group" style="flex:1;"><label for="appointment-service">Послуга</label><select id="appointment-service" required><option value="">Оберіть категорію</option></select></div></div><div class="form-group"><label for="appointment-master">Майстер</label><select id="appointment-master" required><option value="">Оберіть категорію</option></select></div><div class="form-row"><div class="form-group" style="flex:2;"><label for="manual-discount-value">Додаткова знижка</label><input type="number" id="manual-discount-value" placeholder="0" min="0"></div><div class="form-group" style="flex:1;"><label for="manual-discount-type">Тип</label><select id="manual-discount-type"><option value="percent">%</option><option value="fixed">zł</option></select></div></div><div id="final-price-display">Сума до оплати: 0 zł</div><button type="submit" style="margin-top: 1rem;">Створити запис</button></form></div><div class="content-card" style="margin-top: 2rem;"><h2>Список записів</h2><ul id="appointments-list" class="item-list"></ul></div>`;
     setupAppointmentsLogic();
     if (state.preselectedAppointment) {
-      const { dateTime } = state.preselectedAppointment;
+      const { dateTime, masterId } = state.preselectedAppointment;
       const d = new Date(dateTime.getTime() - (dateTime.getTimezoneOffset() * 60000));
       document.getElementById('appointment-datetime').value = d.toISOString().slice(0, 16);
+      if (masterId) {
+          document.getElementById('appointment-master').value = masterId;
+      }
       state.preselectedAppointment = null;
     }
   }
@@ -473,27 +501,27 @@
     content.innerHTML = `<div class="services-layout"><div class="content-card"><h2>Категорії</h2><form id="add-category-form" class="form-group"><input type="text" id="new-category-name" placeholder="Нова категорія..." required><button type="submit" style="width:100%; margin-top:0.5rem;">Додати</button></form><ul id="categories-list" class="item-list"></ul></div><div id="services-container"><div class="content-card"><p>Оберіть категорію зліва.</p></div></div></div><div class="modal-overlay" id="edit-category-modal"><div class="modal-panel"><div class="modal-header"><h2>Редагувати категорію</h2><button class="close-btn">&times;</button></div><form id="edit-category-form"><input type="hidden" id="edit-category-id"><div class="form-group"><label for="edit-category-name">Назва категорії</label><input type="text" id="edit-category-name" required></div><div class="form-group"><label for="edit-category-discount">Акційна знижка (%)</label><input type="number" id="edit-category-discount" min="0" max="100" value="0"></div><button type="submit">Зберегти зміни</button></form></div></div><div class="modal-overlay" id="edit-service-modal"><div class="modal-panel"><div class="modal-header"><h2 id="service-modal-title">Послуга</h2><button class="close-btn">&times;</button></div><form id="edit-service-form"><input type="hidden" id="edit-service-id"><div class="form-group"><label for="edit-service-name">Назва</label><input type="text" id="edit-service-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="edit-service-duration">Тривалість (хв)</label><input type="number" id="edit-service-duration" required min="0"></div><div class="form-group" style="flex:1;"><label for="edit-service-price">Ціна (zł)</label><input type="number" id="edit-service-price" required min="0"></div></div><div class="form-group"><label for="edit-service-discount">Персональна знижка (%)</label><input type="number" id="edit-service-discount" min="0" max="100" value="0"></div><button type="submit">Зберегти</button></form></div></div>`;
     setupCategoriesLogic();
     if (state.selectedCategoryId) {
-      const servicesContainer = document.getElementById('services-container');
-      const category = state.categories.find(c => c.id === state.selectedCategoryId);
-      const categoryName = category ? category.name : '';
-      servicesContainer.innerHTML = `<div class="content-card"><div style="display:flex; justify-content:space-between; align-items:center;"><h2>Послуги: ${categoryName}</h2><button id="add-service-btn">Додати послугу</button></div><ul id="services-list" class="item-list"></ul></div>`;
-      document.getElementById('add-service-btn').onclick = () => showServiceModal();
-      const servicesListEl = document.getElementById('services-list');
-      const filteredServices = state.services.filter(s => s.categoryId === state.selectedCategoryId).sort((a,b)=>a.name.localeCompare(b.name));
-      servicesListEl.innerHTML = filteredServices.length > 0 ? '' : '<li>Немає послуг в цій категорії.</li>';
-      filteredServices.forEach(service => {
-          const finalDiscount = (service.discount > 0) ? service.discount : (category?.discount || 0);
-          const discountedPrice = service.price * (1 - finalDiscount / 100);
-          const li = document.createElement('li');
-          li.innerHTML = `<div><strong>${service.name}</strong><br><small>${service.duration || 'N/A'} хв. ${service.discount > 0 ? `(Знижка ${service.discount}%)` : ''}</small></div><div class="price-display">${finalDiscount > 0 ? `<span class="old-price">${service.price} zł</span>` : ''}<span class="new-price">${discountedPrice.toFixed(0)} zł</span></div><div class="actions"><button class="btn-edit-service" data-id="${service.id}" data-name="${service.name}" data-duration="${service.duration}" data-price="${service.price}" data-discount="${service.discount || 0}">✏️</button><button class="btn-delete-service" data-id="${service.id}">🗑️</button></div>`;
-          servicesListEl.appendChild(li);
-      });
-      servicesListEl.onclick = (event) => {
-          const target = event.target.closest('button');
-          if (!target) return;
-          if (target.classList.contains('btn-delete-service')) handleDeleteService(target.dataset.id);
-          if (target.classList.contains('btn-edit-service')) showServiceModal(target.dataset.id, target.dataset);
-      };
+        const servicesContainer = document.getElementById('services-container');
+        const category = state.categories.find(c => c.id === state.selectedCategoryId);
+        const categoryName = category ? category.name : '';
+        servicesContainer.innerHTML = `<div class="content-card"><div style="display:flex; justify-content:space-between; align-items:center;"><h2>Послуги: ${categoryName}</h2><button id="add-service-btn">Додати послугу</button></div><ul id="services-list" class="item-list"></ul></div>`;
+        document.getElementById('add-service-btn').onclick = () => showServiceModal();
+        const servicesListEl = document.getElementById('services-list');
+        const filteredServices = state.services.filter(s => s.categoryId === state.selectedCategoryId).sort((a,b)=>a.name.localeCompare(b.name));
+        servicesListEl.innerHTML = filteredServices.length > 0 ? '' : '<li>Немає послуг в цій категорії.</li>';
+        filteredServices.forEach(service => {
+            const finalDiscount = (service.discount > 0) ? service.discount : (category?.discount || 0);
+            const discountedPrice = service.price * (1 - finalDiscount / 100);
+            const li = document.createElement('li');
+            li.innerHTML = `<div><strong>${service.name}</strong><br><small>${service.duration || 'N/A'} хв. ${service.discount > 0 ? `(Знижка ${service.discount}%)` : ''}</small></div><div class="price-display">${finalDiscount > 0 ? `<span class="old-price">${service.price} zł</span>` : ''}<span class="new-price">${discountedPrice.toFixed(0)} zł</span></div><div class="actions"><button class="btn-edit-service" data-id="${service.id}" data-name="${service.name}" data-duration="${service.duration}" data-price="${service.price}" data-discount="${service.discount || 0}">✏️</button><button class="btn-delete-service" data-id="${service.id}">🗑️</button></div>`;
+            servicesListEl.appendChild(li);
+        });
+        servicesListEl.onclick = (event) => {
+            const target = event.target.closest('button');
+            if (!target) return;
+            if (target.classList.contains('btn-delete-service')) handleDeleteService(target.dataset.id);
+            if (target.classList.contains('btn-edit-service')) showServiceModal(target.dataset.id, target.dataset);
+        };
     }
   }
   function setupCategoriesLogic() {
@@ -533,7 +561,7 @@
       const today = new Date();
       const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
       const todayStr = today.toISOString().split('T')[0];
-      content.innerHTML = `<div class="content-card"><h2>Розрахунок зарплати</h2><div class="form-row"><div class="form-group" style="flex:1;"> <label for="salary-start-date">З</label> <input type="date" id="salary-start-date" value="${firstDayOfMonth}"> </div><div class="form-group" style="flex:1;"> <label for="salary-end-date">По</label> <input type="date" id="salary-end-date" value="${todayStr}"> </div></div><button id="calculate-salary-btn" style="width: 100%;">Розрахувати</button></div><div id="salary-report" style="margin-top: 2rem;"></div>`;
+      content.innerHTML = `<div class="content-card"><h2>Розрахунок зарплати</h2><div class="form-row"><div class="form-group" style="flex:1;"> <label for="salary-start-date">З</label> <input type="date" id="salary-start-date" value="${firstDayOfMonth}"> </div><div class="form-group" style="flex:1;"> <label for="salary-end-date">По</label> <input type="date" id="salary-end-date" value="${todayStr}"> </div></div><div class="form-group"><label for="salary-master-filter">Майстер</label><select id="salary-master-filter"><option value="all">Всі майстри</option>${state.masters.map(m => `<option value="${m.id}">${m.name}</option>`).join('')}</select></div><button id="calculate-salary-btn" style="width: 100%;">Розрахувати</button></div><div id="salary-report" style="margin-top: 2rem;"></div>`;
       document.getElementById('calculate-salary-btn').onclick = handleCalculateSalary;
   }
   function handleCalculateSalary() {
@@ -543,10 +571,16 @@
     const reportContainer = document.getElementById('salary-report');
     reportContainer.innerHTML = '<p>Розрахунок...</p>';
     
+    const selectedMasterId = document.getElementById('salary-master-filter').value;
     const salaryTiers = state.settings.salaryTiers.sort((a,b) => b.threshold - a.threshold);
 
-    const paidAppointments = state.appointments.filter(app => app.status === 'completed' && app.completedAt && app.completedAt.toDate() >= startDate && app.completedAt.toDate() <= endDate);
+    let paidAppointments = state.appointments.filter(app => app.status === 'completed' && app.completedAt && app.completedAt.toDate() >= startDate && app.completedAt.toDate() <= endDate);
+    if(selectedMasterId !== 'all'){
+        paidAppointments = paidAppointments.filter(app => app.masterId === selectedMasterId);
+    }
+    
     if (paidAppointments.length === 0) { reportContainer.innerHTML = '<p>За обраний період не знайдено оплачених записів.</p>'; return; }
+    
     const masterTotals = {};
     paidAppointments.forEach(appointment => {
         const masterId = appointment.masterId;
@@ -558,11 +592,12 @@
         if (appointment.paymentType === 'cash') masterTotals[masterId].cash += appointment.finalPrice;
         else masterTotals[masterId].card += appointment.finalPrice;
     });
+
     reportContainer.innerHTML = '';
     for (const masterId in masterTotals) {
         const data = masterTotals[masterId];
-        const applicableTier = salaryTiers.find(tier => data.totalEarned >= tier.threshold);
-        const salaryRate = applicableTier ? applicableTier.rate : 0;
+        const applicableTier = salaryTiers.find(tier => data.totalEarned >= tier.threshold) || { rate: 0 };
+        const salaryRate = applicableTier.rate;
         const salary = data.totalEarned * (salaryRate / 100);
         const cardHTML = `<div class="salary-report-card"><h3>${data.name}</h3><p><span>Всього зароблено:</span> <strong>${data.totalEarned.toFixed(0)} zł</strong></p><p><span>- Готівкою:</span> <span>${data.cash.toFixed(0)} zł</span></p><p><span>- Карткою:</span> <span>${data.card.toFixed(0)} zł</span></p><p class="total-salary"><span>Зарплата до виплати (${salaryRate}%):</span> <strong>${salary.toFixed(0)} zł</strong></p></div>`;
         reportContainer.innerHTML += cardHTML;
