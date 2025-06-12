@@ -11,20 +11,13 @@
 
   <style>
     :root { 
-        --main-bg: #f4f7fa; 
-        --panel-bg: #ffffff; 
-        --text-color: #1a1a1a; 
-        --gray-text: #6c757d; 
-        --border-color: #e9ecef; 
-        --primary-color: #2c3e50; 
-        --primary-hover: #34495e; 
-        --danger-color: #e74c3c; 
-        --success-color: #27ae60;
+        --main-bg: #f4f7fa; --panel-bg: #ffffff; --text-color: #1a1a1a; 
+        --gray-text: #6c757d; --border-color: #e9ecef; --primary-color: #2c3e50; 
+        --primary-hover: #34495e; --danger-color: #e74c3c; --success-color: #27ae60;
         --shadow: 0 4px 12px rgba(0,0,0,0.08);
     } 
     body { font-family: 'Inter', Arial, sans-serif; background: var(--main-bg); margin: 0; padding: 0; color: var(--text-color); font-size: 16px; } 
     * { box-sizing: border-box; }
-
     .auth-bg { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);} 
     .auth-card { background: var(--panel-bg); padding: 40px 32px; border-radius: 12px; box-shadow: var(--shadow); width: 360px; max-width: 96vw; text-align: center; } 
     .auth-card h1 { font-size: 1.8rem; margin: 0 0 24px 0; } 
@@ -41,9 +34,10 @@
     .crm-nav li { padding: 1rem 1.5rem; cursor: pointer; border-left: 4px solid transparent; transition: all .2s; }
     .crm-nav li:hover { background-color: rgba(255,255,255,0.05); }
     .crm-nav li.active { background-color: rgba(255,255,255,0.1); border-left-color: var(--success-color); font-weight: 600; }
-    .crm-nav .user-info { padding: 1.5rem; border-top: 1px solid rgba(255,255,255,0.1); }
-    .crm-nav .user-info span { display: block; word-wrap: break-word; font-size: 0.9rem; }
-    .crm-nav .user-info button { width: 100%; background: var(--danger-color); border: none; color: #fff; padding: 0.75rem; border-radius: 6px; cursor: pointer; margin-top: 1rem; text-align: center; }
+    .crm-nav .user-info { padding: 1.5rem; border-top: 1px solid rgba(255,255,255,0.1); text-align: center; }
+    .crm-nav .user-info span { display: block; word-wrap: break-word; font-size: 0.9rem; margin-bottom: 1rem; }
+    .crm-nav .user-info button { width: 100%; background: rgba(255,255,255,0.1); border: 1px solid #fff; color: #fff; padding: 0.75rem; border-radius: 6px; cursor: pointer; }
+    .crm-nav .user-info button:hover { background: var(--danger-color); border-color: var(--danger-color); }
 
     .crm-main { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
     .crm-header { background: var(--panel-bg); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); flex-shrink: 0; }
@@ -67,7 +61,7 @@
     .btn-delete:hover { background-color: var(--danger-color); color: #fff; }
     .btn-complete-payment { background-color: transparent; color: var(--success-color); border-color: var(--success-color); }
     .btn-complete-payment:hover { background-color: var(--success-color); color: #fff; }
-    
+
     .form-group { margin-bottom: 1.5rem; }
     .form-group input, .form-group select { appearance: none; -webkit-appearance: none; width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; background-color: #fff; transition: border-color .2s; }
     .form-group select { background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%236c757d%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22/%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right .7em top 50%; background-size: .65em auto; padding-right: 2.5em; }
@@ -156,12 +150,10 @@
   onAuthStateChanged(auth, async (user) => {
     if (user) {
       if (listenersAreActive) return;
-      appContainer.innerHTML = '<h1>Завантаження даних...</h1>';
-      
+      appContainer.innerHTML = '<h1>Завантаження...</h1>';
       const userDocRef = doc(db, "users", user.uid);
       const userDocSnap = await getDoc(userDocRef);
       state.user = { uid: user.uid, email: user.email, role: userDocSnap.exists() ? userDocSnap.data().role : 'master' };
-
       renderAppLayout(state.user);
       setupRealtimeListeners();
     } else {
@@ -188,6 +180,10 @@
       onSnapshot(doc(db, 'settings', 'salaryRules'), (doc) => {
           state.settings.salaryTiers = doc.exists() ? (doc.data().tiers || []) : [];
           if (state.user) renderView(state.currentView);
+      }, (error) => {
+          console.error("Помилка слухача налаштувань:", error);
+          // Створюємо документ, якщо його немає, щоб уникнути помилок доступу
+          setDoc(doc(db, 'settings', 'salaryRules'), { tiers: [{ threshold: 0, rate: 35 }] });
       });
     }
     listenersAreActive = true;
@@ -202,7 +198,31 @@
   function renderAppLayout(user) {
     const isAdmin = user.role === 'admin';
     const adminTabs = `<li data-view="salary">Зарплата</li><li data-view="settings">Налаштування</li>`;
-    appContainer.innerHTML = `<div class="crm-layout"><header class="crm-header"><h1>${state.currentView.charAt(0).toUpperCase() + state.currentView.slice(1)}</h1><div class="user-info"><span>${user.email} (${user.role})</span><button id="logout-btn">Вийти</button></div></header><main class="crm-main"><nav class="crm-nav"><h1>Lashroom CRM</h1><ul><li data-view="calendar">Календар</li><li data-view="appointments">Запис</li><li data-view="clients">Клієнти</li><li data-view="services">Послуги</li><li data-view="masters">Майстри</li>${isAdmin ? adminTabs : ''}</ul></nav><div class="crm-content"><div class="content-wrapper" id="content-wrapper"></div></div></main></div>`;
+    appContainer.innerHTML = `<div class="crm-layout">
+        <nav class="crm-nav" id="main-nav">
+            <h1>Lashroom CRM</h1>
+            <ul>
+                <li data-view="calendar">Календар</li>
+                <li data-view="appointments">Запис</li>
+                <li data-view="clients">Клієнти</li>
+                <li data-view="services">Послуги</li>
+                <li data-view="masters">Майстри</li>
+                ${isAdmin ? adminTabs : ''}
+            </ul>
+            <div class="user-info">
+                <span>${user.email} (${user.role})</span>
+                <button id="logout-btn">Вийти</button>
+            </div>
+        </nav>
+        <main class="crm-main">
+            <header class="crm-header">
+                <h2 id="header-title"></h2>
+            </header>
+            <div class="crm-content">
+                <div class="content-wrapper" id="content-wrapper"></div>
+            </div>
+        </main>
+    </div>`;
     
     document.getElementById('logout-btn').onclick = () => { listenersAreActive = false; signOut(auth); };
     document.getElementById('main-nav').onclick = (event) => {
@@ -219,7 +239,8 @@
         viewName = 'calendar';
     }
     state.currentView = viewName;
-    const headerTitle = document.querySelector('.crm-header h1');
+
+    const headerTitle = document.getElementById('header-title');
     if(headerTitle) {
       const viewTitles = { calendar: 'Календар', appointments: 'Новий Запис', clients: 'Клієнти', services: 'Послуги та Категорії', masters: 'Майстри', salary: 'Зарплата', settings: 'Налаштування' };
       headerTitle.textContent = viewTitles[viewName] || 'Dashboard';
@@ -262,14 +283,14 @@
       locale: 'uk', initialView: 'timeGridWeek', 
       headerToolbar: { left: 'prev,next today', center: 'title', right: 'timeGridWeek,timeGridDay' },
       editable: false, selectable: true,
-      events: function(fetchInfo, successCallback, failureCallback) {
+      events: function(fetchInfo, successCallback) {
         const filteredAppointments = state.calendarSelectedMasterId === 'all' 
             ? state.appointments 
             : state.appointments.filter(app => app.masterId === state.calendarSelectedMasterId);
         const events = filteredAppointments.map(app => {
             const service = state.services.find(s => s.id === app.serviceId);
-            const masterIndex = state.masters.findIndex(m => m.id === app.masterId);
             const endTime = new Date(app.dateTime.toDate().getTime() + (app.duration || 60) * 60000);
+            const masterIndex = state.masters.findIndex(m => m.id === app.masterId);
             return { id: app.id, title: `${app.clientName} (${service?.name || ''})`, start: app.dateTime.toDate(), end: endTime, backgroundColor: colorPalette[masterIndex % colorPalette.length], borderColor: colorPalette[masterIndex % colorPalette.length]};
         });
         successCallback(events);
@@ -548,6 +569,46 @@
         const cardHTML = `<div class="salary-report-card"><h3>${data.name}</h3><p><span>Всього зароблено:</span> <strong>${data.totalEarned.toFixed(0)} zł</strong></p><p><span>- Готівкою:</span> <span>${data.cash.toFixed(0)} zł</span></p><p><span>- Карткою:</span> <span>${data.card.toFixed(0)} zł</span></p><p class="total-salary"><span>Зарплата до виплати (${salaryRate}%):</span> <strong>${salary.toFixed(0)} zł</strong></p></div>`;
         reportContainer.innerHTML += cardHTML;
     }
+  }
+  // #endregion
+
+  // #region Settings View
+  function renderSettingsView(container) {
+    const tiers = state.settings.salaryTiers.sort((a,b) => a.threshold - b.threshold);
+    let tableRows = tiers.map((tier, index) => `<tr><td>Від ${tier.threshold} zł</td><td>${tier.rate}%</td><td class="actions"><button class="btn-edit btn-edit-tier" data-index="${index}">Редагувати</button><button class="btn-delete btn-delete-tier" data-index="${index}">Видалити</button></td></tr>`).join('');
+    container.innerHTML = `<div class="content-card"><h2>Налаштування відсотків зарплати</h2><table><thead><tr><th>Сума від (поріг)</th><th>Відсоток</th><th>Дія</th></tr></thead><tbody id="salary-tiers-table">${tableRows}</tbody></table><hr style="margin: 2rem 0;"><h3 id="tier-form-title">Додати новий рівень</h3><form id="tier-form" class="form-row"><div class="form-group" style="flex:1;"><label for="tier-threshold">Сума від (zł)</label><input type="number" id="tier-threshold" min="0" required></div><div class="form-group" style="flex:1;"><label for="tier-rate">Відсоток (%)</label><input type="number" id="tier-rate" min="0" max="100" required></div><div class="form-group"><button type="submit" id="tier-submit-btn">Додати</button><button type="button" id="tier-cancel-btn" style="display:none; margin-left: 1rem; background-color: var(--gray-text)">Скасувати</button></div></form></div>`;
+    document.getElementById('tier-form').onsubmit = handleSaveSalaryTier;
+    document.getElementById('tier-cancel-btn').onclick = () => { state.editingTierIndex = null; renderView('settings'); };
+    document.getElementById('salary-tiers-table').onclick = (e) => {
+        if(e.target.classList.contains('btn-delete-tier')) { handleDeleteSalaryTier(parseInt(e.target.dataset.index)); }
+        if(e.target.classList.contains('btn-edit-tier')) { handleEditSalaryTier(parseInt(e.target.dataset.index)); }
+    };
+  }
+  function handleEditSalaryTier(index) {
+    state.editingTierIndex = index;
+    const tier = state.settings.salaryTiers[index];
+    document.getElementById('tier-form-title').innerText = 'Редагувати рівень';
+    document.getElementById('tier-threshold').value = tier.threshold;
+    document.getElementById('tier-rate').value = tier.rate;
+    document.getElementById('tier-submit-btn').innerText = 'Зберегти зміни';
+    document.getElementById('tier-cancel-btn').style.display = 'inline-block';
+  }
+  async function handleSaveSalaryTier(event) {
+    event.preventDefault();
+    const threshold = parseInt(document.getElementById('tier-threshold').value);
+    const rate = parseInt(document.getElementById('tier-rate').value);
+    let newTiers = [...state.settings.salaryTiers];
+    if (state.editingTierIndex !== null) { newTiers[state.editingTierIndex] = { threshold, rate }; } 
+    else { newTiers.push({ threshold, rate }); }
+    state.editingTierIndex = null;
+    try { await setDoc(doc(db, 'settings', 'salaryRules'), { tiers: newTiers }); } 
+    catch(e) { console.error("Помилка збереження рівня:", e); alert('Не вдалося зберегти рівень.'); }
+  }
+  async function handleDeleteSalaryTier(index) {
+    if (!confirm('Ви впевнені, що хочете видалити цей рівень?')) return;
+    const newTiers = state.settings.salaryTiers.filter((_, i) => i !== index);
+    try { await setDoc(doc(db, 'settings', 'salaryRules'), { tiers: newTiers }); } 
+    catch(e) { console.error("Помилка видалення рівня:", e); alert('Не вдалося видалити рівень.'); }
   }
   // #endregion
 
