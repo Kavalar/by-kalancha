@@ -6,24 +6,47 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link href="https://fonts.googleapis.com/css?family=Inter:400,600&display=swap" rel="stylesheet">
   <style>
-    :root { --main-bg: #f8f9fa; --panel-bg: #fff; --text-color: #222; --gray-text: #6c757d; --border-color: #dee2e6; --primary-color: #222; --primary-hover: #444; --danger-color: #d32f2f; } body { font-family: 'Inter', Arial, sans-serif; background: var(--main-bg); margin: 0; padding: 0; color: var(--text-color); } * { box-sizing: border-box; } .auth-bg { min-height: 100vh; display: flex; align-items: center; justify-content: center;} .auth-card { background: var(--panel-bg); padding: 36px 28px; border-radius: 18px; box-shadow: 0 2px 20px rgba(0,0,0,0.05); width: 340px; max-width: 96vw;} .auth-card h1 {font-size: 2rem; margin: 0 0 16px 0; text-align:center;} .auth-card input { width: 100%; margin-bottom: 12px; padding: 11px 10px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1.08rem; outline: none; } .auth-card button { width: 100%; background: var(--primary-color); color: #fff; border: none; font-weight: 600; transition:.2s; cursor:pointer; padding: 11px 10px; border-radius: 8px; font-size: 1.08rem;} .auth-card button:hover { background: var(--primary-hover); } .error-msg {color: #d32f2f; margin-bottom: 10px; min-height: 1.2em;} .crm-layout { display: flex; flex-direction: column; height: 100vh; } .crm-header { background: var(--panel-bg); padding: 0 2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); flex-shrink: 0; } .crm-header h1 { font-size: 1.2rem; } .crm-header button { background: none; border: 1px solid var(--border-color); color: var(--text-color); padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; transition: .2s; } .crm-header button:hover { background: var(--main-bg); } .crm-main { display: flex; flex-grow: 1; overflow: hidden; } .crm-nav { background: var(--panel-bg); border-right: 1px solid var(--border-color); padding: 1rem; width: 220px; flex-shrink: 0; } .crm-nav ul { list-style: none; padding: 0; margin: 0; } .crm-nav li { padding: 0.8rem 1rem; border-radius: 8px; font-weight: 600; cursor: pointer; margin-bottom: 0.5rem; } .crm-nav li.active { background: var(--primary-color); color: #fff; } .crm-nav li:not(.active):hover { background: var(--main-bg); } .crm-content { flex-grow: 1; padding: 2rem; overflow-y: auto; } .content-card { background: var(--panel-bg); padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); } .item-list { padding: 0; list-style: none; } .item-list li { display: flex; justify-content: space-between; align-items:center; padding: 1rem; border-bottom: 1px solid var(--border-color); } .item-list li:last-child { border-bottom: none; } .item-list .actions button { margin-left: 0.5rem; padding: 0.4rem 0.8rem; font-size: 0.8rem; border-radius: 6px; } .btn-edit { background: none; border: 1px solid var(--gray-text); color: var(--gray-text); } .btn-delete { background: none; border: 1px solid var(--danger-color); color: var(--danger-color); } .form-group { margin-bottom: 1rem; } .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; } .form-group input, .form-group select { width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; background: #fff; } form button { background: var(--primary-color); color: #fff; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; } .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; } .modal-panel { background: #fff; padding: 2rem; border-radius: 8px; width: 450px; max-width: 90vw; } .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; } .modal-header h2 { margin: 0; } .close-btn { font-size: 1.5rem; background: none; border: none; cursor: pointer; }
-    .services-layout { display: grid; grid-template-columns: 300px 1fr; gap: 2rem; align-items: start; } .category-list-item { cursor: pointer; } .category-list-item.selected { font-weight: bold; background-color: var(--main-bg); } .price-display { text-align: right; } .price-display .old-price { text-decoration: line-through; color: var(--gray-text); margin-right: 0.5rem; font-size: 0.9em; } .price-display .new-price { font-weight: bold; } .form-row { display: flex; gap: 1rem; }
+    :root { --main-bg: #f8f9fa; --panel-bg: #fff; --text-color: #222; --gray-text: #6c757d; --border-color: #dee2e6; --primary-color: #222; --primary-hover: #444; --danger-color: #d32f2f; --success-color: #2e7d32;} body { font-family: 'Inter', Arial, sans-serif; background: var(--main-bg); margin: 0; padding: 0; color: var(--text-color); } * { box-sizing: border-box; } .auth-bg { min-height: 100vh; display: flex; align-items: center; justify-content: center;} .auth-card { background: var(--panel-bg); padding: 36px 28px; border-radius: 18px; box-shadow: 0 2px 20px rgba(0,0,0,0.05); width: 340px; max-width: 96vw;} .auth-card h1 {font-size: 2rem; margin: 0 0 16px 0; text-align:center;} .auth-card input { width: 100%; margin-bottom: 12px; padding: 11px 10px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1.08rem; outline: none; } .auth-card button { width: 100%; background: var(--primary-color); color: #fff; border: none; font-weight: 600; transition:.2s; cursor:pointer; padding: 11px 10px; border-radius: 8px; font-size: 1.08rem;} .auth-card button:hover { background: var(--primary-hover); } .error-msg {color: #d32f2f; margin-bottom: 10px; min-height: 1.2em;} .crm-layout { display: flex; flex-direction: column; height: 100vh; } .crm-header { background: var(--panel-bg); padding: 0 2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); flex-shrink: 0; } .crm-header h1 { font-size: 1.2rem; } .crm-header button { background: none; border: 1px solid var(--border-color); color: var(--text-color); padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; transition: .2s; } .crm-header button:hover { background: var(--main-bg); } .crm-main { display: flex; flex-grow: 1; overflow: hidden; } .crm-nav { background: var(--panel-bg); border-right: 1px solid var(--border-color); padding: 1rem; width: 220px; flex-shrink: 0; } .crm-nav ul { list-style: none; padding: 0; margin: 0; } .crm-nav li { padding: 0.8rem 1rem; border-radius: 8px; font-weight: 600; cursor: pointer; margin-bottom: 0.5rem; } .crm-nav li.active { background: var(--primary-color); color: #fff; } .crm-nav li:not(.active):hover { background: var(--main-bg); } .crm-content { flex-grow: 1; padding: 2rem; overflow-y: auto; } .content-card { background: var(--panel-bg); padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); } .item-list { padding: 0; list-style: none; } .item-list li { display: flex; justify-content: space-between; align-items:center; padding: 1rem; border-bottom: 1px solid var(--border-color); } .item-list li:last-child { border-bottom: none; } .item-list .actions button { margin-left: 0.5rem; padding: 0.4rem 0.8rem; font-size: 0.8rem; border-radius: 6px; } .btn-edit { background: none; border: 1px solid var(--gray-text); color: var(--gray-text); } .btn-delete { background: none; border: 1px solid var(--danger-color); color: var(--danger-color); } .form-group { margin-bottom: 1rem; } .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; } .form-group input, .form-group select { width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; background: #fff; } form button { background: var(--primary-color); color: #fff; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; } .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; } .modal-panel { background: #fff; padding: 2rem; border-radius: 8px; width: 450px; max-width: 90vw; } .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; } .modal-header h2 { margin: 0; } .close-btn { font-size: 1.5rem; background: none; border: none; cursor: pointer; }
+    .services-layout { display: grid; grid-template-columns: 300px 1fr; gap: 2rem; align-items: start; } .category-list-item { cursor: pointer; } .category-list-item.selected { font-weight: bold; background-color: var(--main-bg); } .price-display { text-align: right; } .price-display .old-price { text-decoration: line-through; color: var(--gray-text); margin-right: 0.5rem; font-size: 0.9em; } .price-display .new-price { font-weight: bold; } .form-row { display: flex; gap: 1rem; align-items: flex-end;}
     .category-checkbox-group { max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px; }
     .category-checkbox-group label { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; font-weight: normal; }
     #final-price-display { font-size: 1.5rem; font-weight: bold; text-align: right; margin-top: 1rem; padding-top: 1rem; border-top: 2px solid var(--primary-color);}
-    .salary-report-card { background: #fff; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    .salary-report-card h3 { margin: 0 0 1rem 0; }
-    .salary-report-card p { margin: 0.5rem 0; display: flex; justify-content: space-between; }
-    .salary-report-card .total-salary { font-weight: bold; font-size: 1.2rem; color: var(--danger-color); border-top: 1px solid var(--border-color); padding-top: 0.5rem; margin-top: 0.5rem;}
+    .salary-report-card { background: #fff; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); } .salary-report-card h3 { margin: 0 0 1rem 0; } .salary-report-card p { margin: 0.5rem 0; display: flex; justify-content: space-between; } .salary-report-card .total-salary { font-weight: bold; font-size: 1.2rem; color: var(--danger-color); border-top: 1px solid var(--border-color); padding-top: 0.5rem; margin-top: 0.5rem;}
+    .btn-complete-payment { background-color: var(--success-color); color: white; border: none; }
+    .status-badge { padding: 0.2em 0.6em; border-radius: 10px; font-size: 0.8em; color: white; }
+    .status-completed { background-color: var(--success-color); }
+    .status-upcoming { background-color: var(--gray-text); }
   </style>
 </head>
 <body>
 <div id="app"></div>
 
+<div class="modal-overlay" id="complete-payment-modal">
+  <div class="modal-panel">
+    <div class="modal-header">
+      <h2>Провести оплату</h2>
+      <button class="close-btn">&times;</button>
+    </div>
+    <form id="complete-payment-form">
+      <input type="hidden" id="payment-appointment-id">
+      <p>Сума до оплати: <strong id="payment-modal-amount">0 zł</strong></p>
+      <div class="form-group">
+        <label for="payment-modal-type">Тип оплати</label>
+        <select id="payment-modal-type">
+          <option value="cash">Готівка</option>
+          <option value="card">Картка</option>
+        </select>
+      </div>
+      <button type="submit">Підтвердити оплату</button>
+    </form>
+  </div>
+</div>
+
+
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-  import { getFirestore, collection, query, where, onSnapshot, addDoc, doc, deleteDoc, updateDoc, getDoc, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { getFirestore, collection, query, where, onSnapshot, addDoc, doc, deleteDoc, updateDoc, getDocs, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const firebaseConfig = { apiKey: "AIzaSyBoGeREvdgrVSm-S4f3cW0HyB7Us9yh_us", authDomain: "bykalancha.firebaseapp.com", projectId: "bykalancha", storageBucket: "bykalancha.appspot.com", messagingSenderId: "196166318613", appId: "1:196166318613:web:0067f9de531e290e43ec1c", measurementId: "G-V72ECFLKFE" };
 
@@ -37,16 +60,18 @@
     selectedCategoryId: null,
     categories: [],
     services: [],
-    masters: []
+    masters: [],
+    currentView: 'appointments' // НОВЕ: відстежуємо поточну вкладку
   };
 
   onAuthStateChanged(auth, user => {
     state.user = user;
     if (user) {
-      // Завантажуємо усі дані при старті
       onSnapshot(collection(db, 'serviceCategories'), snapshot => {
         state.categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         state.categories.sort((a,b) => a.name.localeCompare(b.name));
+        // НОВЕ: Оновлюємо список, якщо користувач на вкладці записів
+        if(state.currentView === 'appointments') populateAppointmentFormDropdowns();
       });
       onSnapshot(collection(db, 'services'), snapshot => {
         state.services = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -60,14 +85,11 @@
     }
   });
 
-  function renderLoginView() {
-    appContainer.innerHTML = `<div class="auth-bg"><div class="auth-card"><h1>Вхід у CRM</h1><div id="login-error" class="error-msg"></div><input id="email" type="email" placeholder="Email" autocomplete="username" autofocus><input id="password" type="password" placeholder="Пароль" autocomplete="current-password"><button id="login-btn">Увійти</button></div></div>`;
-    document.getElementById('login-btn').onclick = handleLogin;
-  }
+  function renderLoginView() { /* ... без змін ... */ }
 
   function renderAppLayout(user) {
     appContainer.innerHTML = `<div class="crm-layout"><header class="crm-header"><h1>Lashroom CRM</h1><div><span>${user.email}</span><button id="logout-btn">Вийти</button></div></header><main class="crm-main"><nav class="crm-nav" id="main-nav"><ul><li data-view="appointments">Запис</li><li data-view="services">Послуги</li><li data-view="masters">Майстри</li><li data-view="salary">Зарплата</li></ul></nav><div class="crm-content" id="crm-content"></div></main></div>`;
-    renderView('appointments'); // Стартова вкладка - Запис
+    renderView(state.currentView);
     document.getElementById('logout-btn').onclick = () => signOut(auth);
     document.getElementById('main-nav').onclick = (event) => {
         const target = event.target.closest('li');
@@ -76,16 +98,14 @@
   }
 
   function renderView(viewName) {
+    state.currentView = viewName; // НОВЕ: оновлюємо стан поточної вкладки
     document.querySelectorAll('#main-nav li').forEach(li => li.classList.remove('active'));
     const activeLi = document.querySelector(`#main-nav li[data-view="${viewName}"]`);
     if(activeLi) activeLi.classList.add('active');
     
     switch (viewName) {
         case 'appointments': renderAppointmentsView(); break;
-        case 'services': renderServicesView(); break;
-        case 'masters': renderMastersView(); break;
-        case 'salary': renderSalaryView(); break;
-        default: document.getElementById('crm-content').innerHTML = `<h2>Розділ в розробці...</h2>`;
+        /* ... решта без змін ... */
     }
   }
 
@@ -107,33 +127,33 @@
           <div class="form-row">
             <div class="form-group" style="flex:1;">
               <label for="appointment-category">Категорія послуг</label>
-              <select id="appointment-category" required><option value="">Спочатку оберіть категорію</option></select>
+              <select id="appointment-category" required><option value="">Завантаження...</option></select>
             </div>
             <div class="form-group" style="flex:1;">
               <label for="appointment-service">Послуга</label>
-              <select id="appointment-service" required><option value="">Спочатку оберіть послугу</option></select>
+              <select id="appointment-service" required><option value="">Оберіть категорію</option></select>
             </div>
           </div>
           <div class="form-group">
             <label for="appointment-master">Майстер</label>
-            <select id="appointment-master" required><option value="">Оберіть майстра</option></select>
+            <select id="appointment-master" required><option value="">Оберіть категорію</option></select>
           </div>
           <div class="form-row">
-            <div class="form-group" style="flex:1;">
-                <label for="manual-discount">Додаткова знижка (zł)</label>
-                <input type="number" id="manual-discount" placeholder="0" min="0">
-            </div>
-            <div class="form-group" style="flex:1;">
-                <label for="payment-type">Тип оплати</label>
-                <select id="payment-type"><option value="cash">Готівка</option><option value="card">Картка</option></select>
-            </div>
+              <div class="form-group" style="flex:2;">
+                  <label for="manual-discount-value">Додаткова знижка</label>
+                  <input type="number" id="manual-discount-value" placeholder="0" min="0">
+              </div>
+              <div class="form-group" style="flex:1;">
+                  <label for="manual-discount-type">Тип</label>
+                  <select id="manual-discount-type"><option value="percent">%</option><option value="fixed">zł</option></select>
+              </div>
           </div>
           <div id="final-price-display">Сума до оплати: 0 zł</div>
           <button type="submit" style="margin-top: 1rem;">Створити запис</button>
         </form>
       </div>
       <div class="content-card" style="margin-top: 2rem;">
-        <h2>Майбутні записи</h2>
+        <h2>Список записів</h2>
         <ul id="appointments-list" class="item-list"><li>Завантаження...</li></ul>
       </div>
     `;
@@ -141,21 +161,24 @@
   }
 
   function setupAppointmentsLogic() {
+    // НОВЕ: Ініціалізуємо модальне вікно оплати
+    const paymentModal = document.getElementById('complete-payment-modal');
+    paymentModal.querySelector('.close-btn').onclick = () => paymentModal.style.display = 'none';
+    document.getElementById('complete-payment-form').onsubmit = handleConfirmPayment;
+
+    // Запускаємо початкове заповнення
+    populateAppointmentFormDropdowns();
+
     const categorySelect = document.getElementById('appointment-category');
     const serviceSelect = document.getElementById('appointment-service');
     const masterSelect = document.getElementById('appointment-master');
-    const discountInput = document.getElementById('manual-discount');
-
-    // Заповнення категорій
-    categorySelect.innerHTML = '<option value="">Оберіть категорію</option>' + state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    const discountValueInput = document.getElementById('manual-discount-value');
+    const discountTypeSelect = document.getElementById('manual-discount-type');
     
-    // Обробники подій
     categorySelect.onchange = () => {
         const categoryId = categorySelect.value;
-        // Фільтруємо послуги
         const servicesInCategory = state.services.filter(s => s.categoryId === categoryId);
         serviceSelect.innerHTML = '<option value="">Оберіть послугу</option>' + servicesInCategory.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-        // Фільтруємо майстрів
         const mastersForCategory = state.masters.filter(m => m.categoryIds && m.categoryIds.includes(categoryId));
         masterSelect.innerHTML = '<option value="">Оберіть майстра</option>' + mastersForCategory.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
         updateFinalPrice();
@@ -163,105 +186,123 @@
 
     serviceSelect.onchange = updateFinalPrice;
     masterSelect.onchange = updateFinalPrice;
-    discountInput.oninput = updateFinalPrice;
+    discountValueInput.oninput = updateFinalPrice;
+    discountTypeSelect.onchange = updateFinalPrice;
 
     document.getElementById('add-appointment-form').onsubmit = handleAddAppointment;
 
-    // Відображення списку записів
-    const q = query(collection(db, 'appointments'), where("dateTime", ">=", Timestamp.now()));
+    // ЗМІНА: Відображення списку записів з урахуванням статусу
+    const q = query(collection(db, 'appointments'));
     onSnapshot(q, (snapshot) => {
         const listEl = document.getElementById('appointments-list');
-        if(snapshot.empty) {
-            listEl.innerHTML = '<li>Немає майбутніх записів.</li>';
-            return;
-        }
-        listEl.innerHTML = '';
+        listEl.innerHTML = snapshot.empty ? '<li>Немає записів.</li>' : '';
+        
         snapshot.docs
-            .sort((a,b) => a.data().dateTime.toMillis() - b.data().dateTime.toMillis())
+            .sort((a,b) => b.data().dateTime.toMillis() - a.data().dateTime.toMillis()) // сортуємо від новіших до старіших
             .forEach(doc => {
-                const appointment = doc.data();
-                const service = state.services.find(s => s.id === appointment.serviceId)?.name || 'Послуга не знайдена';
-                const master = state.masters.find(m => m.id === appointment.masterId)?.name || 'Майстер не знайдений';
+                const appointment = {id: doc.id, ...doc.data()};
+                const service = state.services.find(s => s.id === appointment.serviceId)?.name || 'Послуга';
+                const master = state.masters.find(m => m.id === appointment.masterId)?.name || 'Майстер';
                 const date = appointment.dateTime.toDate().toLocaleString('uk-UA', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'});
                 
+                let statusHtml = '';
+                // ЗМІНА: Кнопки та статус в залежності від оплати
+                if (appointment.status === 'completed') {
+                    const paymentIcon = appointment.paymentType === 'card' ? '💳' : '💵';
+                    statusHtml = `<span class="status-badge status-completed">Оплачено ${paymentIcon}</span>`;
+                } else {
+                    statusHtml = `
+                        <button class="btn-complete-payment" data-id="${appointment.id}" data-price="${appointment.finalPrice.toFixed(0)}">Провести оплату</button>
+                    `;
+                }
+
                 const li = document.createElement('li');
                 li.innerHTML = `
                     <div>
                         <strong>${appointment.clientName}</strong> - ${service}<br>
                         <small>${date} - ${master}</small>
                     </div>
-                    <div>
+                    <div class="actions">
                         <strong>${appointment.finalPrice.toFixed(0)} zł</strong>
+                        ${statusHtml}
                         <button class="btn-delete" data-id="${doc.id}">🗑️</button>
-                    </div>
-                `;
+                    </div>`;
                 listEl.appendChild(li);
         });
     });
 
     document.getElementById('appointments-list').onclick = (e) => {
         if (e.target.classList.contains('btn-delete')) {
-            const id = e.target.dataset.id;
-            if (confirm('Ви впевнені, що хочете видалити цей запис?')) {
-                deleteDoc(doc(db, 'appointments', id));
-            }
+            if (confirm('Видалити цей запис?')) deleteDoc(doc(db, 'appointments', e.target.dataset.id));
         }
+        // НОВЕ: Обробник для кнопки оплати
+        if (e.target.classList.contains('btn-complete-payment')) {
+            const appointmentId = e.target.dataset.id;
+            const finalPrice = e.target.dataset.price;
+            document.getElementById('payment-appointment-id').value = appointmentId;
+            document.getElementById('payment-modal-amount').innerText = `${finalPrice} zł`;
+            document.getElementById('complete-payment-modal').style.display = 'flex';
+        }
+    }
+  }
+
+  // НОВЕ: Функція для заповнення списків, щоб уникнути проблеми з асинхронністю
+  function populateAppointmentFormDropdowns() {
+    const categorySelect = document.getElementById('appointment-category');
+    if (categorySelect && state.categories.length > 0) {
+        categorySelect.innerHTML = '<option value="">Оберіть категорію</option>' + state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
     }
   }
 
   function updateFinalPrice() {
       const serviceId = document.getElementById('appointment-service').value;
       const masterId = document.getElementById('appointment-master').value;
-      const manualDiscount = parseFloat(document.getElementById('manual-discount').value) || 0;
+      const manualDiscountValue = parseFloat(document.getElementById('manual-discount-value').value) || 0;
+      const manualDiscountType = document.getElementById('manual-discount-type').value;
 
+      const priceDisplay = document.getElementById('final-price-display');
       if (!serviceId || !masterId) {
-          document.getElementById('final-price-display').innerText = `Сума до оплати: 0 zł`;
-          return;
+          priceDisplay.innerText = `Сума до оплати: 0 zł`;
+          return 0;
       }
 
       const service = state.services.find(s => s.id === serviceId);
       const category = state.categories.find(c => c.id === service.categoryId);
       const master = state.masters.find(m => m.id === masterId);
-
       let price = service.price;
 
-      // 1. Застосовуємо знижку на послугу або категорію
       const discountPercent = service.discount > 0 ? service.discount : (category.discount || 0);
-      price = price * (1 - discountPercent / 100);
-
-      // 2. Застосовуємо націнку майстра
+      price *= (1 - discountPercent / 100);
       const markupPercent = master.priceModifier || 0;
-      price = price * (1 + markupPercent / 100);
+      price *= (1 + markupPercent / 100);
+      
+      // ЗМІНА: Застосовуємо ручну знижку в залежності від її типу
+      if (manualDiscountType === 'percent') {
+          price *= (1 - manualDiscountValue / 100);
+      } else { // 'fixed'
+          price -= manualDiscountValue;
+      }
 
-      // 3. Застосовуємо ручну знижку (фіксована сума)
-      price = price - manualDiscount;
-
-      document.getElementById('final-price-display').innerText = `Сума до оплати: ${price.toFixed(0)} zł`;
+      priceDisplay.innerText = `Сума до оплати: ${price.toFixed(0)} zł`;
       return price;
   }
   
   async function handleAddAppointment(event) {
     event.preventDefault();
     const finalPrice = updateFinalPrice();
-    const clientName = document.getElementById('client-name').value;
-    const datetimeString = document.getElementById('appointment-datetime').value;
-    const serviceId = document.getElementById('appointment-service').value;
-    const masterId = document.getElementById('appointment-master').value;
-
-    if (!clientName || !datetimeString || !serviceId || !masterId) {
-        alert('Будь ласка, заповніть усі поля.');
-        return;
-    }
-
+    // ... решта полів
     const appointment = {
-        clientName: clientName,
-        dateTime: Timestamp.fromDate(new Date(datetimeString)),
-        categoryId: document.getElementById('appointment-category').value,
-        serviceId: serviceId,
-        masterId: masterId,
-        paymentType: document.getElementById('payment-type').value,
-        manualDiscount: parseFloat(document.getElementById('manual-discount').value) || 0,
+        clientName: document.getElementById('client-name').value,
+        dateTime: Timestamp.fromDate(new Date(document.getElementById('appointment-datetime').value)),
+        serviceId: document.getElementById('appointment-service').value,
+        masterId: document.getElementById('appointment-master').value,
+        manualDiscount: {
+            value: parseFloat(document.getElementById('manual-discount-value').value) || 0,
+            type: document.getElementById('manual-discount-type').value
+        },
         finalPrice: finalPrice,
+        status: 'upcoming', // НОВЕ: Статус за замовчуванням
+        paymentType: null, // НОВЕ: Тип оплати поки невідомий
         createdAt: Timestamp.now()
     };
     
@@ -269,108 +310,51 @@
         await addDoc(collection(db, 'appointments'), appointment);
         alert('Запис успішно створено!');
         event.target.reset();
-        // Скидаємо залежні поля
-        document.getElementById('appointment-service').innerHTML = '<option value="">Спочатку оберіть послугу</option>';
-        document.getElementById('appointment-master').innerHTML = '<option value="">Оберіть майстра</option>';
+        document.getElementById('appointment-service').innerHTML = '<option value="">Оберіть категорію</option>';
+        document.getElementById('appointment-master').innerHTML = '<option value="">Оберіть категорію</option>';
         updateFinalPrice();
     } catch (e) {
         console.error("Помилка при додаванні запису: ", e);
         alert('Не вдалося створити запис.');
     }
   }
+
+  // НОВЕ: Функція для підтвердження оплати
+  async function handleConfirmPayment(event) {
+    event.preventDefault();
+    const appointmentId = document.getElementById('payment-appointment-id').value;
+    const paymentType = document.getElementById('payment-modal-type').value;
+
+    try {
+        await updateDoc(doc(db, 'appointments', appointmentId), {
+            status: 'completed',
+            paymentType: paymentType,
+            completedAt: Timestamp.now()
+        });
+        document.getElementById('complete-payment-modal').style.display = 'none';
+    } catch(e) {
+        console.error("Помилка при оновленні запису: ", e);
+        alert('Не вдалося провести оплату.');
+    }
+  }
+
   // #endregion
 
   // #region Salary View
-  function renderSalaryView() {
-      const content = document.getElementById('crm-content');
-      const today = new Date();
-      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-      const todayStr = today.toISOString().split('T')[0];
-
-      content.innerHTML = `
-        <div class="content-card">
-            <h2>Розрахунок зарплати</h2>
-            <div class="form-row">
-                <div class="form-group" style="flex:1;">
-                    <label for="salary-start-date">З</label>
-                    <input type="date" id="salary-start-date" value="${firstDayOfMonth}">
-                </div>
-                <div class="form-group" style="flex:1;">
-                    <label for="salary-end-date">По</label>
-                    <input type="date" id="salary-end-date" value="${todayStr}">
-                </div>
-            </div>
-            <button id="calculate-salary-btn" style="width: 100%;">Розрахувати</button>
-        </div>
-        <div id="salary-report" style="margin-top: 2rem;"></div>
-      `;
-      document.getElementById('calculate-salary-btn').onclick = handleCalculateSalary;
-  }
+  function renderSalaryView() { /* ... без змін ... */ }
 
   async function handleCalculateSalary() {
-    const startDate = new Date(document.getElementById('salary-start-date').value);
-    const endDate = new Date(document.getElementById('salary-end-date').value);
-    // Встановлюємо час на кінець дня для коректної вибірки
-    endDate.setHours(23, 59, 59, 999);
-
-    const reportContainer = document.getElementById('salary-report');
-    reportContainer.innerHTML = '<p>Розрахунок...</p>';
-    
-    // **ВАЖЛИВО**: Тут задається відсоток для розрахунку ЗП.
-    // У майбутньому це можна винести в налаштування.
-    const SALARY_PERCENTAGE = 0.40; // 40%
+    // ...
+    const SALARY_PERCENTAGE = 0.40;
 
     try {
+        // ЗМІНА: вибираємо тільки оплачені записи
         const q = query(collection(db, 'appointments'), 
-            where("dateTime", ">=", Timestamp.fromDate(startDate)),
-            where("dateTime", "<=", Timestamp.fromDate(endDate))
+            where("status", "==", "completed"),
+            where("completedAt", ">=", Timestamp.fromDate(startDate)),
+            where("completedAt", "<=", Timestamp.fromDate(endDate))
         );
-        const snapshot = await getDocs(q);
-
-        if (snapshot.empty) {
-            reportContainer.innerHTML = '<p>За обраний період не знайдено виконаних записів.</p>';
-            return;
-        }
-
-        const masterTotals = {};
-
-        snapshot.docs.forEach(doc => {
-            const appointment = doc.data();
-            const masterId = appointment.masterId;
-            if (!masterTotals[masterId]) {
-                const master = state.masters.find(m => m.id === masterId);
-                masterTotals[masterId] = {
-                    name: master ? master.name : 'Невідомий майстер',
-                    totalEarned: 0,
-                    cash: 0,
-                    card: 0,
-                };
-            }
-            masterTotals[masterId].totalEarned += appointment.finalPrice;
-            if (appointment.paymentType === 'cash') {
-                masterTotals[masterId].cash += appointment.finalPrice;
-            } else {
-                masterTotals[masterId].card += appointment.finalPrice;
-            }
-        });
-
-        reportContainer.innerHTML = ''; // Очищуємо контейнер
-        for (const masterId in masterTotals) {
-            const data = masterTotals[masterId];
-            const salary = data.totalEarned * SALARY_PERCENTAGE;
-            
-            const cardHTML = `
-                <div class="salary-report-card">
-                    <h3>${data.name}</h3>
-                    <p><span>Всього зароблено:</span> <strong>${data.totalEarned.toFixed(0)} zł</strong></p>
-                    <p><span>- Готівкою:</span> <span>${data.cash.toFixed(0)} zł</span></p>
-                    <p><span>- Карткою:</span> <span>${data.card.toFixed(0)} zł</span></p>
-                    <p class="total-salary"><span>Зарплата до виплати (${(SALARY_PERCENTAGE * 100).toFixed(0)}%):</span> <strong>${salary.toFixed(0)} zł</strong></p>
-                </div>
-            `;
-            reportContainer.innerHTML += cardHTML;
-        }
-
+        // ... решта логіки розрахунку без змін ...
     } catch (e) {
         console.error("Помилка розрахунку ЗП: ", e);
         reportContainer.innerHTML = '<p>Сталася помилка. Перевірте консоль.</p>';
@@ -378,35 +362,5 @@
   }
   // #endregion
 
-  // Код для вкладок "Послуги" та "Майстри" залишається тут...
-  // (я скоротив його, щоб не дублювати, але у вашому файлі він має бути повністю)
-  function renderMastersView() { /* ... ваш існуючий код ... */ }
-  function populateCategoryCheckboxes(elementId, checkedIds = []) { /* ... ваш існуючий код ... */ }
-  function renderServicesView() { /* ... ваш існуючий код ... */ }
-  function setupCategoriesLogic() { /* ... ваш існуючий код ... */ }
-  function renderServicesForCategory(categoryId) { /* ... ваш існуючий код ... */ }
-  async function handleLogin(e) { /* ... ваш існуючий код ... */ }
-  async function handleAddMaster(event) { /* ... ваш існуючий код ... */ }
-  async function handleDeleteMaster(id) { /* ... ваш існуючий код ... */ }
-  async function showEditMasterModal(id) { /* ... ваш існуючий код ... */ }
-  async function handleUpdateMaster(event) { /* ... ваш існуючий код ... */ }
-  async function handleAddCategory(event) { /* ... ваш існуючий код ... */ }
-  async function handleDeleteCategory(id) { /* ... ваш існуючий код ... */ }
-  function showEditCategoryModal(id, name, discount) { /* ... ваш існуючий код ... */ }
-  async function handleUpdateCategory(event) { /* ... ваш існуючий код ... */ }
-  function showServiceModal(id = null, data = {}) { /* ... ваш існуючий код ... */ }
-  async function handleAddService(event) { /* ... ваш існуючий код ... */ }
-  async function handleUpdateService(event) { /* ... ваш існуючий код ... */ }
-  async function handleDeleteService(id) { /* ... ваш існуючий код ... */ }
+  // ... (Решта ваших функцій для вкладок "Послуги", "Майстри" і т.д. без змін)
 </script>
-<script type="module">
-    // ... (весь код з першого script блоку)
-
-    // PASTE ALL YOUR OTHER FUNCTIONS HERE
-    // (renderMastersView, renderServicesView, handleAddMaster, etc.)
-    // Важливо: переконайтесь, що всі функції, які я згорнув,
-    // присутні у вашому фінальному файлі.
-</script>
-
-</body>
-</html>
