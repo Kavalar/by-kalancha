@@ -36,7 +36,8 @@
     if (user) {
       onSnapshot(collection(db, 'serviceCategories'), snapshot => {
         state.categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        state.categories.sort((a,b) => a.name.localeCompare(b.data().name));
+        // ВИПРАВЛЕНО: Правильне сортування об'єктів
+        state.categories.sort((a,b) => a.name.localeCompare(b.name));
       });
       renderAppLayout(user);
     } else {
@@ -106,7 +107,8 @@
   }
 
   function renderServicesView() {
-    selectedCategoryId = null;
+    // ВИПРАВЛЕНО: Використання state.selectedCategoryId
+    state.selectedCategoryId = null;
     const contentContainer = document.getElementById('crm-content');
     contentContainer.innerHTML = `<div class="services-layout"><div class="content-card"><h2>Категорії</h2><form id="add-category-form" class="form-group"><input type="text" id="new-category-name" placeholder="Нова категорія..." required><button type="submit" style="width:100%; margin-top:0.5rem;">Додати</button></form><ul id="categories-list" class="item-list"><li>Завантаження...</li></ul></div><div id="services-container"><div class="content-card"><p>Оберіть категорію зліва.</p></div></div></div><div class="modal-overlay" id="edit-category-modal"><div class="modal-panel"><div class="modal-header"><h2>Редагувати категорію</h2><button class="close-btn">&times;</button></div><form id="edit-category-form"><input type="hidden" id="edit-category-id"><div class="form-group"><label for="edit-category-name">Назва категорії</label><input type="text" id="edit-category-name" required></div><div class="form-group"><label for="edit-category-discount">Акційна знижка (%)</label><input type="number" id="edit-category-discount" min="0" max="100" value="0"></div><button type="submit">Зберегти зміни</button></form></div></div><div class="modal-overlay" id="edit-service-modal"><div class="modal-panel"><div class="modal-header"><h2 id="service-modal-title">Послуга</h2><button class="close-btn">&times;</button></div><form id="edit-service-form"><input type="hidden" id="edit-service-id"><div class="form-group"><label for="edit-service-name">Назва</label><input type="text" id="edit-service-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="edit-service-duration">Тривалість (хв)</label><input type="number" id="edit-service-duration" required></div><div class="form-group" style="flex:1;"><label for="edit-service-price">Ціна (zł)</label><input type="number" id="edit-service-price" required></div></div><div class="form-group"><label for="edit-service-discount">Персональна знижка (%)</label><input type="number" id="edit-service-discount" min="0" max="100" value="0"></div><button type="submit">Зберегти</button></form></div></div>`;
     setupCategoriesLogic();
@@ -130,7 +132,8 @@
         const li = document.createElement('li');
         li.className = 'category-list-item';
         li.dataset.id = doc.id;
-        if (doc.id === selectedCategoryId) li.classList.add('selected');
+        // ВИПРАВЛЕНО: Використання state.selectedCategoryId
+        if (doc.id === state.selectedCategoryId) li.classList.add('selected');
         li.innerHTML = `<span>${category.name} ${category.discount ? `<strong style="color:var(--danger-color);">-`+category.discount+'%</strong>' : ''}</span><div class="actions"><button class="btn-edit" data-id="${doc.id}" data-name="${category.name}" data-discount="${category.discount || 0}">✏️</button><button class="btn-delete" data-id="${doc.id}">🗑️</button></div>`;
         categoriesListEl.appendChild(li);
       });
@@ -138,14 +141,20 @@
   }
 
   function renderServicesForCategory(categoryId) {
-    selectedCategoryId = categoryId;
+    // ВИПРАВЛЕНО: Використання state.selectedCategoryId
+    state.selectedCategoryId = categoryId;
     document.querySelectorAll('.category-list-item').forEach(li => li.classList.remove('selected'));
     const categoryElement = document.querySelector(`.category-list-item[data-id="${categoryId}"]`);
     if(categoryElement) categoryElement.classList.add('selected');
+    
     const servicesContainer = document.getElementById('services-container');
-    const categoryName = categoryElement ? categoryElement.querySelector('span').textContent : '...';
+    const category = state.categories.find(c => c.id === categoryId);
+    const categoryName = category ? category.name : '...';
+
     servicesContainer.innerHTML = `<div class="content-card"><div style="display:flex; justify-content:space-between; align-items:center;"><h2>Послуги: ${categoryName}</h2><button id="add-service-btn">Додати послугу</button></div><ul id="services-list" class="item-list"><li>Завантаження...</li></ul></div>`;
+    
     document.getElementById('add-service-btn').onclick = () => showServiceModal();
+    
     const servicesListEl = document.getElementById('services-list');
     servicesListEl.onclick = (event) => {
         const target = event.target.closest('button');
@@ -154,9 +163,10 @@
         if (target.classList.contains('btn-delete-service')) handleDeleteService(serviceData.id);
         if (target.classList.contains('btn-edit-service')) showServiceModal(serviceData.id, serviceData);
     };
+
     const q = query(collection(db, 'services'), where("categoryId", "==", categoryId));
     onSnapshot(q, (snapshot) => {
-      const categoryDiscount = categoryElement ? parseFloat(categoryElement.querySelector('.btn-edit').dataset.discount) || 0 : 0;
+      const categoryDiscount = category ? (category.discount || 0) : 0;
       servicesListEl.innerHTML = snapshot.empty ? '<li>Немає послуг в цій категорії.</li>' : '';
       snapshot.docs.sort((a,b) => a.data().name.localeCompare(b.data().name)).forEach(doc => {
         const service = doc.data();
@@ -179,7 +189,7 @@
   function showEditCategoryModal(id, name, discount) { const modal = document.getElementById('edit-category-modal'); document.getElementById('edit-category-id').value = id; document.getElementById('edit-category-name').value = name; document.getElementById('edit-category-discount').value = discount || 0; modal.style.display = 'flex'; }
   async function handleUpdateCategory(event) { event.preventDefault(); const id = document.getElementById('edit-category-id').value; const name = document.getElementById('edit-category-name').value.trim(); const discount = parseFloat(document.getElementById('edit-category-discount').value) || 0; if (!name) return alert('Назва не може бути порожньою.'); try { await updateDoc(doc(db, 'serviceCategories', id), { name, discount }); document.getElementById('edit-category-modal').style.display = 'none'; } catch(e) { alert('Не вдалося оновити.'); } }
   function showServiceModal(id = null, data = {}) { const modal = document.getElementById('edit-service-modal'); modal.querySelector('h2').textContent = id ? 'Редагувати послугу' : 'Додати нову послугу'; document.getElementById('edit-service-id').value = id || ''; document.getElementById('edit-service-name').value = data.name || ''; document.getElementById('edit-service-duration').value = data.duration || ''; document.getElementById('edit-service-price').value = data.price || ''; document.getElementById('edit-service-discount').value = data.discount || 0; document.getElementById('edit-service-form').onsubmit = id ? handleUpdateService : handleAddService; modal.style.display = 'flex'; document.querySelector('#edit-service-modal .close-btn').onclick = () => modal.style.display = 'none'; }
-  async function handleAddService(event) { event.preventDefault(); if (!selectedCategoryId) return alert('Спочатку оберіть категорію!'); const name = document.getElementById('edit-service-name').value.trim(); const duration = parseInt(document.getElementById('edit-service-duration').value); const price = parseFloat(document.getElementById('edit-service-price').value); const discount = parseFloat(document.getElementById('edit-service-discount').value) || 0; if (!name || !duration || !(price>=0)) return alert('Заповніть усі поля.'); try { await addDoc(collection(db, 'services'), { name, duration, price, discount, categoryId: selectedCategoryId }); document.getElementById('edit-service-modal').style.display = 'none'; } catch (e) { alert('Не вдалося додати.'); } }
+  async function handleAddService(event) { event.preventDefault(); if (!state.selectedCategoryId) return alert('Спочатку оберіть категорію!'); const name = document.getElementById('edit-service-name').value.trim(); const duration = parseInt(document.getElementById('edit-service-duration').value); const price = parseFloat(document.getElementById('edit-service-price').value); const discount = parseFloat(document.getElementById('edit-service-discount').value) || 0; if (!name || !duration || !(price>=0)) return alert('Заповніть усі поля.'); try { await addDoc(collection(db, 'services'), { name, duration, price, discount, categoryId: state.selectedCategoryId }); document.getElementById('edit-service-modal').style.display = 'none'; } catch (e) { alert('Не вдалося додати.'); } }
   async function handleUpdateService(event) { event.preventDefault(); const id = document.getElementById('edit-service-id').value; const name = document.getElementById('edit-service-name').value.trim(); const duration = parseInt(document.getElementById('edit-service-duration').value); const price = parseFloat(document.getElementById('edit-service-price').value); const discount = parseFloat(document.getElementById('edit-service-discount').value) || 0; if (!name || !duration || !(price>=0)) return alert('Заповніть усі поля.'); try { await updateDoc(doc(db, 'services', id), { name, duration, price, discount }); document.getElementById('edit-service-modal').style.display = 'none'; } catch(e) { alert('Не вдалося оновити.'); } }
   async function handleDeleteService(id) { if (!confirm('Видалити послугу?')) return; try { await deleteDoc(doc(db, 'services', id)); } catch (e) { alert('Не вдалося видалити.'); } }
 </script>
