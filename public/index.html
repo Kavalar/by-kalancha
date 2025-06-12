@@ -29,10 +29,10 @@
 <body>
 <div id="app"></div>
 
-<div class="modal-overlay" id="complete-payment-modal">
+<div class="modal-overlay" id="payment-modal">
   <div class="modal-panel">
     <div class="modal-header"> <h2>Провести оплату</h2> <button class="close-btn">&times;</button> </div>
-    <form id="complete-payment-form">
+    <form id="payment-form">
       <input type="hidden" id="payment-appointment-id">
       <p>Сума до оплати: <strong id="payment-modal-amount">0 zł</strong></p>
       <div class="form-group">
@@ -63,7 +63,6 @@
   };
 
   let listenersAreActive = false;
-  let calendarInstance = null;
   
   onAuthStateChanged(auth, async (user) => {
     if (user) {
@@ -120,6 +119,8 @@
         const target = event.target.closest('li');
         if (target) renderView(target.dataset.view);
     };
+    // Глобальне налаштування кнопки закриття модального вікна оплати
+    document.getElementById('payment-modal').querySelector('.close-btn').onclick = () => { document.getElementById('payment-modal').style.display = 'none'; };
     renderView(state.currentView);
   }
 
@@ -147,58 +148,50 @@
   // #region Calendar View
   function renderCalendarView() {
     const content = document.getElementById('crm-content');
-    // НОВЕ: Додаємо HTML для фільтра
-    content.innerHTML = `<div class="content-card">
-        <div id="calendar-container">
-            <div class="form-group">
-                <label for="calendar-master-filter">Показати розклад для:</label>
-                <select id="calendar-master-filter">
-                    <option value="all">Всі майстри</option>
-                    ${state.masters.map(m => `<option value="${m.id}">${m.name}</option>`).join('')}
-                </select>
-            </div>
-            <div id="calendar"></div>
-        </div>
-    </div>`;
+    content.innerHTML = `<div class="content-card"><div id="calendar-container"><div class="form-group"><label for="calendar-master-filter">Показати розклад для:</label><select id="calendar-master-filter"><option value="all">Всі майстри</option>${state.masters.map(m => `<option value="${m.id}">${m.name}</option>`).join('')}</select></div><div id="calendar">Завантаження...</div></div></div>`;
     
     const calendarEl = document.getElementById('calendar');
     const masterFilter = document.getElementById('calendar-master-filter');
     if (!calendarEl || !masterFilter) return;
 
-    // НОВЕ: Палітра кольорів для майстрів
     const colorPalette = ['#3788d8', '#e25141', '#4caf50', '#ff9800', '#9c27b0', '#795548', '#607d8b'];
-
-    const events = state.appointments
-        .filter(app => { // Фільтруємо записи згідно з селектором
-            const selectedMaster = masterFilter.value;
-            return selectedMaster === 'all' || app.masterId === selectedMaster;
-        })
-        .map(app => {
+    
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+      locale: 'uk',
+      initialView: 'timeGridWeek', 
+      headerToolbar: { left: 'prev,next today', center: 'title', right: 'timeGridWeek,timeGridDay' },
+      editable: false, 
+      selectable: true,
+      events: function(fetchInfo, successCallback, failureCallback) {
+        const selectedMaster = masterFilter.value;
+        const filteredAppointments = selectedMaster === 'all' 
+            ? state.appointments 
+            : state.appointments.filter(app => app.masterId === selectedMaster);
+        const events = filteredAppointments.map(app => {
             const service = state.services.find(s => s.id === app.serviceId);
             const masterIndex = state.masters.findIndex(m => m.id === app.masterId);
             const endTime = new Date(app.dateTime.toDate().getTime() + (app.duration || 60) * 60000);
             return {
               id: app.id, title: `${app.clientName} (${service?.name || ''})`,
               start: app.dateTime.toDate(), end: endTime,
-              backgroundColor: colorPalette[masterIndex % colorPalette.length], // Колір залежить від майстра
+              backgroundColor: colorPalette[masterIndex % colorPalette.length],
               borderColor: colorPalette[masterIndex % colorPalette.length],
             };
         });
-
-    calendarInstance = new FullCalendar.Calendar(calendarEl, {
-      locale: 'uk',
-      // ВИПРАВЛЕНО: Використовуємо безкоштовні види
-      initialView: 'timeGridWeek', 
-      headerToolbar: { left: 'prev,next today', center: 'title', right: 'timeGridWeek,timeGridDay' },
-      editable: false, // Перетягування тут менш зручне, краще робити через форму
-      selectable: true,
-      events: events,
+        successCallback(events);
+      },
       eventClick: function(info) {
         const appointment = state.appointments.find(a => a.id === info.event.id);
-        if (appointment && appointment.status !== 'completed') {
-          document.getElementById('payment-appointment-id').value = info.event.id;
-          document.getElementById('payment-modal-amount').innerText = `${appointment.finalPrice.toFixed(0)} zł`;
-          document.getElementById('complete-payment-modal').style.display = 'flex';
+        if (!appointment) return;
+        
+        if (appointment.status === 'completed') {
+            const service = state.services.find(s => s.id === appointment.serviceId);
+            const master = state.masters.find(m => m.id === appointment.masterId);
+            alert(`Деталі запису:\n\nКлієнт: ${appointment.clientName}\nПослуга: ${service?.name || ''}\nМайстер: ${master?.name || ''}\nСтатус: Оплачено (${appointment.paymentType === 'card' ? 'Картка' : 'Готівка'})`);
+        } else {
+            document.getElementById('payment-appointment-id').value = info.event.id;
+            document.getElementById('payment-modal-amount').innerText = `${appointment.finalPrice.toFixed(0)} zł`;
+            document.getElementById('payment-modal').style.display = 'flex';
         }
       },
       select: function(selectionInfo) {
@@ -206,11 +199,10 @@
         renderView('appointments');
       }
     });
-    calendarInstance.render();
+    calendar.render();
 
-    // НОВЕ: Обробник для фільтра
     masterFilter.onchange = () => {
-        renderCalendarView(); // Просто перебудовуємо календар з новим фільтром
+        calendar.refetchEvents();
     };
   }
   // #endregion
@@ -229,8 +221,6 @@
   }
 
   function setupAppointmentsLogic() {
-    document.getElementById('complete-payment-modal').querySelector('.close-btn').onclick = () => { document.getElementById('complete-payment-modal').style.display = 'none'; };
-    document.getElementById('complete-payment-form').onsubmit = handleConfirmPayment;
     document.getElementById('add-appointment-form').onsubmit = handleAddAppointment;
     populateAppointmentFormDropdowns();
     const categorySelect = document.getElementById('appointment-category');
@@ -266,7 +256,7 @@
             const btn = target.closest('.btn-complete-payment');
             document.getElementById('payment-appointment-id').value = btn.dataset.id;
             document.getElementById('payment-modal-amount').innerText = `${btn.dataset.price} zł`;
-            document.getElementById('complete-payment-modal').style.display = 'flex';
+            document.getElementById('payment-modal').style.display = 'flex';
         }
     }
   }
@@ -339,7 +329,7 @@
     const paymentType = document.getElementById('payment-modal-type').value;
     try {
         await updateDoc(doc(db, 'appointments', appointmentId), { status: 'completed', paymentType: paymentType, completedAt: Timestamp.now() });
-        document.getElementById('complete-payment-modal').style.display = 'none';
+        document.getElementById('payment-modal').style.display = 'none';
     } catch(e) { console.error("Помилка: ", e); alert('Не вдалося провести оплату.'); }
   }
   // #endregion
@@ -390,7 +380,7 @@
     if (state.selectedCategoryId) {
         const servicesContainer = document.getElementById('services-container');
         const category = state.categories.find(c => c.id === state.selectedCategoryId);
-        const categoryName = category ? category.name : '...';
+        const categoryName = category ? category.name : '';
         servicesContainer.innerHTML = `<div class="content-card"><div style="display:flex; justify-content:space-between; align-items:center;"><h2>Послуги: ${categoryName}</h2><button id="add-service-btn">Додати послугу</button></div><ul id="services-list" class="item-list"></ul></div>`;
         document.getElementById('add-service-btn').onclick = () => showServiceModal();
         const servicesListEl = document.getElementById('services-list');
