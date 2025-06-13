@@ -190,15 +190,24 @@
 
   function setupRealtimeListeners() {
     if (listenersAreActive) return;
+    // Цей об'єкт тепер точно відповідає вашій базі даних.
     const collections = { 
-        serviceCategories: 'categories', services: 'services', masters: 'masters', 
-        appointments: 'appointments', clients: 'clients'
+        serviceCategories: 'categories', 
+        services: 'services', 
+        masters: 'masters', 
+        appointments: 'appointments', 
+        clients: 'clients'
     };
     Object.entries(collections).forEach(([col, stateKey]) => {
       onSnapshot(collection(db, col), snapshot => {
         state[stateKey] = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
         if (stateKey === 'categories') state.categories.sort((a,b) => a.name.localeCompare(b.name));
+        // renderView викликається при кожному оновленні даних, що гарантує актуальність
         if (state.user) renderView(state.currentView);
+      }, (error) => {
+          // Додано обробку помилок для діагностики в майбутньому
+          console.error(`Помилка завантаження колекції ${col}:`, error);
+          alert(`Не вдалося завантажити дані: ${col}. Перевірте консоль (F12)`);
       });
     });
     
@@ -310,6 +319,14 @@
 
   // #region Calendar View
   function renderCalendarView(container) {
+    // ===== ОСНОВНЕ ВИПРАВЛЕННЯ ТУТ =====
+    // Перевіряємо, чи завантажились майстри. Якщо ні - показуємо заглушку і чекаємо наступного оновлення.
+    if (!state.masters || state.masters.length === 0) {
+        container.innerHTML = `<div class="content-card"><p>Завантаження майстрів...</p></div>`;
+        return; 
+    }
+    // ===================================
+      
     const activeMasters = state.masters.filter(m => !m.isFrozen);
     container.innerHTML = `<div class="content-card">
         <div id="calendar-container">
@@ -328,9 +345,6 @@
     const masterFilter = document.getElementById('calendar-master-filter');
     if (!calendarEl || !masterFilter) return;
 
-    // FullCalendar потребує ліцензії для resource views. Без неї може з'являтись попередження.
-    // schedulerLicenseKey: 'GPL-My-Project-Is-Open-Source', // або ваш комерційний ключ
-
     const isResourceView = state.calendarSelectedMasterId === 'all';
     
     const calendar = new FullCalendar.Calendar(calendarEl, {
@@ -343,7 +357,7 @@
       },
       editable: false,
       selectable: true,
-      nowIndicator: true, // Лінія поточного часу
+      nowIndicator: true, 
       resources: isResourceView ? activeMasters.map(m => ({ id: m.id, title: m.name })) : [],
       events: function(fetchInfo, successCallback, failureCallback) {
         const filteredAppointments = !isResourceView
@@ -383,7 +397,6 @@
       },
       select: function(selectionInfo) {
         state.preselectedAppointment = { dateTime: selectionInfo.start };
-        // Якщо обрано конкретного майстра або в режимі ресурсів клікнуто на колонку
         const selectedMaster = isResourceView ? selectionInfo.resource?.id : state.calendarSelectedMasterId;
         if (selectedMaster && selectedMaster !== 'all') {
              state.preselectedAppointment.masterId = selectedMaster;
@@ -461,28 +474,24 @@
       const d = new Date(dateTime.getTime() - (dateTime.getTimezoneOffset() * 60000));
       document.getElementById('appointment-datetime').value = d.toISOString().slice(0, 16);
       if (masterId) { 
-        // Need to find which category this master belongs to, to pre-select it
         const master = state.masters.find(m => m.id === masterId);
         const firstCategoryId = master?.categoryIds?.[0];
         if (firstCategoryId) {
-            // We need to wait for the dropdowns to populate, then set values
             setTimeout(() => {
                 const categorySelect = document.getElementById('appointment-category');
                 if (categorySelect) {
                     categorySelect.value = firstCategoryId;
-                    // Manually trigger change to populate services and masters
                     categorySelect.dispatchEvent(new Event('change'));
                     
-                    // Now set the master
                     setTimeout(() => {
                         const masterSelect = document.getElementById('appointment-master');
                         if (masterSelect) {
                            masterSelect.value = masterId;
-                           masterSelect.dispatchEvent(new Event('input')); // for price update
+                           masterSelect.dispatchEvent(new Event('input')); 
                         }
-                    }, 50); // Small delay for master list to populate
+                    }, 50); 
                 }
-            }, 50); // Small delay for category list to populate
+            }, 50); 
         }
       }
       state.preselectedAppointment = null;
@@ -627,7 +636,6 @@
         const categories = (master.categoryIds || []).map(id => state.categories.find(c => c.id === id)?.name || '').filter(Boolean).join(', ');
         const li = document.createElement('li');
         li.className = master.isFrozen ? 'is-frozen' : '';
-        // Змінено: додано кнопку Профіль, видалено клікабельність з блоку інформації
         li.innerHTML = `<div><strong>${master.name}</strong> ${master.tier ? `(${master.tier})` : ''} ${master.priceModifier > 0 ? `<strong style="color:var(--danger-color)">+${master.priceModifier}%</strong>` : ''}<br><small>${categories || 'Без спеціалізації'}</small></div>
                         <div class="actions">
                             <button class="btn btn-profile" data-id="${master.id}" data-action="view-profile">Профіль</button>
@@ -696,7 +704,7 @@
     const sortedAdvances = state.viewingMasterAdvances.sort((a,b) => b.date.toDate() - a.date.toDate());
     tableBody.innerHTML = sortedAdvances.length > 0 ? '' : `<tr><td colspan="2">Авансів не було.</td></tr>`;
     sortedAdvances.forEach(adv => {
-        const tr = document.createElement('tr'); // Changed li to tr for table
+        const tr = document.createElement('tr');
         tr.innerHTML = `<td>${adv.date.toDate().toLocaleDateString('uk-UA')}</td><td>${adv.amount.toFixed(0)} zł</td>`;
         tableBody.appendChild(tr);
     });
