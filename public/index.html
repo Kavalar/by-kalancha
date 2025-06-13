@@ -55,7 +55,7 @@
     .content-card h2, .content-card h3 { margin-top: 0; color: var(--primary-color); }
     .item-list { padding: 0; list-style: none; margin: 0; }
     .item-list li { display: flex; justify-content: space-between; align-items:center; padding: 1rem; border-bottom: 1px solid var(--border-color); transition: background-color 0.2s; }
-    .item-list li:not(.no-hover):hover { background-color: #f8f9fa; cursor: pointer; }
+    .item-list li:hover { background-color: #f8f9fa; }
     .item-list li.is-frozen { opacity: 0.5; background-color: #f8f9fa; }
     .item-list li:last-child { border-bottom: none; }
     .actions { display: flex; gap: 0.5rem; align-items: center; }
@@ -567,20 +567,21 @@
     state.masters.sort((a,b) => a.name.localeCompare(b.name)).forEach(master => {
         const categories = (master.categoryIds || []).map(id => state.categories.find(c => c.id === id)?.name || '').filter(Boolean).join(', ');
         const li = document.createElement('li');
-        li.className = master.isFrozen ? 'is-frozen' : 'no-hover';
-        li.dataset.id = master.id;
-        li.innerHTML = `<div><strong>${master.name}</strong> ${master.tier ? `(${master.tier})` : ''} ${master.priceModifier > 0 ? `<strong style="color:var(--danger-color)">+${master.priceModifier}%</strong>` : ''}<br><small>${categories || 'Без спеціалізації'}</small></div><div class="actions"><button class="btn btn-edit" data-id="${master.id}" data-action="edit-profile">Ред.</button></div>`;
+        li.className = master.isFrozen ? 'is-frozen' : '';
+        li.innerHTML = `<div class="master-info-clickable" data-id="${master.id}"><strong>${master.name}</strong> ${master.tier ? `(${master.tier})` : ''} ${master.priceModifier > 0 ? `<strong style="color:var(--danger-color)">+${master.priceModifier}%</strong>` : ''}<br><small>${categories || 'Без спеціалізації'}</small></div><div class="actions"><button class="btn btn-edit" data-id="${master.id}" data-action="edit-profile">Ред.</button></div>`;
         listEl.appendChild(li);
     });
     listEl.onclick = (event) => { 
-        const masterItem = event.target.closest('li');
-        const button = event.target.closest('button');
-        if (button && button.dataset.action === 'edit-profile') {
+        const button = event.target.closest('button[data-action="edit-profile"]');
+        if (button) {
             event.stopPropagation();
-            showEditMasterModal(masterItem.dataset.id);
-        } else if (masterItem) {
-            state.viewingMasterId = masterItem.dataset.id; 
-            renderView('masterDetail');
+            showEditMasterModal(button.dataset.id);
+        } else {
+            const masterItem = event.target.closest('li');
+            if (masterItem) {
+                state.viewingMasterId = masterItem.querySelector('.master-info-clickable').dataset.id; 
+                renderView('masterDetail');
+            }
         }
     };
   }
@@ -589,7 +590,7 @@
   function showEditMasterModal(id) { const master = state.masters.find(m => m.id === id); if (!master) return alert('Майстра не знайдено!'); const modal = document.getElementById('edit-master-modal'); modal.style.display = 'flex'; document.getElementById('edit-master-id').value = id; document.getElementById('edit-master-name').value = master.name; document.getElementById('edit-master-tier').value = master.tier || ''; document.getElementById('edit-master-modifier').value = master.priceModifier || 0; document.getElementById('edit-master-frozen').checked = master.isFrozen || false; populateCategoryCheckboxes('edit-master-categories', master.categoryIds || []); }
   async function handleUpdateMaster(event) { event.preventDefault(); const id = document.getElementById('edit-master-id').value; const name = document.getElementById('edit-master-name').value.trim(); const tier = document.getElementById('edit-master-tier').value.trim(); const priceModifier = parseFloat(document.getElementById('edit-master-modifier').value) || 0; const categoryIds = Array.from(document.querySelectorAll('#edit-master-categories input:checked')).map(el => el.value); const isFrozen = document.getElementById('edit-master-frozen').checked; if (!name) return alert("Ім'я не може бути порожнім."); try { await updateDoc(doc(db, 'masters', id), { name, tier, priceModifier, categoryIds, isFrozen }); document.getElementById('edit-master-modal').style.display = 'none'; } catch(e) { alert('Не вдалося оновити.'); } }
   // #endregion
-
+  
   // #region Master Detail View
   function renderMasterDetailView(container) {
     const master = state.masters.find(m => m.id === state.viewingMasterId);
@@ -598,26 +599,19 @@
         document.getElementById('back-to-masters-btn').onclick = () => renderView('masters');
         return;
     }
-
-    container.innerHTML = `<div class="content-card"><button id="back-to-masters-btn" class="btn" style="margin-bottom: 2rem;">&larr; Назад до списку майстрів</button><h2>${master.name}</h2></div>
-    <div class="content-card" id="salary-calculation-card"><h3>Поточний розрахунок ЗП (за цей місяць)</h3><p>Завантаження...</p></div>
-    <div class="content-card"><h3>Видача авансу</h3><form id="add-advance-form" class="form-row"><div class="form-group" style="flex:1;"><label for="advance-amount">Сума авансу (zł)</label><input type="number" id="advance-amount" min="1" required></div><div class="form-group"><button type="submit" class="btn">Видати аванс</button></div></form></div>
-    <div class="content-card"><h3>Історія авансів</h3><table><thead><tr><th>Дата</th><th>Сума</th></tr></thead><tbody id="advances-history-table"><tr><td colspan="2">Завантаження...</td></tr></tbody></table></div>`;
-
+    container.innerHTML = `<div class="content-card"><button id="back-to-masters-btn" class="btn" style="margin-bottom: 2rem;">&larr; Назад до списку майстрів</button><h2>${master.name}</h2></div><div class="content-card" id="salary-calculation-card"><h3>Поточний розрахунок ЗП (за цей місяць)</h3><p>Завантаження...</p></div><div class="content-card"><h3>Видача авансу</h3><form id="add-advance-form" class="form-row"><div class="form-group" style="flex:1;"><label for="advance-amount">Сума авансу (zł)</label><input type="number" id="advance-amount" min="1" required></div><div class="form-group"><button type="submit" class="btn">Видати аванс</button></div></form></div><div class="content-card"><h3>Історія авансів</h3><table><thead><tr><th>Дата</th><th>Сума</th></tr></thead><tbody id="advances-history-table"><tr><td colspan="2">Завантаження...</td></tr></tbody></table></div>`;
     document.getElementById('back-to-masters-btn').onclick = () => renderView('masters');
     document.getElementById('add-advance-form').onsubmit = (e) => handleAddAdvance(e, master.id);
-    
     if (masterAdvancesUnsubscribe) masterAdvancesUnsubscribe();
     const advancesRef = collection(db, 'masters', master.id, 'advances');
     masterAdvancesUnsubscribe = onSnapshot(advancesRef, (snapshot) => {
         state.viewingMasterAdvances = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
         renderMasterSalaryCard(master.id);
-        renderMasterAdvancesHistory(master.id);
+        renderMasterAdvancesHistory();
     });
   }
   function renderMasterSalaryCard(masterId) {
-    const card = document.getElementById('salary-calculation-card');
-    if (!card) return;
+    const card = document.getElementById('salary-calculation-card'); if (!card) return;
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
@@ -633,12 +627,11 @@
     card.innerHTML = `<h3>Поточний розрахунок ЗП (за цей місяць)</h3><p><span>Зароблено для салону:</span> <strong>${totalEarned.toFixed(0)} zł</strong></p><p><span>Ставка зарплати:</span> <strong>${salaryRate}%</strong></p><p><span>Нарахована ЗП:</span> <strong>${calculatedSalary.toFixed(0)} zł</strong></p><p><span>Взято авансів:</span> <strong style="color:var(--danger-color)">-${totalAdvances.toFixed(0)} zł</strong></p><p class="total-salary"><span>До виплати:</span> <strong>${finalPayout.toFixed(0)} zł</strong></p>`;
   }
   function renderMasterAdvancesHistory() {
-    const tableBody = document.getElementById('advances-history-table');
-    if (!tableBody) return;
+    const tableBody = document.getElementById('advances-history-table'); if (!tableBody) return;
     const sortedAdvances = state.viewingMasterAdvances.sort((a,b) => b.date.toDate() - a.date.toDate());
     tableBody.innerHTML = sortedAdvances.length > 0 ? '' : `<tr><td colspan="2">Авансів не було.</td></tr>`;
     sortedAdvances.forEach(adv => {
-        const tr = document.createElement('tr');
+        const tr = document.createElement('li');
         tr.innerHTML = `<td>${adv.date.toDate().toLocaleDateString('uk-UA')}</td><td>${adv.amount.toFixed(0)} zł</td>`;
         tableBody.appendChild(tr);
     });
@@ -682,12 +675,13 @@
     let paidAppointments = state.appointments.filter(app => app.status === 'completed' && app.completedAt && app.completedAt.toDate() >= startDate && app.completedAt.toDate() <= endDate);
     if(selectedMasterId !== 'all'){ paidAppointments = paidAppointments.filter(app => app.masterId === selectedMasterId); }
     if (paidAppointments.length === 0) { reportContainer.innerHTML = '<p>За обраний період не знайдено оплачених записів.</p>'; return; }
-    
     const masterTotals = {};
-    const advancesRef = collection(db, 'advances');
-    const q = query(advancesRef, where('date', '>=', Timestamp.fromDate(startDate)), where('date', '<=', Timestamp.fromDate(endDate)));
-    const advancesSnap = await getDocs(q);
-    const periodAdvances = advancesSnap.docs.map(d => ({...d.data()}));
+    const advancesRef = collection(db, 'advances'); // Це потенційна помилка, такої колекції немає
+    const advancesByMaster = {};
+    for (const master of state.masters) {
+        const advancesSnap = await getDocs(collection(db, 'masters', master.id, 'advances'));
+        advancesByMaster[master.id] = advancesSnap.docs.map(d => d.data());
+    }
 
     paidAppointments.forEach(appointment => {
         const masterId = appointment.masterId;
@@ -698,13 +692,11 @@
         masterTotals[masterId].totalEarned += appointment.finalPrice;
     });
 
-    periodAdvances.forEach(adv => {
-        if(masterTotals[adv.masterId]) {
-            masterTotals[adv.masterId].advances += adv.amount;
-        } else if (selectedMasterId === 'all' || selectedMasterId === adv.masterId) {
-            const master = state.masters.find(m => m.id === adv.masterId);
-            masterTotals[adv.masterId] = { name: master ? master.name : 'Невідомий', totalEarned: 0, advances: adv.amount };
-        }
+    Object.keys(masterTotals).forEach(masterId => {
+        const periodAdvances = (advancesByMaster[masterId] || [])
+            .filter(adv => adv.date.toDate() >= startDate && adv.date.toDate() <= endDate)
+            .reduce((sum, adv) => sum + adv.amount, 0);
+        masterTotals[masterId].advances = periodAdvances;
     });
 
     reportContainer.innerHTML = '';
