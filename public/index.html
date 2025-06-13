@@ -11,9 +11,16 @@
 
   <style>
     :root { 
-        --main-bg: #f4f7fa; --panel-bg: #ffffff; --text-color: #1a1a1a; --gray-text: #6c757d; 
-        --border-color: #e9ecef; --primary-color: #2c3e50; --primary-hover: #34495e; 
-        --danger-color: #e74c3c; --success-color: #27ae60; --shadow: 0 4px 12px rgba(0,0,0,0.08);
+        --main-bg: #f4f7fa; 
+        --panel-bg: #ffffff; 
+        --text-color: #1a1a1a; 
+        --gray-text: #6c757d; 
+        --border-color: #e9ecef; 
+        --primary-color: #2c3e50; 
+        --primary-hover: #34495e; 
+        --danger-color: #e74c3c; 
+        --success-color: #27ae60;
+        --shadow: 0 4px 12px rgba(0,0,0,0.08);
     } 
     body { font-family: 'Inter', Arial, sans-serif; background: var(--main-bg); margin: 0; padding: 0; color: var(--text-color); font-size: 16px; } 
     * { box-sizing: border-box; }
@@ -534,14 +541,23 @@
     if (isOverlapping) { return alert("Помилка! Цей час вже зайнятий у обраного майстра."); }
     const finalPrice = updateFinalPrice();
     const appointment = { clientName, clientId, dateTime: Timestamp.fromDate(newAppStart), serviceId, masterId, duration: service.duration || 60, manualDiscount: { value: parseFloat(document.getElementById('manual-discount-value').value) || 0, type: document.getElementById('manual-discount-type').value }, finalPrice, status: 'upcoming', paymentType: null, createdAt: Timestamp.now() };
-    try { await addDoc(collection(db, 'appointments'), appointment); alert('Запис успішно створено!'); event.target.reset(); document.getElementById('client-phone-group').style.display = 'none'; updateFinalPrice(); } catch (e) { alert('Не вдалося створити запис.'); console.error(e); }
+    try { 
+      await addDoc(collection(db, 'appointments'), appointment); 
+      alert('Запис успішно створено!'); 
+      event.target.reset(); 
+      document.getElementById('client-phone-group').style.display = 'none'; 
+      updateFinalPrice();
+    } catch (e) { 
+      console.error(e);
+      alert('Не вдалося створити запис.'); 
+    }
   }
   async function handleConfirmPayment(event) { event.preventDefault(); const appointmentId = document.getElementById('payment-appointment-id').value; const paymentType = document.getElementById('payment-modal-type').value; try { await updateDoc(doc(db, 'appointments', appointmentId), { status: 'completed', paymentType: paymentType, completedAt: Timestamp.now() }); document.getElementById('payment-modal').style.display = 'none'; } catch(e) { alert('Не вдалося провести оплату.'); } }
   // #endregion
 
   // #region Masters View
   function renderMastersView(container) {
-    container.innerHTML = `<div class="content-card"><h2>Додати нового майстра</h2><form id="add-master-form"><div class="form-group"><label for="new-master-name">Ім'я та прізвище</label><input type="text" id="new-master-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="new-master-tier">Ранг</label><input type="text" id="new-master-tier" placeholder="напр. Топ-майстер"></div><div class="form-group" style="flex:1;"><label for="new-master-modifier">Націнка (%)</label><input type="number" id="new-master-modifier" value="0" min="0"></div></div><div class="form-group"><label>Спеціалізації</label><div id="new-master-categories" class="category-checkbox-group"></div></div><button class="btn" type="submit">Додати майстра</button></form></div><div class="content-card" style="margin-top: 2rem;"><h2>Список майстрів</h2><ul id="masters-list" class="item-list"></ul></div><div class="modal-overlay" id="edit-master-modal"><div class="modal-panel"><div class="modal-header"><h2>Редагувати майстра</h2><button class="close-btn">&times;</button></div><form id="edit-master-form"><input type="hidden" id="edit-master-id"><div class="form-group"><label for="edit-master-name">Ім'я та прізвище</label><input type="text" id="edit-master-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="edit-master-tier">Ранг</label><input type="text" id="edit-master-tier"></div><div class="form-group" style="flex:1;"><label for="edit-master-modifier">Націнка (%)</label><input type="number" id="edit-master-modifier" min="0"></div></div><div class="form-group"><label>Спеціалізації</label><div id="edit-master-categories" class="category-checkbox-group"></div></div><div class="form-group"><label><input type="checkbox" id="edit-master-frozen"> Заморозити майстра (приховати з форм)</label></div><button type="submit">Зберегти зміни</button></form></div></div>`;
+    container.innerHTML = `<div class="content-card"><h2>Додати нового майстра</h2><form id="add-master-form"><div class="form-group"><label for="new-master-name">Ім'я та прізвище</label><input type="text" id="new-master-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="new-master-tier">Ранг</label><input type="text" id="new-master-tier" placeholder="напр. Топ-майстер"></div><div class="form-group" style="flex:1;"><label for="new-master-modifier">Націнка (%)</label><input type="number" id="new-master-modifier" value="0" min="0"></div></div><div class="form-group"><label>Спеціалізації</label><div id="new-master-categories" class="category-checkbox-group"></div></div><button class="btn" type="submit">Додати майстра</button></form></div><div class="content-card" style="margin-top: 2rem;"><h2>Список майстрів</h2><ul id="masters-list" class="item-list"></ul></div><div class="modal-overlay" id="edit-master-modal"><div class="modal-panel"><div class="modal-header"><h2>Редагувати майстра</h2><button class="close-btn">&times;</button></div><form id="edit-master-form"><input type="hidden" id="edit-master-id"><div class="form-group"><label for="edit-master-name">Ім'я та прізвище</label><input type="text" id="edit-master-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="edit-master-tier">Ранг</label><input type="text" id="edit-master-tier"></div><div class="form-group" style="flex:1;"><label for="edit-master-modifier">Націнка (%)</label><input type="number" id="edit-master-modifier" min="0"></div></div><div class="form-group"><label>Спеціалізації</label><div id="edit-master-categories" class="category-checkbox-group"></div></div><div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem;"><label><input type="checkbox" id="edit-master-frozen"> Заморозити майстра (приховати з форм)</label></div><button type="submit" class="btn">Зберегти зміни</button></form></div></div>`;
     document.getElementById('add-master-form').onsubmit = handleAddMaster;
     document.querySelector('#edit-master-modal .close-btn').onclick = () => document.getElementById('edit-master-modal').style.display = 'none';
     document.getElementById('edit-master-form').onsubmit = handleUpdateMaster;
@@ -551,28 +567,92 @@
     state.masters.sort((a,b) => a.name.localeCompare(b.name)).forEach(master => {
         const categories = (master.categoryIds || []).map(id => state.categories.find(c => c.id === id)?.name || '').filter(Boolean).join(', ');
         const li = document.createElement('li');
-        li.className = master.isFrozen ? 'is-frozen' : '';
+        li.className = master.isFrozen ? 'is-frozen' : 'no-hover';
         li.dataset.id = master.id;
-        li.innerHTML = `<div><strong>${master.name}</strong> ${master.tier ? `(${master.tier})` : ''} ${master.priceModifier > 0 ? `<strong style="color:var(--danger-color)">+${master.priceModifier}%</strong>` : ''}<br><small>${categories || 'Без спеціалізації'}</small></div><div class="actions"><button class="btn btn-edit" data-id="${master.id}">Профіль</button><button class="btn btn-edit" data-action="edit-profile">Ред.</button></div>`;
+        li.innerHTML = `<div><strong>${master.name}</strong> ${master.tier ? `(${master.tier})` : ''} ${master.priceModifier > 0 ? `<strong style="color:var(--danger-color)">+${master.priceModifier}%</strong>` : ''}<br><small>${categories || 'Без спеціалізації'}</small></div><div class="actions"><button class="btn btn-edit" data-id="${master.id}" data-action="edit-profile">Ред.</button></div>`;
         listEl.appendChild(li);
     });
     listEl.onclick = (event) => { 
-        const target = event.target.closest('li');
+        const masterItem = event.target.closest('li');
         const button = event.target.closest('button');
         if (button && button.dataset.action === 'edit-profile') {
-            showEditMasterModal(button.closest('li').dataset.id);
             event.stopPropagation();
-        } else if (target && !button) {
-            state.viewingMasterId = target.dataset.id; 
+            showEditMasterModal(masterItem.dataset.id);
+        } else if (masterItem) {
+            state.viewingMasterId = masterItem.dataset.id; 
             renderView('masterDetail');
         }
     };
   }
   function populateCategoryCheckboxes(elementId, checkedIds = []) { const container = document.getElementById(elementId); if (!container) return; container.innerHTML = state.categories.length ? '' : 'Спочатку додайте категорії'; state.categories.forEach(category => { const isChecked = checkedIds.includes(category.id); container.innerHTML += `<label><input type="checkbox" value="${category.id}" ${isChecked ? 'checked' : ''}> ${category.name}</label>`; }); }
   async function handleAddMaster(event) { event.preventDefault(); const name = document.getElementById('new-master-name').value.trim(); const tier = document.getElementById('new-master-tier').value.trim(); const priceModifier = parseFloat(document.getElementById('new-master-modifier').value) || 0; const categoryIds = Array.from(document.querySelectorAll('#new-master-categories input:checked')).map(el => el.value); if (!name) return alert("Введіть ім'я майстра."); try { await addDoc(collection(db, 'masters'), { name, tier, priceModifier, categoryIds, isFrozen: false }); event.target.reset(); } catch (e) { alert('Не вдалося додати майстра.'); } }
-  async function handleDeleteMaster(id) { if (!confirm('Видалити майстра?')) return; try { await deleteDoc(doc(db, 'masters', id)); } catch (e) { alert('Не вдалося видалити.'); } }
   function showEditMasterModal(id) { const master = state.masters.find(m => m.id === id); if (!master) return alert('Майстра не знайдено!'); const modal = document.getElementById('edit-master-modal'); modal.style.display = 'flex'; document.getElementById('edit-master-id').value = id; document.getElementById('edit-master-name').value = master.name; document.getElementById('edit-master-tier').value = master.tier || ''; document.getElementById('edit-master-modifier').value = master.priceModifier || 0; document.getElementById('edit-master-frozen').checked = master.isFrozen || false; populateCategoryCheckboxes('edit-master-categories', master.categoryIds || []); }
   async function handleUpdateMaster(event) { event.preventDefault(); const id = document.getElementById('edit-master-id').value; const name = document.getElementById('edit-master-name').value.trim(); const tier = document.getElementById('edit-master-tier').value.trim(); const priceModifier = parseFloat(document.getElementById('edit-master-modifier').value) || 0; const categoryIds = Array.from(document.querySelectorAll('#edit-master-categories input:checked')).map(el => el.value); const isFrozen = document.getElementById('edit-master-frozen').checked; if (!name) return alert("Ім'я не може бути порожнім."); try { await updateDoc(doc(db, 'masters', id), { name, tier, priceModifier, categoryIds, isFrozen }); document.getElementById('edit-master-modal').style.display = 'none'; } catch(e) { alert('Не вдалося оновити.'); } }
+  // #endregion
+
+  // #region Master Detail View
+  function renderMasterDetailView(container) {
+    const master = state.masters.find(m => m.id === state.viewingMasterId);
+    if (!master) {
+        container.innerHTML = `<div class="content-card"><h2>Майстра не знайдено</h2><p><button id="back-to-masters-btn" class="btn">Назад до списку</button></p></div>`;
+        document.getElementById('back-to-masters-btn').onclick = () => renderView('masters');
+        return;
+    }
+
+    container.innerHTML = `<div class="content-card"><button id="back-to-masters-btn" class="btn" style="margin-bottom: 2rem;">&larr; Назад до списку майстрів</button><h2>${master.name}</h2></div>
+    <div class="content-card" id="salary-calculation-card"><h3>Поточний розрахунок ЗП (за цей місяць)</h3><p>Завантаження...</p></div>
+    <div class="content-card"><h3>Видача авансу</h3><form id="add-advance-form" class="form-row"><div class="form-group" style="flex:1;"><label for="advance-amount">Сума авансу (zł)</label><input type="number" id="advance-amount" min="1" required></div><div class="form-group"><button type="submit" class="btn">Видати аванс</button></div></form></div>
+    <div class="content-card"><h3>Історія авансів</h3><table><thead><tr><th>Дата</th><th>Сума</th></tr></thead><tbody id="advances-history-table"><tr><td colspan="2">Завантаження...</td></tr></tbody></table></div>`;
+
+    document.getElementById('back-to-masters-btn').onclick = () => renderView('masters');
+    document.getElementById('add-advance-form').onsubmit = (e) => handleAddAdvance(e, master.id);
+    
+    if (masterAdvancesUnsubscribe) masterAdvancesUnsubscribe();
+    const advancesRef = collection(db, 'masters', master.id, 'advances');
+    masterAdvancesUnsubscribe = onSnapshot(advancesRef, (snapshot) => {
+        state.viewingMasterAdvances = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
+        renderMasterSalaryCard(master.id);
+        renderMasterAdvancesHistory(master.id);
+    });
+  }
+  function renderMasterSalaryCard(masterId) {
+    const card = document.getElementById('salary-calculation-card');
+    if (!card) return;
+    const today = new Date();
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
+    const masterAppointmentsThisMonth = state.appointments.filter(app => app.masterId === masterId && app.status === 'completed' && app.completedAt.toDate() >= startOfMonth && app.completedAt.toDate() <= endOfMonth);
+    const totalEarned = masterAppointmentsThisMonth.reduce((sum, app) => sum + app.finalPrice, 0);
+    const salaryTiers = state.settings.salaryTiers.sort((a,b) => b.threshold - a.threshold);
+    const applicableTier = salaryTiers.find(tier => totalEarned >= tier.threshold) || { rate: 0 };
+    const salaryRate = applicableTier.rate;
+    const calculatedSalary = totalEarned * (salaryRate / 100);
+    const masterAdvancesThisMonth = state.viewingMasterAdvances.filter(adv => adv.date.toDate() >= startOfMonth && adv.date.toDate() <= endOfMonth);
+    const totalAdvances = masterAdvancesThisMonth.reduce((sum, adv) => sum + adv.amount, 0);
+    const finalPayout = calculatedSalary - totalAdvances;
+    card.innerHTML = `<h3>Поточний розрахунок ЗП (за цей місяць)</h3><p><span>Зароблено для салону:</span> <strong>${totalEarned.toFixed(0)} zł</strong></p><p><span>Ставка зарплати:</span> <strong>${salaryRate}%</strong></p><p><span>Нарахована ЗП:</span> <strong>${calculatedSalary.toFixed(0)} zł</strong></p><p><span>Взято авансів:</span> <strong style="color:var(--danger-color)">-${totalAdvances.toFixed(0)} zł</strong></p><p class="total-salary"><span>До виплати:</span> <strong>${finalPayout.toFixed(0)} zł</strong></p>`;
+  }
+  function renderMasterAdvancesHistory() {
+    const tableBody = document.getElementById('advances-history-table');
+    if (!tableBody) return;
+    const sortedAdvances = state.viewingMasterAdvances.sort((a,b) => b.date.toDate() - a.date.toDate());
+    tableBody.innerHTML = sortedAdvances.length > 0 ? '' : `<tr><td colspan="2">Авансів не було.</td></tr>`;
+    sortedAdvances.forEach(adv => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${adv.date.toDate().toLocaleDateString('uk-UA')}</td><td>${adv.amount.toFixed(0)} zł</td>`;
+        tableBody.appendChild(tr);
+    });
+  }
+  async function handleAddAdvance(event, masterId) {
+    event.preventDefault();
+    const amountInput = document.getElementById('advance-amount');
+    const amount = parseInt(amountInput.value);
+    if (!amount || amount <= 0) { return alert('Введіть коректну суму авансу.'); }
+    try {
+        await addDoc(collection(db, 'masters', masterId, 'advances'), { amount: amount, date: Timestamp.now() });
+        amountInput.value = '';
+    } catch(e) { alert('Не вдалося видати аванс.'); console.error("Помилка видачі авансу:", e); }
+  }
   // #endregion
 
   // #region Services View
@@ -604,29 +684,26 @@
     if (paidAppointments.length === 0) { reportContainer.innerHTML = '<p>За обраний період не знайдено оплачених записів.</p>'; return; }
     
     const masterTotals = {};
-    const advancesSnap = await getDocs(collection(db, 'masters'));
-    let allAdvances = [];
-    for (const masterDoc of advancesSnap.docs) {
-        const advancesCol = await getDocs(collection(db, 'masters', masterDoc.id, 'advances'));
-        advancesCol.forEach(advDoc => {
-            allAdvances.push({ masterId: masterDoc.id, ...advDoc.data() });
-        });
-    }
+    const advancesRef = collection(db, 'advances');
+    const q = query(advancesRef, where('date', '>=', Timestamp.fromDate(startDate)), where('date', '<=', Timestamp.fromDate(endDate)));
+    const advancesSnap = await getDocs(q);
+    const periodAdvances = advancesSnap.docs.map(d => ({...d.data()}));
 
     paidAppointments.forEach(appointment => {
         const masterId = appointment.masterId;
         if (!masterTotals[masterId]) {
             const master = state.masters.find(m => m.id === masterId);
-            masterTotals[masterId] = { name: master ? master.name : 'Невідомий', totalEarned: 0, cash: 0, card: 0, advances: 0 };
+            masterTotals[masterId] = { name: master ? master.name : 'Невідомий', totalEarned: 0, advances: 0 };
         }
         masterTotals[masterId].totalEarned += appointment.finalPrice;
-        if (appointment.paymentType === 'cash') masterTotals[masterId].cash += appointment.finalPrice;
-        else masterTotals[masterId].card += appointment.finalPrice;
     });
 
-    allAdvances.filter(adv => adv.date.toDate() >= startDate && adv.date.toDate() <= endDate).forEach(adv => {
+    periodAdvances.forEach(adv => {
         if(masterTotals[adv.masterId]) {
             masterTotals[adv.masterId].advances += adv.amount;
+        } else if (selectedMasterId === 'all' || selectedMasterId === adv.masterId) {
+            const master = state.masters.find(m => m.id === adv.masterId);
+            masterTotals[adv.masterId] = { name: master ? master.name : 'Невідомий', totalEarned: 0, advances: adv.amount };
         }
     });
 
