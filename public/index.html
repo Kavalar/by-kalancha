@@ -22,7 +22,7 @@
         --danger-color: #e74c3c; 
         --success-color: #27ae60;
         --shadow: 0 4px 12px rgba(0,0,0,0.08);
-        --past-event-bg: #b0c4de; /* Колір для минулих подій */
+        --past-event-bg: #b0c4de;
         --past-event-border: #98adc4;
     } 
     body { font-family: 'Inter', Arial, sans-serif; background: var(--main-bg); margin: 0; padding: 0; color: var(--text-color); font-size: 16px; } 
@@ -190,7 +190,6 @@
 
   function setupRealtimeListeners() {
     if (listenersAreActive) return;
-    // Цей об'єкт тепер точно відповідає вашій базі даних.
     const collections = { 
         serviceCategories: 'categories', 
         services: 'services', 
@@ -202,10 +201,8 @@
       onSnapshot(collection(db, col), snapshot => {
         state[stateKey] = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
         if (stateKey === 'categories') state.categories.sort((a,b) => a.name.localeCompare(b.name));
-        // renderView викликається при кожному оновленні даних, що гарантує актуальність
         if (state.user) renderView(state.currentView);
       }, (error) => {
-          // Додано обробку помилок для діагностики в майбутньому
           console.error(`Помилка завантаження колекції ${col}:`, error);
           alert(`Не вдалося завантажити дані: ${col}. Перевірте консоль (F12)`);
       });
@@ -320,14 +317,15 @@
   // #region Calendar View
   function renderCalendarView(container) {
     // ===== ОСНОВНЕ ВИПРАВЛЕННЯ ТУТ =====
-    // Перевіряємо, чи завантажились майстри. Якщо ні - показуємо заглушку і чекаємо наступного оновлення.
-    if (!state.masters || state.masters.length === 0) {
-        container.innerHTML = `<div class="content-card"><p>Завантаження майстрів...</p></div>`;
+    // Фільтруємо "погані" дані з бази даних, щоб уникнути помилок
+    const cleanMasters = state.masters.filter(m => m && m.name);
+      
+    if (!state.masters || state.masters.length > 0 && cleanMasters.length === 0) {
+        container.innerHTML = `<div class="content-card"><p>Завантаження даних...</p></div>`;
         return; 
     }
-    // ===================================
       
-    const activeMasters = state.masters.filter(m => !m.isFrozen);
+    const activeMasters = cleanMasters.filter(m => !m.isFrozen);
     container.innerHTML = `<div class="content-card">
         <div id="calendar-container">
             <div class="form-group">
@@ -364,21 +362,24 @@
           ? state.appointments.filter(app => app.masterId === state.calendarSelectedMasterId)
           : state.appointments;
 
-        const events = filteredAppointments.map(app => {
-            const service = state.services.find(s => s.id === app.serviceId);
-            const endTime = new Date(app.dateTime.toDate().getTime() + (app.duration || 60) * 60000);
-            const isPast = endTime < new Date();
-            
-            return {
-                id: app.id,
-                resourceId: app.masterId,
-                title: `${app.clientName} (${service?.name || ''})`,
-                start: app.dateTime.toDate(),
-                end: endTime,
-                backgroundColor: isPast ? 'var(--past-event-bg)' : 'var(--fc-event-bg-color, #3788d8)',
-                borderColor: isPast ? 'var(--past-event-border)' : 'var(--fc-event-border-color, #3788d8)',
-                textColor: isPast ? '#333' : '#fff'
-            };
+        // Додатково фільтруємо "погані" записи, в яких може не бути дати чи клієнта
+        const events = filteredAppointments
+            .filter(app => app && app.dateTime && app.clientName)
+            .map(app => {
+                const service = state.services.find(s => s.id === app.serviceId);
+                const endTime = new Date(app.dateTime.toDate().getTime() + (app.duration || 60) * 60000);
+                const isPast = endTime < new Date();
+                
+                return {
+                    id: app.id,
+                    resourceId: app.masterId,
+                    title: `${app.clientName} (${service?.name || ''})`,
+                    start: app.dateTime.toDate(),
+                    end: endTime,
+                    backgroundColor: isPast ? 'var(--past-event-bg)' : 'var(--fc-event-bg-color, #3788d8)',
+                    borderColor: isPast ? 'var(--past-event-border)' : 'var(--fc-event-border-color, #3788d8)',
+                    textColor: isPast ? '#333' : '#fff'
+                };
         });
         successCallback(events);
       },
@@ -421,7 +422,10 @@
     const listEl = document.getElementById('clients-list');
     if (!listEl) return;
     const normalizedSearch = searchTerm.toLowerCase().trim();
-    const filteredClients = searchTerm ? state.clients.filter(client => client.name.toLowerCase().includes(normalizedSearch) || (client.phone && client.phone.includes(normalizedSearch))) : state.clients;
+    const filteredClients = searchTerm 
+        ? state.clients.filter(client => client && client.name && (client.name.toLowerCase().includes(normalizedSearch) || (client.phone && client.phone.includes(normalizedSearch)))) 
+        : state.clients.filter(client => client && client.name); // Також фільтруємо "погані" дані тут
+
     listEl.innerHTML = filteredClients.length > 0 ? '' : '<li>Клієнтів не знайдено.</li>';
     filteredClients.sort((a,b) => a.name.localeCompare(b.name)).forEach(client => {
         const li = document.createElement('li');
@@ -509,7 +513,7 @@
         phoneGroup.style.display = 'block'; phoneInput.required = true;
         const searchTerm = searchInput.value.toLowerCase().trim();
         if (searchTerm.length < 2) { searchResultsEl.style.display = 'none'; return; }
-        const results = state.clients.filter(c => c.name.toLowerCase().includes(searchTerm) || (c.phone && c.phone.includes(searchTerm)));
+        const results = state.clients.filter(c => c && c.name && (c.name.toLowerCase().includes(searchTerm) || (c.phone && c.phone.includes(searchTerm))));
         searchResultsEl.innerHTML = results.length > 0 ? results.map(c => `<div data-id="${c.id}" data-name="${c.name}" data-phone="${c.phone}">${c.name} - ${c.phone}</div>`).join('') : '';
         searchResultsEl.style.display = results.length > 0 ? 'block' : 'none';
     };
@@ -528,7 +532,7 @@
         const categoryId = categorySelect.value;
         document.getElementById('appointment-service').innerHTML = '<option value="">Оберіть послугу</option>' + state.services.filter(s => s.categoryId === categoryId).map(s => `<option value="${s.id}">${s.name}</option>`).join('');
         const masterSelect = document.getElementById('appointment-master');
-        const activeMasters = state.masters.filter(m => !m.isFrozen);
+        const activeMasters = state.masters.filter(m => m && m.name && !m.isFrozen);
         const selectedCategoryName = state.categories.find(c => c.id === categoryId)?.name;
         const mastersForCategory = activeMasters.filter(m => (m.categoryIds?.includes(categoryId)) || (m.specialization && selectedCategoryName && Array.isArray(m.specialization) && m.specialization.includes(selectedCategoryName)));
         masterSelect.innerHTML = '<option value="">Оберіть майстра</option>' + mastersForCategory.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
@@ -555,6 +559,7 @@
     const startOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
     const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
     const dailyUnpaidAppointments = state.appointments.filter(app => {
+        if(!app || !app.dateTime) return false;
         const appDate = app.dateTime.toDate();
         return app.status !== 'completed' && appDate >= startOfDay && appDate <= endOfDay;
     }).sort((a,b) => a.dateTime.toDate() - b.dateTime.toDate());
@@ -587,8 +592,8 @@
         paginationControls.appendChild(loadMoreBtn);
     }
   }
-  function populateAppointmentFormDropdowns() { const categorySelect = document.getElementById('appointment-category'); if (categorySelect) { categorySelect.innerHTML = '<option value="">Оберіть категорію</option>' + state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join(''); } }
-  function updateFinalPrice() { const serviceId = document.getElementById('appointment-service').value; const masterId = document.getElementById('appointment-master').value; const manualDiscountValue = parseFloat(document.getElementById('manual-discount-value').value) || 0; const manualDiscountType = document.getElementById('manual-discount-type').value; const priceDisplay = document.getElementById('final-price-display'); if (!serviceId || !masterId) { priceDisplay.innerText = `Сума до оплати: 0 zł`; return 0; } const service = state.services.find(s => s.id === serviceId); const category = state.categories.find(c => c.id === service?.categoryId); const master = state.masters.find(m => m.id === masterId); let price = service.price; const discountPercent = service.discount > 0 ? service.discount : (category?.discount || 0); price *= (1 - discountPercent / 100); const markupPercent = master.priceModifier || 0; price *= (1 + markupPercent / 100); if (manualDiscountType === 'percent') { price *= (1 - manualDiscountValue / 100); } else { price -= manualDiscountValue; } priceDisplay.innerText = `Сума до оплати: ${price.toFixed(0)} zł`; return price; }
+  function populateAppointmentFormDropdowns() { const categorySelect = document.getElementById('appointment-category'); if (categorySelect) { categorySelect.innerHTML = '<option value="">Оберіть категорію</option>' + state.categories.filter(c => c && c.name).map(c => `<option value="${c.id}">${c.name}</option>`).join(''); } }
+  function updateFinalPrice() { const serviceId = document.getElementById('appointment-service').value; const masterId = document.getElementById('appointment-master').value; const manualDiscountValue = parseFloat(document.getElementById('manual-discount-value').value) || 0; const manualDiscountType = document.getElementById('manual-discount-type').value; const priceDisplay = document.getElementById('final-price-display'); if (!serviceId || !masterId) { priceDisplay.innerText = `Сума до оплати: 0 zł`; return 0; } const service = state.services.find(s => s.id === serviceId); const category = state.categories.find(c => c.id === service?.categoryId); const master = state.masters.find(m => m.id === masterId); if (!service || !master) { priceDisplay.innerText = `Сума до оплати: 0 zł`; return 0; } let price = service.price; const discountPercent = service.discount > 0 ? service.discount : (category?.discount || 0); price *= (1 - discountPercent / 100); const markupPercent = master.priceModifier || 0; price *= (1 + markupPercent / 100); if (manualDiscountType === 'percent') { price *= (1 - manualDiscountValue / 100); } else { price -= manualDiscountValue; } priceDisplay.innerText = `Сума до оплати: ${price.toFixed(0)} zł`; return price; }
   async function handleAddAppointment(event) {
     event.preventDefault();
     let clientId; let clientName = document.getElementById('client-search-input').value.trim(); let clientPhone = document.getElementById('client-phone-input').value.trim();
@@ -631,8 +636,9 @@
     document.getElementById('edit-master-form').onsubmit = handleUpdateMaster;
     populateCategoryCheckboxes('new-master-categories');
     const listEl = document.getElementById('masters-list');
-    listEl.innerHTML = state.masters.length > 0 ? '' : '<li>Немає майстрів.</li>';
-    state.masters.sort((a,b) => a.name.localeCompare(b.name)).forEach(master => {
+    const cleanMasters = state.masters.filter(m => m && m.name);
+    listEl.innerHTML = cleanMasters.length > 0 ? '' : '<li>Немає майстрів.</li>';
+    cleanMasters.sort((a,b) => a.name.localeCompare(b.name)).forEach(master => {
         const categories = (master.categoryIds || []).map(id => state.categories.find(c => c.id === id)?.name || '').filter(Boolean).join(', ');
         const li = document.createElement('li');
         li.className = master.isFrozen ? 'is-frozen' : '';
@@ -658,7 +664,7 @@
         }
     };
   }
-  function populateCategoryCheckboxes(elementId, checkedIds = []) { const container = document.getElementById(elementId); if (!container) return; container.innerHTML = state.categories.length ? '' : 'Спочатку додайте категорії'; state.categories.forEach(category => { const isChecked = checkedIds.includes(category.id); container.innerHTML += `<label><input type="checkbox" value="${category.id}" ${isChecked ? 'checked' : ''}> ${category.name}</label>`; }); }
+  function populateCategoryCheckboxes(elementId, checkedIds = []) { const container = document.getElementById(elementId); if (!container) return; const cleanCategories = state.categories.filter(c => c && c.name); container.innerHTML = cleanCategories.length ? '' : 'Спочатку додайте категорії'; cleanCategories.forEach(category => { const isChecked = checkedIds.includes(category.id); container.innerHTML += `<label><input type="checkbox" value="${category.id}" ${isChecked ? 'checked' : ''}> ${category.name}</label>`; }); }
   async function handleAddMaster(event) { event.preventDefault(); const name = document.getElementById('new-master-name').value.trim(); const tier = document.getElementById('new-master-tier').value.trim(); const priceModifier = parseFloat(document.getElementById('new-master-modifier').value) || 0; const categoryIds = Array.from(document.querySelectorAll('#new-master-categories input:checked')).map(el => el.value); if (!name) return alert("Введіть ім'я майстра."); try { await addDoc(collection(db, 'masters'), { name, tier, priceModifier, categoryIds, isFrozen: false }); event.target.reset(); } catch (e) { alert('Не вдалося додати майстра.'); } }
   function showEditMasterModal(id) { const master = state.masters.find(m => m.id === id); if (!master) return alert('Майстра не знайдено!'); const modal = document.getElementById('edit-master-modal'); modal.style.display = 'flex'; document.getElementById('edit-master-id').value = id; document.getElementById('edit-master-name').value = master.name; document.getElementById('edit-master-tier').value = master.tier || ''; document.getElementById('edit-master-modifier').value = master.priceModifier || 0; document.getElementById('edit-master-frozen').checked = master.isFrozen || false; populateCategoryCheckboxes('edit-master-categories', master.categoryIds || []); }
   async function handleUpdateMaster(event) { event.preventDefault(); const id = document.getElementById('edit-master-id').value; const name = document.getElementById('edit-master-name').value.trim(); const tier = document.getElementById('edit-master-tier').value.trim(); const priceModifier = parseFloat(document.getElementById('edit-master-modifier').value) || 0; const categoryIds = Array.from(document.querySelectorAll('#edit-master-categories input:checked')).map(el => el.value); const isFrozen = document.getElementById('edit-master-frozen').checked; if (!name) return alert("Ім'я не може бути порожнім."); try { await updateDoc(doc(db, 'masters', id), { name, tier, priceModifier, categoryIds, isFrozen }); document.getElementById('edit-master-modal').style.display = 'none'; } catch(e) { alert('Не вдалося оновити.'); } }
@@ -688,7 +694,7 @@
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
-    const masterAppointmentsThisMonth = state.appointments.filter(app => app.masterId === masterId && app.status === 'completed' && app.completedAt.toDate() >= startOfMonth && app.completedAt.toDate() <= endOfMonth);
+    const masterAppointmentsThisMonth = state.appointments.filter(app => app.masterId === masterId && app.status === 'completed' && app.completedAt && app.completedAt.toDate() >= startOfMonth && app.completedAt.toDate() <= endOfMonth);
     const totalEarned = masterAppointmentsThisMonth.reduce((sum, app) => sum + app.finalPrice, 0);
     const salaryTiers = state.settings.salaryTiers.sort((a,b) => b.threshold - a.threshold);
     const applicableTier = salaryTiers.find(tier => totalEarned >= tier.threshold) || { rate: 0 };
@@ -723,8 +729,8 @@
 
   // #region Services View
   function renderServicesView(container) { container.innerHTML = `<div class="services-layout"><div class="content-card"><h2>Категорії</h2><form id="add-category-form" class="form-group"><input type="text" id="new-category-name" placeholder="Нова категорія..." required><button class="btn" type="submit" style="width:100%; margin-top:0.5rem;">Додати</button></form><ul id="categories-list" class="item-list"></ul></div><div id="services-container"><div class="content-card"><p>Оберіть категорію зліва.</p></div></div></div><div class="modal-overlay" id="edit-category-modal"><div class="modal-panel"><div class="modal-header"><h2>Редагувати категорію</h2><button class="close-btn">&times;</button></div><form id="edit-category-form"><input type="hidden" id="edit-category-id"><div class="form-group"><label for="edit-category-name">Назва категорії</label><input type="text" id="edit-category-name" required></div><div class="form-group"><label for="edit-category-discount">Акційна знижка (%)</label><input type="number" id="edit-category-discount" min="0" max="100" value="0"></div><button type="submit">Зберегти зміни</button></form></div></div><div class="modal-overlay" id="edit-service-modal"><div class="modal-panel"><div class="modal-header"><h2 id="service-modal-title">Послуга</h2><button class="close-btn">&times;</button></div><form id="edit-service-form"><input type="hidden" id="edit-service-id"><div class="form-group"><label for="edit-service-name">Назва</label><input type="text" id="edit-service-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="edit-service-duration">Тривалість (хв)</label><input type="number" id="edit-service-duration" required min="0"></div><div class="form-group" style="flex:1;"><label for="edit-service-price">Ціна (zł)</label><input type="number" id="edit-service-price" required min="0"></div></div><div class="form-group"><label for="edit-service-discount">Персональна знижка (%)</label><input type="number" id="edit-service-discount" min="0" max="100" value="0"></div><button type="submit">Зберегти</button></form></div></div>`; setupCategoriesLogic(); if (state.selectedCategoryId) { renderServicesForCategory(); } }
-  function setupCategoriesLogic() { document.getElementById('add-category-form').onsubmit = handleAddCategory; document.getElementById('edit-category-modal').querySelector('.close-btn').onclick = () => document.getElementById('edit-category-modal').style.display = 'none'; document.getElementById('edit-category-form').onsubmit = handleUpdateCategory; const categoriesListEl = document.getElementById('categories-list'); categoriesListEl.innerHTML = state.categories.length > 0 ? '' : '<li>Немає категорій.</li>'; state.categories.forEach(category => { const li = document.createElement('li'); li.className = 'category-list-item'; li.dataset.id = category.id; if (category.id === state.selectedCategoryId) li.classList.add('selected'); li.innerHTML = `<span>${category.name} ${category.discount ? `<strong style="color:var(--danger-color);">-`+category.discount+'%</strong>' : ''}</span><div class="actions"><button class="btn btn-edit" data-id="${category.id}" data-name="${category.name}" data-discount="${category.discount || 0}">✏️</button><button class="btn btn-delete" data-id="${category.id}">🗑️</button></div>`; categoriesListEl.appendChild(li); }); categoriesListEl.onclick = (event) => { const target = event.target; if (target.closest('.btn-delete')) { handleDeleteCategory(target.closest('.btn-delete').dataset.id); } else if (target.closest('.btn-edit')) { const btn = target.closest('.btn-edit'); showEditCategoryModal(btn.dataset.id, btn.dataset.name, btn.dataset.discount); } else if (target.closest('.category-list-item')) { state.selectedCategoryId = target.closest('.category-list-item').dataset.id; renderView('services'); } }; }
-  function renderServicesForCategory() { const categoryId = state.selectedCategoryId; const servicesContainer = document.getElementById('services-container'); const category = state.categories.find(c => c.id === categoryId); const categoryName = category ? category.name : ''; servicesContainer.innerHTML = `<div class="content-card"><div style="display:flex; justify-content:space-between; align-items:center;"><h2>Послуги: ${categoryName}</h2><button id="add-service-btn" class="btn">Додати послугу</button></div><ul id="services-list" class="item-list"></ul></div>`; document.getElementById('add-service-btn').onclick = () => showServiceModal(); const servicesListEl = document.getElementById('services-list'); const filteredServices = state.services.filter(s => s.categoryId === categoryId).sort((a,b)=>a.name.localeCompare(b.name)); servicesListEl.innerHTML = filteredServices.length > 0 ? '' : '<li>Немає послуг в цій категорії.</li>'; filteredServices.forEach(service => { const finalDiscount = (service.discount > 0) ? service.discount : (category?.discount || 0); const discountedPrice = service.price * (1 - finalDiscount / 100); const li = document.createElement('li'); li.innerHTML = `<div><strong>${service.name}</strong><br><small>${service.duration || 'N/A'} хв. ${service.discount > 0 ? `(Знижка ${service.discount}%)` : ''}</small></div><div class="price-display">${finalDiscount > 0 ? `<span class="old-price">${service.price} zł</span>` : ''}<span class="new-price">${discountedPrice.toFixed(0)} zł</span></div><div class="actions"><button class="btn btn-edit btn-edit-service" data-id="${service.id}" data-name="${service.name}" data-duration="${service.duration}" data-price="${service.price}" data-discount="${service.discount || 0}">✏️</button><button class="btn btn-delete btn-delete-service" data-id="${service.id}">🗑️</button></div>`; servicesListEl.appendChild(li); }); servicesListEl.onclick = (event) => { const target = event.target.closest('button'); if (!target) return; if (target.classList.contains('btn-delete-service')) handleDeleteService(target.dataset.id); if (target.classList.contains('btn-edit-service')) showServiceModal(target.dataset.id, target.dataset); }; }
+  function setupCategoriesLogic() { document.getElementById('add-category-form').onsubmit = handleAddCategory; document.getElementById('edit-category-modal').querySelector('.close-btn').onclick = () => document.getElementById('edit-category-modal').style.display = 'none'; document.getElementById('edit-category-form').onsubmit = handleUpdateCategory; const categoriesListEl = document.getElementById('categories-list'); const cleanCategories = state.categories.filter(c => c && c.name); categoriesListEl.innerHTML = cleanCategories.length > 0 ? '' : '<li>Немає категорій.</li>'; cleanCategories.forEach(category => { const li = document.createElement('li'); li.className = 'category-list-item'; li.dataset.id = category.id; if (category.id === state.selectedCategoryId) li.classList.add('selected'); li.innerHTML = `<span>${category.name} ${category.discount ? `<strong style="color:var(--danger-color);">-`+category.discount+'%</strong>' : ''}</span><div class="actions"><button class="btn btn-edit" data-id="${category.id}" data-name="${category.name}" data-discount="${category.discount || 0}">✏️</button><button class="btn btn-delete" data-id="${category.id}">🗑️</button></div>`; categoriesListEl.appendChild(li); }); categoriesListEl.onclick = (event) => { const target = event.target; if (target.closest('.btn-delete')) { handleDeleteCategory(target.closest('.btn-delete').dataset.id); } else if (target.closest('.btn-edit')) { const btn = target.closest('.btn-edit'); showEditCategoryModal(btn.dataset.id, btn.dataset.name, btn.dataset.discount); } else if (target.closest('.category-list-item')) { state.selectedCategoryId = target.closest('.category-list-item').dataset.id; renderView('services'); } }; }
+  function renderServicesForCategory() { const categoryId = state.selectedCategoryId; const servicesContainer = document.getElementById('services-container'); const category = state.categories.find(c => c.id === categoryId); const categoryName = category ? category.name : ''; servicesContainer.innerHTML = `<div class="content-card"><div style="display:flex; justify-content:space-between; align-items:center;"><h2>Послуги: ${categoryName}</h2><button id="add-service-btn" class="btn">Додати послугу</button></div><ul id="services-list" class="item-list"></ul></div>`; document.getElementById('add-service-btn').onclick = () => showServiceModal(); const servicesListEl = document.getElementById('services-list'); const filteredServices = state.services.filter(s => s && s.name && s.categoryId === categoryId).sort((a,b)=>a.name.localeCompare(b.name)); servicesListEl.innerHTML = filteredServices.length > 0 ? '' : '<li>Немає послуг в цій категорії.</li>'; filteredServices.forEach(service => { const finalDiscount = (service.discount > 0) ? service.discount : (category?.discount || 0); const discountedPrice = service.price * (1 - finalDiscount / 100); const li = document.createElement('li'); li.innerHTML = `<div><strong>${service.name}</strong><br><small>${service.duration || 'N/A'} хв. ${service.discount > 0 ? `(Знижка ${service.discount}%)` : ''}</small></div><div class="price-display">${finalDiscount > 0 ? `<span class="old-price">${service.price} zł</span>` : ''}<span class="new-price">${discountedPrice.toFixed(0)} zł</span></div><div class="actions"><button class="btn btn-edit btn-edit-service" data-id="${service.id}" data-name="${service.name}" data-duration="${service.duration}" data-price="${service.price}" data-discount="${service.discount || 0}">✏️</button><button class="btn btn-delete btn-delete-service" data-id="${service.id}">🗑️</button></div>`; servicesListEl.appendChild(li); }); servicesListEl.onclick = (event) => { const target = event.target.closest('button'); if (!target) return; if (target.classList.contains('btn-delete-service')) handleDeleteService(target.dataset.id); if (target.classList.contains('btn-edit-service')) showServiceModal(target.dataset.id, target.dataset); }; }
   async function handleAddCategory(event) { event.preventDefault(); const nameInput = document.getElementById('new-category-name'); const name = nameInput.value.trim(); if (!name) return; try { await addDoc(collection(db, 'serviceCategories'), { name, discount: 0 }); nameInput.value = ''; } catch (e) { alert('Не вдалося додати.'); } }
   async function handleDeleteCategory(id) { if (!confirm('Видалити категорію та всі послуги в ній?')) return; try { await deleteDoc(doc(db, 'serviceCategories', id)); if (state.selectedCategoryId === id) { state.selectedCategoryId = null; } } catch (e) { alert('Не вдалося видалити.'); } }
   function showEditCategoryModal(id, name, discount) { const modal = document.getElementById('edit-category-modal'); modal.style.display = 'flex'; document.getElementById('edit-category-id').value = id; document.getElementById('edit-category-name').value = name; document.getElementById('edit-category-discount').value = discount || 0; }
@@ -736,7 +742,7 @@
   // #endregion
 
   // #region Salary View
-  function renderSalaryView(container) { const today = new Date(); const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0]; const todayStr = today.toISOString().split('T')[0]; container.innerHTML = `<div class="content-card"><h2>Розрахунок зарплати</h2><div class="form-row"><div class="form-group" style="flex:1;"> <label for="salary-start-date">З</label> <input type="date" id="salary-start-date" value="${firstDayOfMonth}"> </div><div class="form-group" style="flex:1;"> <label for="salary-end-date">По</label> <input type="date" id="salary-end-date" value="${todayStr}"> </div></div><div class="form-group"><label for="salary-master-filter">Майстер</label><select id="salary-master-filter"><option value="all">Всі майстри</option>${state.masters.filter(m => !m.isFrozen).map(m => `<option value="${m.id}">${m.name}</option>`).join('')}</select></div><button id="calculate-salary-btn" class="btn" style="width: 100%;">Розрахувати</button></div><div id="salary-report" style="margin-top: 2rem;"></div>`; document.getElementById('calculate-salary-btn').onclick = handleCalculateSalary; }
+  function renderSalaryView(container) { const today = new Date(); const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0]; const todayStr = today.toISOString().split('T')[0]; const cleanMasters = state.masters.filter(m => m && m.name); container.innerHTML = `<div class="content-card"><h2>Розрахунок зарплати</h2><div class="form-row"><div class="form-group" style="flex:1;"> <label for="salary-start-date">З</label> <input type="date" id="salary-start-date" value="${firstDayOfMonth}"> </div><div class="form-group" style="flex:1;"> <label for="salary-end-date">По</label> <input type="date" id="salary-end-date" value="${todayStr}"> </div></div><div class="form-group"><label for="salary-master-filter">Майстер</label><select id="salary-master-filter"><option value="all">Всі майстри</option>${cleanMasters.filter(m => !m.isFrozen).map(m => `<option value="${m.id}">${m.name}</option>`).join('')}</select></div><button id="calculate-salary-btn" class="btn" style="width: 100%;">Розрахувати</button></div><div id="salary-report" style="margin-top: 2rem;"></div>`; document.getElementById('calculate-salary-btn').onclick = handleCalculateSalary; }
   async function handleCalculateSalary() {
     const startDate = new Date(document.getElementById('salary-start-date').value);
     const endDate = new Date(document.getElementById('salary-end-date').value);
@@ -745,12 +751,13 @@
     reportContainer.innerHTML = '<p>Розрахунок...</p>';
     const selectedMasterId = document.getElementById('salary-master-filter').value;
     const salaryTiers = state.settings.salaryTiers.sort((a,b) => b.threshold - a.threshold);
-    let paidAppointments = state.appointments.filter(app => app.status === 'completed' && app.completedAt && app.completedAt.toDate() >= startDate && app.completedAt.toDate() <= endDate);
+    let paidAppointments = state.appointments.filter(app => app && app.status === 'completed' && app.completedAt && app.completedAt.toDate() >= startDate && app.completedAt.toDate() <= endDate);
     if(selectedMasterId !== 'all'){ paidAppointments = paidAppointments.filter(app => app.masterId === selectedMasterId); }
     if (paidAppointments.length === 0) { reportContainer.innerHTML = '<p>За обраний період не знайдено оплачених записів.</p>'; return; }
     const masterTotals = {};
     const advancesByMaster = {};
     for (const master of state.masters) {
+        if (!master || !master.id) continue;
         const advancesSnap = await getDocs(collection(db, 'masters', master.id, 'advances'));
         advancesByMaster[master.id] = advancesSnap.docs.map(d => d.data());
     }
