@@ -7,6 +7,7 @@
   <link href="https://fonts.googleapis.com/css?family=Inter:400,600&display=swap" rel="stylesheet">
   
   <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
+  <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/resource@6.1.11/index.global.min.js'></script>
   <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/core/locales/uk.global.js'></script>
 
   <style>
@@ -21,6 +22,8 @@
         --danger-color: #e74c3c; 
         --success-color: #27ae60;
         --shadow: 0 4px 12px rgba(0,0,0,0.08);
+        --past-event-bg: #b0c4de; /* Колір для минулих подій */
+        --past-event-border: #98adc4;
     } 
     body { font-family: 'Inter', Arial, sans-serif; background: var(--main-bg); margin: 0; padding: 0; color: var(--text-color); font-size: 16px; } 
     * { box-sizing: border-box; }
@@ -61,7 +64,9 @@
     .actions { display: flex; gap: 0.5rem; align-items: center; }
     
     .btn, button { font-family: 'Inter', sans-serif; cursor: pointer; border-radius: 6px; padding: 0.5rem 1rem; font-weight: 600; text-decoration: none; display: inline-block; text-align: center; transition: all .2s; }
-    .btn-edit, .btn-delete { border: 1px solid; background-color: transparent; }
+    .btn-profile, .btn-edit, .btn-delete { border: 1px solid; background-color: transparent; }
+    .btn-profile { color: var(--primary-color); border-color: var(--primary-color); }
+    .btn-profile:hover { background-color: var(--primary-color); color: #fff; }
     .btn-edit { color: var(--gray-text); border-color: var(--gray-text); }
     .btn-edit:hover { background-color: var(--gray-text); color: #fff; }
     .btn-delete { color: var(--danger-color); border-color: var(--danger-color); }
@@ -306,27 +311,60 @@
   // #region Calendar View
   function renderCalendarView(container) {
     const activeMasters = state.masters.filter(m => !m.isFrozen);
-    container.innerHTML = `<div class="content-card"><div id="calendar-container"><div class="form-group"><label for="calendar-master-filter">Показати розклад для:</label><select id="calendar-master-filter"><option value="all">Всі майстри</option>${activeMasters.map(m => `<option value="${m.id}" ${state.calendarSelectedMasterId === m.id ? 'selected' : ''}>${m.name}</option>`).join('')}</select></div><div id="calendar"></div></div></div>`;
+    container.innerHTML = `<div class="content-card">
+        <div id="calendar-container">
+            <div class="form-group">
+                <label for="calendar-master-filter">Показати розклад для:</label>
+                <select id="calendar-master-filter">
+                    <option value="all">Всі майстри</option>
+                    ${activeMasters.map(m => `<option value="${m.id}" ${state.calendarSelectedMasterId === m.id ? 'selected' : ''}>${m.name}</option>`).join('')}
+                </select>
+            </div>
+            <div id="calendar"></div>
+        </div>
+    </div>`;
     
     const calendarEl = document.getElementById('calendar');
     const masterFilter = document.getElementById('calendar-master-filter');
     if (!calendarEl || !masterFilter) return;
 
-    const colorPalette = ['#3788d8', '#e25141', '#4caf50', '#ff9800', '#9c27b0', '#795548', '#607d8b'];
+    // FullCalendar потребує ліцензії для resource views. Без неї може з'являтись попередження.
+    // schedulerLicenseKey: 'GPL-My-Project-Is-Open-Source', // або ваш комерційний ключ
+
+    const isResourceView = state.calendarSelectedMasterId === 'all';
     
     const calendar = new FullCalendar.Calendar(calendarEl, {
-      locale: 'uk', initialView: 'timeGridWeek', 
-      headerToolbar: { left: 'prev,next today', center: 'title', right: 'timeGridWeek,timeGridDay' },
-      editable: false, selectable: true,
+      locale: 'uk',
+      initialView: isResourceView ? 'resourceTimeGridDay' : 'timeGridWeek',
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: isResourceView ? 'resourceTimeGridDay,timeGridWeek' : 'timeGridWeek,timeGridDay'
+      },
+      editable: false,
+      selectable: true,
+      nowIndicator: true, // Лінія поточного часу
+      resources: isResourceView ? activeMasters.map(m => ({ id: m.id, title: m.name })) : [],
       events: function(fetchInfo, successCallback, failureCallback) {
-        const filteredAppointments = state.calendarSelectedMasterId === 'all' 
-            ? state.appointments 
-            : state.appointments.filter(app => app.masterId === state.calendarSelectedMasterId);
+        const filteredAppointments = !isResourceView
+          ? state.appointments.filter(app => app.masterId === state.calendarSelectedMasterId)
+          : state.appointments;
+
         const events = filteredAppointments.map(app => {
             const service = state.services.find(s => s.id === app.serviceId);
-            const masterIndex = state.masters.findIndex(m => m.id === app.masterId);
             const endTime = new Date(app.dateTime.toDate().getTime() + (app.duration || 60) * 60000);
-            return { id: app.id, title: `${app.clientName} (${service?.name || ''})`, start: app.dateTime.toDate(), end: endTime, backgroundColor: colorPalette[masterIndex % colorPalette.length], borderColor: colorPalette[masterIndex % colorPalette.length]};
+            const isPast = endTime < new Date();
+            
+            return {
+                id: app.id,
+                resourceId: app.masterId,
+                title: `${app.clientName} (${service?.name || ''})`,
+                start: app.dateTime.toDate(),
+                end: endTime,
+                backgroundColor: isPast ? 'var(--past-event-bg)' : 'var(--fc-event-bg-color, #3788d8)',
+                borderColor: isPast ? 'var(--past-event-border)' : 'var(--fc-event-border-color, #3788d8)',
+                textColor: isPast ? '#333' : '#fff'
+            };
         });
         successCallback(events);
       },
@@ -345,10 +383,15 @@
       },
       select: function(selectionInfo) {
         state.preselectedAppointment = { dateTime: selectionInfo.start };
-        if (state.calendarSelectedMasterId !== 'all') { state.preselectedAppointment.masterId = state.calendarSelectedMasterId; }
+        // Якщо обрано конкретного майстра або в режимі ресурсів клікнуто на колонку
+        const selectedMaster = isResourceView ? selectionInfo.resource?.id : state.calendarSelectedMasterId;
+        if (selectedMaster && selectedMaster !== 'all') {
+             state.preselectedAppointment.masterId = selectedMaster;
+        }
         renderView('appointments');
       }
     });
+    
     calendar.render();
     masterFilter.onchange = (e) => { state.calendarSelectedMasterId = e.target.value; renderView('calendar'); };
   }
@@ -369,7 +412,7 @@
     listEl.innerHTML = filteredClients.length > 0 ? '' : '<li>Клієнтів не знайдено.</li>';
     filteredClients.sort((a,b) => a.name.localeCompare(b.name)).forEach(client => {
         const li = document.createElement('li');
-        li.innerHTML = `<div><strong>${client.name}</strong><br><small>${client.phone || 'Телефон не вказано'}</small></div><div><button class="btn-edit btn-view-history" data-id="${client.id}">Історія</button></div>`;
+        li.innerHTML = `<div><strong>${client.name}</strong><br><small>${client.phone || 'Телефон не вказано'}</small></div><div><button class="btn btn-view-history" data-id="${client.id}">Історія</button></div>`;
         listEl.appendChild(li);
     });
     listEl.onclick = (e) => {
@@ -418,12 +461,28 @@
       const d = new Date(dateTime.getTime() - (dateTime.getTimezoneOffset() * 60000));
       document.getElementById('appointment-datetime').value = d.toISOString().slice(0, 16);
       if (masterId) { 
-        document.getElementById('appointment-master').value = masterId; 
+        // Need to find which category this master belongs to, to pre-select it
         const master = state.masters.find(m => m.id === masterId);
         const firstCategoryId = master?.categoryIds?.[0];
         if (firstCategoryId) {
-            document.getElementById('appointment-category').value = firstCategoryId;
-            document.getElementById('appointment-category').dispatchEvent(new Event('change'));
+            // We need to wait for the dropdowns to populate, then set values
+            setTimeout(() => {
+                const categorySelect = document.getElementById('appointment-category');
+                if (categorySelect) {
+                    categorySelect.value = firstCategoryId;
+                    // Manually trigger change to populate services and masters
+                    categorySelect.dispatchEvent(new Event('change'));
+                    
+                    // Now set the master
+                    setTimeout(() => {
+                        const masterSelect = document.getElementById('appointment-master');
+                        if (masterSelect) {
+                           masterSelect.value = masterId;
+                           masterSelect.dispatchEvent(new Event('input')); // for price update
+                        }
+                    }, 50); // Small delay for master list to populate
+                }
+            }, 50); // Small delay for category list to populate
         }
       }
       state.preselectedAppointment = null;
@@ -568,20 +627,26 @@
         const categories = (master.categoryIds || []).map(id => state.categories.find(c => c.id === id)?.name || '').filter(Boolean).join(', ');
         const li = document.createElement('li');
         li.className = master.isFrozen ? 'is-frozen' : '';
-        li.innerHTML = `<div class="master-info-clickable" data-id="${master.id}"><strong>${master.name}</strong> ${master.tier ? `(${master.tier})` : ''} ${master.priceModifier > 0 ? `<strong style="color:var(--danger-color)">+${master.priceModifier}%</strong>` : ''}<br><small>${categories || 'Без спеціалізації'}</small></div><div class="actions"><button class="btn btn-edit" data-id="${master.id}" data-action="edit-profile">Ред.</button></div>`;
+        // Змінено: додано кнопку Профіль, видалено клікабельність з блоку інформації
+        li.innerHTML = `<div><strong>${master.name}</strong> ${master.tier ? `(${master.tier})` : ''} ${master.priceModifier > 0 ? `<strong style="color:var(--danger-color)">+${master.priceModifier}%</strong>` : ''}<br><small>${categories || 'Без спеціалізації'}</small></div>
+                        <div class="actions">
+                            <button class="btn btn-profile" data-id="${master.id}" data-action="view-profile">Профіль</button>
+                            <button class="btn btn-edit" data-id="${master.id}" data-action="edit-profile">Ред.</button>
+                        </div>`;
         listEl.appendChild(li);
     });
     listEl.onclick = (event) => { 
-        const button = event.target.closest('button[data-action="edit-profile"]');
-        if (button) {
-            event.stopPropagation();
-            showEditMasterModal(button.dataset.id);
-        } else {
-            const masterItem = event.target.closest('li');
-            if (masterItem) {
-                state.viewingMasterId = masterItem.querySelector('.master-info-clickable').dataset.id; 
-                renderView('masterDetail');
-            }
+        const button = event.target.closest('button');
+        if (!button) return;
+        
+        const action = button.dataset.action;
+        const masterId = button.dataset.id;
+        
+        if (action === 'edit-profile') {
+            showEditMasterModal(masterId);
+        } else if (action === 'view-profile') {
+            state.viewingMasterId = masterId; 
+            renderView('masterDetail');
         }
     };
   }
@@ -631,7 +696,7 @@
     const sortedAdvances = state.viewingMasterAdvances.sort((a,b) => b.date.toDate() - a.date.toDate());
     tableBody.innerHTML = sortedAdvances.length > 0 ? '' : `<tr><td colspan="2">Авансів не було.</td></tr>`;
     sortedAdvances.forEach(adv => {
-        const tr = document.createElement('li');
+        const tr = document.createElement('tr'); // Changed li to tr for table
         tr.innerHTML = `<td>${adv.date.toDate().toLocaleDateString('uk-UA')}</td><td>${adv.amount.toFixed(0)} zł</td>`;
         tableBody.appendChild(tr);
     });
@@ -676,7 +741,6 @@
     if(selectedMasterId !== 'all'){ paidAppointments = paidAppointments.filter(app => app.masterId === selectedMasterId); }
     if (paidAppointments.length === 0) { reportContainer.innerHTML = '<p>За обраний період не знайдено оплачених записів.</p>'; return; }
     const masterTotals = {};
-    const advancesRef = collection(db, 'advances'); // Це потенційна помилка, такої колекції немає
     const advancesByMaster = {};
     for (const master of state.masters) {
         const advancesSnap = await getDocs(collection(db, 'masters', master.id, 'advances'));
