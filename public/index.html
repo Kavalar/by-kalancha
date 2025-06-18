@@ -181,7 +181,7 @@
     user: null, selectedCategoryId: null, categories: [], services: [], masters: [], appointments: [], clients: [],
     settings: { salaryTiers: [] },
     currentView: 'calendar',
-    activeSalonFilter: 'all', 
+    activeSalonFilter: 'all',
     preselectedAppointment: null,
     calendarSelectedMasterId: 'all',
     editingAppointmentId: null,
@@ -429,7 +429,7 @@
       eventContent: function(arg) {
         const appointment = arg.event.extendedProps.appointment;
         const service = state.services.find(s => s.id === appointment.serviceId);
-        const salonIndicator = appointment.salonId === 'nowa' ? '(N)' : '(S)';
+        const salonIndicator = appointment.salonId ? (appointment.salonId === 'nowa' ? '(N)' : '(S)') : '';
         const html = `
           <div class="fc-event-main-frame">
             <div class="fc-event-title">${salonIndicator} <span class="math-inline">\{appointment\.clientName\}</div\>
@@ -467,9 +467,10 @@
     const client = state.clients.find(c => c.id === appointment.clientId);
     const service = state.services.find(s => s.id === appointment.serviceId);
     const master = state.masters.find(m => m.id === appointment.masterId);
+    const salonName = appointment.salonId ? (appointment.salonId === 'nowa' ? 'Nowa' : 'Solna') : 'Не вказано';
 
     detailsEl.innerHTML = `
-      <p><strong>Салон:</strong> ${appointment.salonId === 'nowa' ? 'Nowa' : 'Solna'}</p>
+      <p><strong>Салон:</strong> ${salonName}</p>
       <p><strong>Клієнт:</strong> <span class="math-inline">\{appointment\.clientName\} \(</span>{client?.phone || 'не вказано'})</p>
       <p><strong>Послуга:</strong> ${service?.name || 'Невідома послуга'}</p>
       <p><strong>Майстер:</strong> ${master?.name || 'Невідомий майстер'}</p>
@@ -722,10 +723,7 @@
             renderView('calendar');
         };
     } else {
-        // This is not an ideal place for this, but it works for now.
-        // It should be attached only once.
         document.getElementById('payment-form').onsubmit = handleConfirmPayment;
-
         const searchInput = document.getElementById('client-search-input');
         const searchResultsEl = document.getElementById('client-search-results');
         const phoneGroup = document.getElementById('client-phone-group');
