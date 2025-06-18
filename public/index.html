@@ -981,7 +981,44 @@
   // #endregion
 
   // #region Salary View
-  function renderSalaryView(container) { const today = new Date(); const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0]; const todayStr = today.toISOString().split('T')[0]; container.innerHTML = `<div class="content-card"><h2>Розрахунок зарплати</h2><div class="form-row"><div class="form-group" style="flex:1;"> <label for="salary-start-date">З</label> <input type="date" id="salary-start-date" value="<span class="math-inline">\{firstDayOfMonth\}"\> </div\><div class\="form\-group" style\="flex\:1;"\> <label for\="salary\-end\-date"\>По</label\> <input type\="date" id\="salary\-end\-date" value\="</span>{todayStr}"> </div></div><div class="form-group"><label for="salary-master-filter">Майстер</label><select id="salary-master-filter"><option value="all">Всі майстри</option>${state.masters.filter(m => !m.isFrozen).map(m => `<option value="${m.id}">${m.name}</option>`).join('')}</select></div><button id="calculate-salary-btn" class="btn" style="width: 100%;">Розрахувати</button></div><div id="salary-report" style="margin-top: 2rem;"></div>`; document.getElementById('calculate-salary-btn').onclick = handleCalculateSalary; }
+  function renderSalaryView(container) {
+  const today = new Date();
+  const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+  const todayStr = today.toISOString().split('T')[0];
+
+  // Використовуємо правильні лапки (``) для створення списку опцій
+  const masterOptions = state.masters
+      .filter(m => !m.isFrozen)
+      .map(m => `<option value="${m.id}">${m.name}</option>`)
+      .join('');
+
+  // І також використовуємо `` для всього шаблону, щоб вставити змінні
+  container.innerHTML = `
+    <div class="content-card">
+        <h2>Розрахунок зарплати</h2>
+        <div class="form-row">
+            <div class="form-group" style="flex:1;">
+                <label for="salary-start-date">З</label>
+                <input type="date" id="salary-start-date" value="${firstDayOfMonth}">
+            </div>
+            <div class="form-group" style="flex:1;">
+                <label for="salary-end-date">По</label>
+                <input type="date" id="salary-end-date" value="${todayStr}">
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="salary-master-filter">Майстер</label>
+            <select id="salary-master-filter">
+                <option value="all">Всі майстри</option>
+                ${masterOptions}
+            </select>
+        </div>
+        <button id="calculate-salary-btn" class="btn" style="width: 100%;">Розрахувати</button>
+    </div>
+    <div id="salary-report" style="margin-top: 2rem;"></div>
+  `;
+  document.getElementById('calculate-salary-btn').onclick = handleCalculateSalary;
+}
   
   async function handleCalculateSalary() {
     const startDate = new Date(document.getElementById('salary-start-date').value);
