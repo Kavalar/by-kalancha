@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Lashroom by Kalancha CRM</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
   <link href="https://fonts.googleapis.com/css?family=Inter:400,600&display=swap" rel="stylesheet">
   
   <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
@@ -155,6 +156,7 @@
       </div>
   </div>
 </div>
+
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -237,7 +239,8 @@
   function renderAppLayout(user) {
     const isAdmin = user.role === 'admin';
     const adminTabs = `<li data-view="salary">Зарплата</li><li data-view="settings">Налаштування</li>`;
-    appContainer.innerHTML = `<div class="crm-layout">
+    appContainer.innerHTML = `
+    <div class="crm-layout">
         <nav class="crm-nav" id="main-nav">
             <h1>Lashroom CRM</h1>
             <ul>
@@ -263,13 +266,26 @@
         </main>
     </div>`;
     
-    document.getElementById('logout-btn').onclick = () => { listenersAreActive = false; if(masterAdvancesUnsubscribe) masterAdvancesUnsubscribe(); signOut(auth); };
+    document.getElementById('logout-btn').onclick = () => { 
+        listenersAreActive = false; 
+        if(masterAdvancesUnsubscribe) masterAdvancesUnsubscribe(); 
+        signOut(auth); 
+    };
     document.getElementById('main-nav').onclick = (event) => {
         const target = event.target.closest('li');
         if (target) renderView(target.dataset.view);
     };
-    document.getElementById('payment-modal').querySelector('.close-btn').onclick = () => { document.getElementById('payment-modal').style.display = 'none'; };
+    document.getElementById('payment-modal').querySelector('.close-btn').onclick = () => { 
+        document.getElementById('payment-modal').style.display = 'none'; 
+    };
     document.getElementById('payment-form').onsubmit = handleConfirmPayment;
+    
+    const actionModal = document.getElementById('appointment-action-modal');
+    if(actionModal) {
+      actionModal.querySelector('.close-btn').onclick = () => {
+        actionModal.style.display = 'none';
+      };
+    }
     renderView(state.currentView);
   }
 
@@ -323,7 +339,6 @@
   // #endregion
 
   // #region Calendar View
-  // ================== ОСЬ ОНОВЛЕНИЙ БЛОК ДЛЯ КАЛЕНДАРЯ ==================
   function renderCalendarView(container) {
     const activeMasters = state.masters.filter(m => !m.isFrozen);
     container.innerHTML = `<div class="content-card"><div id="calendar-container"><div class="form-group"><label for="calendar-master-filter">Показати розклад для:</label><select id="calendar-master-filter"><option value="all">Всі майстри</option>${activeMasters.map(m => `<option value="${m.id}" ${state.calendarSelectedMasterId === m.id ? 'selected' : ''}>${m.name}</option>`).join('')}</select></div><div id="calendar"></div></div></div>`;
@@ -353,7 +368,7 @@
               backgroundColor: app.status === 'completed' ? 'var(--success-color)' : colorPalette[masterIndex % colorPalette.length],
               borderColor: app.status === 'completed' ? 'var(--success-color)' : colorPalette[masterIndex % colorPalette.length],
               extendedProps: {
-                appointment: app // Зберігаємо весь об'єкт запису тут
+                appointment: app 
               }
             };
         });
@@ -423,7 +438,6 @@
       }
     }
   }
-  // ========================================================================
   // #endregion
   
   // #region Clients Views
