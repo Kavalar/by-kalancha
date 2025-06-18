@@ -415,16 +415,23 @@
 
     let buttonsHtml = '';
     if (appointment.status !== 'completed') {
-      buttonsHtml += `<button class="btn btn-complete-payment" onclick="document.getElementById('payment-appointment-id').value='${appointment.id}'; document.getElementById('payment-modal-amount').innerText='${appointment.finalPrice.toFixed(0)} zł'; document.getElementById('payment-modal').style.display='flex'; document.getElementById('appointment-action-modal').style.display='none';">Провести оплату</button>`;
+      buttonsHtml += `<button class="btn btn-complete-payment" onclick="window.showPaymentModal('${appointment.id}', '${appointment.finalPrice.toFixed(0)}')">Провести оплату</button>`;
     }
     
-    buttonsHtml += `<button class="btn btn-delete" onclick="handleCancelAppointment('${appointment.id}')">Скасувати запис</button>`;
+    buttonsHtml += `<button class="btn btn-delete" onclick="window.handleCancelAppointment('${appointment.id}')">Скасувати запис</button>`;
     
     buttonsEl.innerHTML = buttonsHtml;
     
     modal.querySelector('.close-btn').onclick = () => modal.style.display = 'none';
     modal.style.display = 'flex';
   }
+  
+  window.showPaymentModal = (appointmentId, amount) => {
+    document.getElementById('payment-appointment-id').value = appointmentId;
+    document.getElementById('payment-modal-amount').innerText = `${amount} zł`;
+    document.getElementById('payment-modal').style.display = 'flex';
+    document.getElementById('appointment-action-modal').style.display = 'none';
+  };
 
   async function handleCancelAppointment(appointmentId) {
     if (confirm('Ви впевнені, що хочете скасувати цей запис? Цю дію не можна буде скасувати.')) {
@@ -438,7 +445,7 @@
       }
     }
   }
-  window.handleCancelAppointment = handleCancelAppointment; // Make it globally accessible for the onclick attribute
+  window.handleCancelAppointment = handleCancelAppointment; 
   // #endregion
   
   // #region Clients Views
