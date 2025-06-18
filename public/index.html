@@ -177,6 +177,7 @@
     currentView: 'calendar',
     preselectedAppointment: null,
     calendarSelectedMasterId: 'all',
+    editingAppointmentId: null,
     editingTierIndex: null,
     selectedClientForAppointment: null,
     viewingClientId: null,
@@ -293,6 +294,9 @@
     if (!state.user) return;
     if (state.user.role !== 'admin' && (viewName === 'salary' || viewName === 'settings')) {
         viewName = 'calendar';
+    }
+    if (state.currentView === 'appointments' && viewName !== 'appointments') {
+        state.editingAppointmentId = null;
     }
     state.currentView = viewName;
     
@@ -418,6 +422,7 @@
       buttonsHtml += `<button class="btn btn-complete-payment" onclick="document.getElementById('payment-appointment-id').value='${appointment.id}'; document.getElementById('payment-modal-amount').innerText='${appointment.finalPrice.toFixed(0)} zł'; document.getElementById('payment-modal').style.display='flex'; document.getElementById('appointment-action-modal').style.display='none';">Провести оплату</button>`;
     }
     
+    buttonsHtml += `<button class="btn btn-edit" onclick="handleEditAppointment('${appointment.id}')">Редагувати / Перенести</button>`;
     buttonsHtml += `<button class="btn btn-delete" onclick="handleCancelAppointment('${appointment.id}')">Скасувати запис</button>`;
     
     buttonsEl.innerHTML = buttonsHtml;
@@ -437,6 +442,12 @@
         alert('Не вдалося скасувати запис.');
       }
     }
+  }
+
+  function handleEditAppointment(appointmentId) {
+    state.editingAppointmentId = appointmentId;
+    document.getElementById('appointment-action-modal').style.display = 'none';
+    renderView('appointments');
   }
   // #endregion
   
@@ -490,51 +501,162 @@
 
   // #region Appointments View
   function renderAppointmentsView(container) {
-    state.selectedClientForAppointment = null;
-    container.innerHTML = `<div class="content-card"><h2>Новий запис</h2><form id="add-appointment-form"><div class="form-group client-search-container"><label for="client-search-input">Пошук / Ім'я клієнта</label><input type="text" id="client-search-input" autocomplete="off" required><div id="client-search-results" style="display: none;"></div></div><div class="form-group" id="client-phone-group" style="display: none;"><label for="client-phone-input">Телефон нового клієнта</label><input type="tel" id="client-phone-input"></div><div class="form-group"> <label for="appointment-datetime">Дата і час</label> <input type="datetime-local" id="appointment-datetime" required> </div><div class="form-row"><div class="form-group" style="flex:1;"> <label for="appointment-category">Категорія послуг</label> <select id="appointment-category" required><option value="">Завантаження...</option></select> </div><div class="form-group" style="flex:1;"> <label for="appointment-service">Послуга</label> <select id="appointment-service" required><option value="">Оберіть категорію</option></select> </div></div><div class="form-group"> <label for="appointment-master">Майстер</label> <select id="appointment-master" required><option value="">Оберіть категорію</option></select> </div><div class="form-row"><div class="form-group" style="flex:2;"> <label for="manual-discount-value">Додаткова знижка</label> <input type="number" id="manual-discount-value" placeholder="0" min="0"> </div><div class="form-group" style="flex:1;"> <label for="manual-discount-type">Тип</label> <select id="manual-discount-type"><option value="percent">%</option><option value="fixed">zł</option></select> </div></div><div id="final-price-display">Сума до оплати: 0 zł</div><button type="submit" class="btn" style="margin-top: 1rem;">Створити запис</button></form></div><div class="content-card" style="margin-top: 2rem;"><h2>Неоплачені записи</h2><div class="form-group"><label for="appointments-date-filter">Оберіть дату</label><input type="date" id="appointments-date-filter"></div><ul id="daily-appointments-list" class="item-list"></ul><div id="pagination-controls" style="text-align: center; margin-top: 1rem;"></div></div>`;
+    const isEditMode = !!state.editingAppointmentId;
+    let appointmentToEdit = null;
+    if (isEditMode) {
+        appointmentToEdit = state.appointments.find(a => a.id === state.editingAppointmentId);
+    }
+
+    container.innerHTML = `
+        <div class="content-card">
+            <h2 id="appointment-form-title">${isEditMode ? 'Редагувати запис' : 'Новий запис'}</h2>
+            <form id="appointment-form">
+                <div class="form-group client-search-container">
+                    <label for="client-search-input">Пошук / Ім'я клієнта</label>
+                    <input type="text" id="client-search-input" autocomplete="off" required ${isEditMode ? 'disabled' : ''}>
+                    <div id="client-search-results" style="display: none;"></div>
+                </div>
+                <div class="form-group" id="client-phone-group" style="display: ${isEditMode ? 'block' : 'none'};">
+                    <label for="client-phone-input">Телефон нового клієнта</label>
+                    <input type="tel" id="client-phone-input" ${isEditMode ? 'disabled' : ''}>
+                </div>
+                <div class="form-group">
+                    <label for="appointment-datetime">Дата і час</label>
+                    <input type="datetime-local" id="appointment-datetime" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <label for="appointment-category">Категорія послуг</label>
+                        <select id="appointment-category" required></select>
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label for="appointment-service">Послуга</label>
+                        <select id="appointment-service" required></select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="appointment-master">Майстер</label>
+                    <select id="appointment-master" required></select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:2;">
+                        <label for="manual-discount-value">Додаткова знижка</label>
+                        <input type="number" id="manual-discount-value" placeholder="0" min="0">
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label for="manual-discount-type">Тип</label>
+                        <select id="manual-discount-type">
+                            <option value="percent">%</option>
+                            <option value="fixed">zł</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="final-price-display">Сума до оплати: 0 zł</div>
+                <button type="submit" id="appointment-submit-btn" class="btn" style="margin-top: 1rem;">${isEditMode ? 'Зберегти зміни' : 'Створити запис'}</button>
+                ${isEditMode ? `<button type="button" id="appointment-cancel-edit-btn" class="btn" style="margin-top: 0.5rem; background-color: var(--gray-text);">Скасувати редагування</button>` : ''}
+            </form>
+        </div>
+        ${!isEditMode ? `
+        <div class="content-card" style="margin-top: 2rem;">
+            <h2>Неоплачені записи</h2>
+            <div class="form-group">
+                <label for="appointments-date-filter">Оберіть дату</label>
+                <input type="date" id="appointments-date-filter">
+            </div>
+            <ul id="daily-appointments-list" class="item-list"></ul>
+            <div id="pagination-controls" style="text-align: center; margin-top: 1rem;"></div>
+        </div>` : ''}
+    `;
     setupAppointmentsLogic();
-    if (state.preselectedAppointment) {
-      const { dateTime, masterId } = state.preselectedAppointment;
-      const d = new Date(dateTime.getTime() - (dateTime.getTimezoneOffset() * 60000));
-      document.getElementById('appointment-datetime').value = d.toISOString().slice(0, 16);
-      if (masterId) { 
-        document.getElementById('appointment-master').value = masterId; 
-        const master = state.masters.find(m => m.id === masterId);
-        const firstCategoryId = master?.categoryIds?.[0];
-        if (firstCategoryId) {
-          document.getElementById('appointment-category').value = firstCategoryId;
-          document.getElementById('appointment-category').dispatchEvent(new Event('change'));
+
+    if (isEditMode && appointmentToEdit) {
+        const client = state.clients.find(c => c.id === appointmentToEdit.clientId);
+        document.getElementById('client-search-input').value = client?.name || appointmentToEdit.clientName;
+        document.getElementById('client-phone-input').value = client?.phone || '';
+        
+        const d = new Date(appointmentToEdit.dateTime.toDate().getTime() - (appointmentToEdit.dateTime.toDate().getTimezoneOffset() * 60000));
+        document.getElementById('appointment-datetime').value = d.toISOString().slice(0, 16);
+        
+        document.getElementById('manual-discount-value').value = appointmentToEdit.manualDiscount?.value || 0;
+        document.getElementById('manual-discount-type').value = appointmentToEdit.manualDiscount?.type || 'percent';
+
+        const service = state.services.find(s => s.id === appointmentToEdit.serviceId);
+        if (service) {
+            const categorySelect = document.getElementById('appointment-category');
+            categorySelect.value = service.categoryId;
+            categorySelect.dispatchEvent(new Event('change'));
+
+            setTimeout(() => {
+                document.getElementById('appointment-service').value = appointmentToEdit.serviceId;
+                document.getElementById('appointment-master').value = appointmentToEdit.masterId;
+                updateFinalPrice();
+            }, 100); 
         }
-      }
-      state.preselectedAppointment = null;
+    } else if (state.preselectedAppointment) {
+        const { dateTime, masterId } = state.preselectedAppointment;
+        const d = new Date(dateTime.getTime() - (dateTime.getTimezoneOffset() * 60000));
+        document.getElementById('appointment-datetime').value = d.toISOString().slice(0, 16);
+        if (masterId) { 
+            const master = state.masters.find(m => m.id === masterId);
+            const firstCategoryId = master?.categoryIds?.[0];
+            if (firstCategoryId) {
+                const categorySelect = document.getElementById('appointment-category');
+                categorySelect.value = firstCategoryId;
+                categorySelect.dispatchEvent(new Event('change'));
+                setTimeout(() => {
+                    document.getElementById('appointment-master').value = masterId;
+                }, 100);
+            }
+        }
+        state.preselectedAppointment = null;
+    } else {
+        const dateFilter = document.getElementById('appointments-date-filter');
+        dateFilter.valueAsDate = state.appointmentsListDate;
+        dateFilter.onchange = () => {
+            state.appointmentsListDate = dateFilter.valueAsDate;
+            state.appointmentsPage = 1;
+            renderDailyAppointmentsList();
+        };
+        renderDailyAppointmentsList();
     }
   }
+
   function setupAppointmentsLogic() {
-    document.getElementById('payment-form').onsubmit = handleConfirmPayment;
-    document.getElementById('add-appointment-form').onsubmit = handleAddAppointment;
-    const searchInput = document.getElementById('client-search-input');
-    const searchResultsEl = document.getElementById('client-search-results');
-    const phoneGroup = document.getElementById('client-phone-group');
-    const phoneInput = document.getElementById('client-phone-input');
-    searchInput.oninput = () => {
-        state.selectedClientForAppointment = null;
-        phoneGroup.style.display = 'block'; phoneInput.required = true;
-        const searchTerm = searchInput.value.toLowerCase().trim();
-        if (searchTerm.length < 2) { searchResultsEl.style.display = 'none'; return; }
-        const results = state.clients.filter(c => c.name.toLowerCase().includes(searchTerm) || (c.phone && c.phone.includes(searchTerm)));
-        searchResultsEl.innerHTML = results.length > 0 ? results.map(c => `<div data-id="${c.id}" data-name="${c.name}" data-phone="${c.phone}">${c.name} - ${c.phone}</div>`).join('') : '';
-        searchResultsEl.style.display = results.length > 0 ? 'block' : 'none';
-    };
-    searchResultsEl.onclick = (e) => {
-        if(e.target.dataset.id) {
-            state.selectedClientForAppointment = { id: e.target.dataset.id, name: e.target.dataset.name, phone: e.target.dataset.phone };
-            searchInput.value = state.selectedClientForAppointment.name;
-            phoneInput.value = state.selectedClientForAppointment.phone;
-            searchResultsEl.style.display = 'none'; phoneGroup.style.display = 'block';
-        }
-    };
-    searchInput.onblur = () => { setTimeout(() => searchResultsEl.style.display = 'none', 200); };
+    document.getElementById('appointment-form').onsubmit = handleSaveAppointment;
+
+    if (state.editingAppointmentId) {
+        document.getElementById('appointment-cancel-edit-btn').onclick = () => {
+            state.editingAppointmentId = null;
+            renderView('calendar');
+        };
+    } else {
+        document.getElementById('payment-form').onsubmit = handleConfirmPayment;
+        const searchInput = document.getElementById('client-search-input');
+        const searchResultsEl = document.getElementById('client-search-results');
+        const phoneGroup = document.getElementById('client-phone-group');
+        const phoneInput = document.getElementById('client-phone-input');
+        searchInput.oninput = () => {
+            state.selectedClientForAppointment = null;
+            phoneGroup.style.display = 'block'; phoneInput.required = true;
+            const searchTerm = searchInput.value.toLowerCase().trim();
+            if (searchTerm.length < 2) { searchResultsEl.style.display = 'none'; return; }
+            const results = state.clients.filter(c => c.name.toLowerCase().includes(searchTerm) || (c.phone && c.phone.includes(searchTerm)));
+            searchResultsEl.innerHTML = results.length > 0 ? results.map(c => `<div data-id="${c.id}" data-name="${c.name}" data-phone="${c.phone}">${c.name} - ${c.phone}</div>`).join('') : '';
+            searchResultsEl.style.display = results.length > 0 ? 'block' : 'none';
+        };
+        searchResultsEl.onclick = (e) => {
+            if(e.target.dataset.id) {
+                state.selectedClientForAppointment = { id: e.target.dataset.id, name: e.target.dataset.name, phone: e.target.dataset.phone };
+                searchInput.value = state.selectedClientForAppointment.name;
+                phoneInput.value = state.selectedClientForAppointment.phone;
+                searchResultsEl.style.display = 'none'; phoneGroup.style.display = 'block';
+            }
+        };
+        searchInput.onblur = () => { setTimeout(() => searchResultsEl.style.display = 'none', 200); };
+    }
+    
     populateAppointmentFormDropdowns();
+
     const categorySelect = document.getElementById('appointment-category');
     categorySelect.onchange = () => {
         const categoryId = categorySelect.value;
@@ -546,19 +668,13 @@
         masterSelect.innerHTML = '<option value="">Оберіть майстра</option>' + mastersForCategory.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
         updateFinalPrice();
     };
+    
     ['appointment-service', 'appointment-master', 'manual-discount-value', 'manual-discount-type'].forEach(id => {
         const el = document.getElementById(id);
         if(el) el.oninput = updateFinalPrice;
     });
-    const dateFilter = document.getElementById('appointments-date-filter');
-    dateFilter.valueAsDate = state.appointmentsListDate;
-    dateFilter.onchange = () => {
-        state.appointmentsListDate = dateFilter.valueAsDate;
-        state.appointmentsPage = 1;
-        renderDailyAppointmentsList();
-    };
-    renderDailyAppointmentsList();
   }
+
   function renderDailyAppointmentsList() {
     const listEl = document.getElementById('daily-appointments-list');
     const paginationControls = document.getElementById('pagination-controls');
@@ -600,41 +716,166 @@
         paginationControls.appendChild(loadMoreBtn);
     }
   }
-  function populateAppointmentFormDropdowns() { const categorySelect = document.getElementById('appointment-category'); if (categorySelect) { categorySelect.innerHTML = '<option value="">Оберіть категорію</option>' + state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join(''); } }
-  function updateFinalPrice() { const serviceId = document.getElementById('appointment-service').value; const masterId = document.getElementById('appointment-master').value; const manualDiscountValue = parseFloat(document.getElementById('manual-discount-value').value) || 0; const manualDiscountType = document.getElementById('manual-discount-type').value; const priceDisplay = document.getElementById('final-price-display'); if (!serviceId || !masterId) { priceDisplay.innerText = `Сума до оплати: 0 zł`; return 0; } const service = state.services.find(s => s.id === serviceId); const category = state.categories.find(c => c.id === service?.categoryId); const master = state.masters.find(m => m.id === masterId); let price = service.price; const discountPercent = service.discount > 0 ? service.discount : (category?.discount || 0); price *= (1 - discountPercent / 100); const markupPercent = master.priceModifier || 0; price *= (1 + markupPercent / 100); if (manualDiscountType === 'percent') { price *= (1 - manualDiscountValue / 100); } else { price -= manualDiscountValue; } priceDisplay.innerText = `Сума до оплати: ${price.toFixed(0)} zł`; return price; }
-  async function handleAddAppointment(event) {
+
+  function populateAppointmentFormDropdowns() { 
+      const categorySelect = document.getElementById('appointment-category'); 
+      if (categorySelect) { 
+          categorySelect.innerHTML = '<option value="">Оберіть категорію</option>' + state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join(''); 
+      } 
+  }
+
+  function updateFinalPrice() { 
+      const serviceId = document.getElementById('appointment-service').value; 
+      const masterId = document.getElementById('appointment-master').value; 
+      const manualDiscountValue = parseFloat(document.getElementById('manual-discount-value').value) || 0; 
+      const manualDiscountType = document.getElementById('manual-discount-type').value; 
+      const priceDisplay = document.getElementById('final-price-display'); 
+      if (!serviceId || !masterId) { 
+          priceDisplay.innerText = `Сума до оплати: 0 zł`; 
+          return 0; 
+      } 
+      const service = state.services.find(s => s.id === serviceId); 
+      const category = state.categories.find(c => c.id === service?.categoryId); 
+      const master = state.masters.find(m => m.id === masterId); 
+      let price = service.price; 
+      const discountPercent = service.discount > 0 ? service.discount : (category?.discount || 0); 
+      price *= (1 - discountPercent / 100); 
+      const markupPercent = master.priceModifier || 0; 
+      price *= (1 + markupPercent / 100); 
+      if (manualDiscountType === 'percent') { 
+          price *= (1 - manualDiscountValue / 100); 
+      } else { 
+          price -= manualDiscountValue; 
+      } 
+      priceDisplay.innerText = `Сума до оплати: ${price.toFixed(0)} zł`; 
+      return price; 
+  }
+
+  async function handleSaveAppointment(event) {
     event.preventDefault();
-    let clientId; let clientName = document.getElementById('client-search-input').value.trim(); let clientPhone = document.getElementById('client-phone-input').value.trim();
-    if (state.selectedClientForAppointment) { clientId = state.selectedClientForAppointment.id; } 
-    else {
-        if (!clientPhone) return alert("Для нового клієнта необхідно вказати номер телефону.");
-        const normalizedPhone = clientPhone.replace(/[\s-()]/g, '');
-        const existingClient = state.clients.find(c => c.name.toLowerCase() === clientName.toLowerCase() && c.phone.replace(/[\s-()]/g, '') === normalizedPhone);
-        if (existingClient) { clientId = existingClient.id; }
-        else { try { const newClientRef = await addDoc(collection(db, 'clients'), { name: clientName, phone: clientPhone, createdAt: Timestamp.now() }); clientId = newClientRef.id; } catch (e) { return alert("Не вдалося створити нового клієнта."); } }
+    const isEditMode = !!state.editingAppointmentId;
+    
+    const serviceId = document.getElementById('appointment-service').value;
+    const masterId = document.getElementById('appointment-master').value;
+    const dateTimeString = document.getElementById('appointment-datetime').value;
+
+    if (!serviceId || !masterId || !dateTimeString) {
+        return alert("Будь ласка, заповніть усі поля.");
     }
-    const serviceId = document.getElementById('appointment-service').value; const masterId = document.getElementById('appointment-master').value; const dateTimeString = document.getElementById('appointment-datetime').value;
-    if (!serviceId || !masterId || !dateTimeString) { return alert("Будь ласка, заповніть усі поля."); }
+
     const service = state.services.find(s => s.id === serviceId);
     if (!service) return alert("Помилка: послугу не знайдено!");
-    const newAppStart = new Date(dateTimeString);
-    const isOverlapping = state.appointments.some(app => { if (app.masterId !== masterId) return false; const existingAppStart = app.dateTime.toDate(); const existingAppEnd = new Date(existingAppStart.getTime() + (app.duration || 60) * 60000); return newAppStart < existingAppEnd && new Date(newAppStart.getTime() + (service.duration || 60) * 60000) > existingAppStart; });
-    if (isOverlapping) { return alert("Помилка! Цей час вже зайнятий у обраного майстра."); }
+
     const finalPrice = updateFinalPrice();
-    const appointment = { clientName, clientId, dateTime: Timestamp.fromDate(newAppStart), serviceId, masterId, duration: service.duration || 60, manualDiscount: { value: parseFloat(document.getElementById('manual-discount-value').value) || 0, type: document.getElementById('manual-discount-type').value }, finalPrice, status: 'upcoming', paymentType: null, createdAt: Timestamp.now() };
-    try { 
-      await addDoc(collection(db, 'appointments'), appointment); 
-      alert('Запис успішно створено!'); 
-      event.target.reset(); 
-      document.getElementById('client-phone-group').style.display = 'none'; 
-      updateFinalPrice();
-    } catch (e) { console.error(e); alert('Не вдалося створити запис.'); }
+    const appointmentData = {
+        dateTime: Timestamp.fromDate(new Date(dateTimeString)),
+        serviceId,
+        masterId,
+        duration: service.duration || 60,
+        manualDiscount: {
+            value: parseFloat(document.getElementById('manual-discount-value').value) || 0,
+            type: document.getElementById('manual-discount-type').value
+        },
+        finalPrice,
+    };
+    
+    try {
+        if (isEditMode) {
+            const appointmentId = state.editingAppointmentId;
+            await updateDoc(doc(db, 'appointments', appointmentId), appointmentData);
+            alert('Запис успішно оновлено!');
+            state.editingAppointmentId = null;
+            renderView('calendar');
+        } else {
+            let clientId;
+            let clientName = document.getElementById('client-search-input').value.trim();
+            let clientPhone = document.getElementById('client-phone-input').value.trim();
+            if (state.selectedClientForAppointment) {
+                clientId = state.selectedClientForAppointment.id;
+                clientName = state.selectedClientForAppointment.name;
+            } else {
+                if (!clientPhone) return alert("Для нового клієнта необхідно вказати номер телефону.");
+                const normalizedPhone = clientPhone.replace(/[\s-()]/g, '');
+                const existingClient = state.clients.find(c => c.name.toLowerCase() === clientName.toLowerCase() && c.phone.replace(/[\s-()]/g, '') === normalizedPhone);
+                if (existingClient) {
+                    clientId = existingClient.id;
+                } else {
+                    const newClientRef = await addDoc(collection(db, 'clients'), { name: clientName, phone: clientPhone, createdAt: Timestamp.now() });
+                    clientId = newClientRef.id;
+                }
+            }
+            
+            const fullAppointmentData = {
+                ...appointmentData,
+                clientName,
+                clientId,
+                status: 'upcoming',
+                paymentType: null,
+                createdAt: Timestamp.now()
+            };
+
+            await addDoc(collection(db, 'appointments'), fullAppointmentData);
+            alert('Запис успішно створено!');
+            event.target.reset();
+            document.getElementById('client-phone-group').style.display = 'none';
+            updateFinalPrice();
+        }
+    } catch (e) {
+        console.error("Помилка збереження запису:", e);
+        alert('Не вдалося зберегти запис.');
+    }
   }
-  async function handleConfirmPayment(event) { event.preventDefault(); const appointmentId = document.getElementById('payment-appointment-id').value; const paymentType = document.getElementById('payment-modal-type').value; try { await updateDoc(doc(db, 'appointments', appointmentId), { status: 'completed', paymentType: paymentType, completedAt: Timestamp.now() }); document.getElementById('payment-modal').style.display = 'none'; } catch(e) { alert('Не вдалося провести оплату.'); } }
+  
+  async function handleConfirmPayment(event) { 
+      event.preventDefault(); 
+      const appointmentId = document.getElementById('payment-appointment-id').value; 
+      const paymentType = document.getElementById('payment-modal-type').value; 
+      try { 
+          await updateDoc(doc(db, 'appointments', appointmentId), { status: 'completed', paymentType: paymentType, completedAt: Timestamp.now() }); 
+          document.getElementById('payment-modal').style.display = 'none'; 
+      } catch(e) { 
+          alert('Не вдалося провести оплату.'); 
+      } 
+  }
   // #endregion
 
   // #region Masters View
-  function renderMastersView(container) { container.innerHTML = `<div class="content-card"><h2>Додати нового майстра</h2><form id="add-master-form"><div class="form-group"><label for="new-master-name">Ім'я та прізвище</label><input type="text" id="new-master-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="new-master-tier">Ранг</label><input type="text" id="new-master-tier" placeholder="напр. Топ-майстер"></div><div class="form-group" style="flex:1;"><label for="new-master-modifier">Націнка (%)</label><input type="number" id="new-master-modifier" value="0" min="0"></div></div><div class="form-group"><label>Спеціалізації</label><div id="new-master-categories" class="category-checkbox-group"></div></div><button class="btn" type="submit">Додати майстра</button></form></div><div class="content-card" style="margin-top: 2rem;"><h2>Список майстрів</h2><ul id="masters-list" class="item-list"></ul></div><div class="modal-overlay" id="edit-master-modal"><div class="modal-panel"><div class="modal-header"><h2>Редагувати майстра</h2><button class="close-btn">&times;</button></div><form id="edit-master-form"><input type="hidden" id="edit-master-id"><div class="form-group"><label for="edit-master-name">Ім'я та прізвище</label><input type="text" id="edit-master-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="edit-master-tier">Ранг</label><input type="text" id="edit-master-tier"></div><div class="form-group" style="flex:1;"><label for="edit-master-modifier">Націнка (%)</label><input type="number" id="edit-master-modifier" min="0"></div></div><div class="form-group"><label>Спеціалізації</label><div id="edit-master-categories" class="category-checkbox-group"></div></div><div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem;"><label><input type="checkbox" id="edit-master-frozen"> Заморозити майстра (приховати з форм)</label></div><button type="submit" class="btn">Зберегти зміни</button></form></div></div>`; document.getElementById('add-master-form').onsubmit = handleAddMaster; document.querySelector('#edit-master-modal .close-btn').onclick = () => document.getElementById('edit-master-modal').style.display = 'none'; document.getElementById('edit-master-form').onsubmit = handleUpdateMaster; populateCategoryCheckboxes('new-master-categories'); const listEl = document.getElementById('masters-list'); listEl.innerHTML = state.masters.length > 0 ? '' : '<li>Немає майстрів.</li>'; state.masters.sort((a,b) => a.name.localeCompare(b.name)).forEach(master => { const categories = (master.categoryIds || []).map(id => state.categories.find(c => c.id === id)?.name || '').filter(Boolean).join(', '); const li = document.createElement('li'); li.className = master.isFrozen ? 'is-frozen no-hover' : 'no-hover'; li.innerHTML = `<div class="master-info-clickable" data-id="${master.id}" style="flex-grow: 1; cursor: pointer;"><strong>${master.name}</strong> ${master.tier ? `(${master.tier})` : ''} ${master.priceModifier > 0 ? `<strong style="color:var(--danger-color)">+${master.priceModifier}%</strong>` : ''}<br><small>${categories || 'Без спеціалізації'}</small></div><div class="actions"><button class="btn btn-edit" data-id="${master.id}" data-action="edit-profile">Ред.</button></div>`; listEl.appendChild(li); }); listEl.onclick = (event) => { const button = event.target.closest('button[data-action="edit-profile"]'); if (button) { event.stopPropagation(); showEditMasterModal(button.dataset.id); } else { const masterItem = event.target.closest('li'); if (masterItem) { const masterInfo = masterItem.querySelector('.master-info-clickable'); if(masterInfo) { state.viewingMasterId = masterInfo.dataset.id; renderView('masterDetail'); } } } }; }
+  function renderMastersView(container) { 
+      container.innerHTML = `<div class="content-card"><h2>Додати нового майстра</h2><form id="add-master-form"><div class="form-group"><label for="new-master-name">Ім'я та прізвище</label><input type="text" id="new-master-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="new-master-tier">Ранг</label><input type="text" id="new-master-tier" placeholder="напр. Топ-майстер"></div><div class="form-group" style="flex:1;"><label for="new-master-modifier">Націнка (%)</label><input type="number" id="new-master-modifier" value="0" min="0"></div></div><div class="form-group"><label>Спеціалізації</label><div id="new-master-categories" class="category-checkbox-group"></div></div><button class="btn" type="submit">Додати майстра</button></form></div><div class="content-card" style="margin-top: 2rem;"><h2>Список майстрів</h2><ul id="masters-list" class="item-list"></ul></div><div class="modal-overlay" id="edit-master-modal"><div class="modal-panel"><div class="modal-header"><h2>Редагувати майстра</h2><button class="close-btn">&times;</button></div><form id="edit-master-form"><input type="hidden" id="edit-master-id"><div class="form-group"><label for="edit-master-name">Ім'я та прізвище</label><input type="text" id="edit-master-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="edit-master-tier">Ранг</label><input type="text" id="edit-master-tier"></div><div class="form-group" style="flex:1;"><label for="edit-master-modifier">Націнка (%)</label><input type="number" id="edit-master-modifier" min="0"></div></div><div class="form-group"><label>Спеціалізації</label><div id="edit-master-categories" class="category-checkbox-group"></div></div><div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem;"><label><input type="checkbox" id="edit-master-frozen"> Заморозити майстра (приховати з форм)</label></div><button type="submit" class="btn">Зберегти зміни</button></form></div></div>`; 
+      document.getElementById('add-master-form').onsubmit = handleAddMaster; 
+      document.querySelector('#edit-master-modal .close-btn').onclick = () => document.getElementById('edit-master-modal').style.display = 'none'; 
+      document.getElementById('edit-master-form').onsubmit = handleUpdateMaster; 
+      populateCategoryCheckboxes('new-master-categories'); 
+      const listEl = document.getElementById('masters-list'); 
+      listEl.innerHTML = state.masters.length > 0 ? '' : '<li>Немає майстрів.</li>'; 
+      state.masters.sort((a,b) => a.name.localeCompare(b.name)).forEach(master => { 
+          const categories = (master.categoryIds || []).map(id => state.categories.find(c => c.id === id)?.name || '').filter(Boolean).join(', '); 
+          const li = document.createElement('li'); 
+          li.className = master.isFrozen ? 'is-frozen no-hover' : 'no-hover'; 
+          li.innerHTML = `
+            <div class="master-info-clickable" data-id="${master.id}" style="flex-grow: 1; cursor: pointer;">
+              <strong>${master.name}</strong> ${master.tier ? `(${master.tier})` : ''} ${master.priceModifier > 0 ? `<strong style="color:var(--danger-color)">+${master.priceModifier}%</strong>` : ''}<br>
+              <small>${categories || 'Без спеціалізації'}</small>
+            </div>
+            <div class="actions">
+              <button class="btn btn-edit" data-id="${master.id}" data-action="edit-profile">Ред.</button>
+            </div>`; 
+          listEl.appendChild(li); 
+      }); 
+      listEl.onclick = (event) => { 
+          const button = event.target.closest('button[data-action="edit-profile"]'); 
+          if (button) { 
+              event.stopPropagation(); 
+              showEditMasterModal(button.dataset.id); 
+          } else { 
+              const masterItem = event.target.closest('.master-info-clickable'); 
+              if (masterItem) { 
+                  state.viewingMasterId = masterItem.dataset.id; 
+                  renderView('masterDetail'); 
+              } 
+          } 
+      }; 
+  }
 
   function renderMasterDetailView(container) {
     const masterId = state.viewingMasterId;
@@ -766,7 +1007,41 @@
   // #endregion
 
   // #region Salary View
-  function renderSalaryView(container) { const today = new Date(); const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0]; const todayStr = today.toISOString().split('T')[0]; container.innerHTML = `<div class="content-card"><h2>Розрахунок зарплати</h2><div class="form-row"><div class="form-group" style="flex:1;"> <label for="salary-start-date">З</label> <input type="date" id="salary-start-date" value="${firstDayOfMonth}"> </div><div class="form-group" style="flex:1;"> <label for="salary-end-date">По</label> <input type="date" id="salary-end-date" value="${todayStr}"> </div></div><div class="form-group"><label for="salary-master-filter">Майстер</label><select id="salary-master-filter"><option value="all">Всі майстри</option>${state.masters.filter(m => !m.isFrozen).map(m => `<option value="<span class="math-inline">\{m\.id\}"\></span>{m.name}</option>`).join('')}</select></div><button id="calculate-salary-btn" class="btn" style="width: 100%;">Розрахувати</button></div><div id="salary-report" style="margin-top: 2rem;"></div>`; document.getElementById('calculate-salary-btn').onclick = handleCalculateSalary; }
+  function renderSalaryView(container) { 
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+    const todayStr = today.toISOString().split('T')[0];
+    
+    const masterOptions = state.masters
+      .filter(m => !m.isFrozen)
+      .map(m => `<option value="${m.id}">${m.name}</option>`)
+      .join('');
+      
+    container.innerHTML = `
+      <div class="content-card">
+        <h2>Розрахунок зарплати</h2>
+        <div class="form-row">
+          <div class="form-group" style="flex:1;">
+            <label for="salary-start-date">З</label>
+            <input type="date" id="salary-start-date" value="${firstDayOfMonth}">
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label for="salary-end-date">По</label>
+            <input type="date" id="salary-end-date" value="${todayStr}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="salary-master-filter">Майстер</label>
+          <select id="salary-master-filter">
+            <option value="all">Всі майстри</option>
+            ${masterOptions}
+          </select>
+        </div>
+        <button id="calculate-salary-btn" class="btn" style="width: 100%;">Розрахувати</button>
+      </div>
+      <div id="salary-report" style="margin-top: 2rem;"></div>`;
+    document.getElementById('calculate-salary-btn').onclick = handleCalculateSalary; 
+  }
   
   async function handleCalculateSalary() {
     const startDate = new Date(document.getElementById('salary-start-date').value);
