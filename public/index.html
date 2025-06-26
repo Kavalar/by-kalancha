@@ -849,7 +849,6 @@
         return price; 
     }
 
-    // --- ЗМІНА ДЛЯ ЗАРПЛАТИ ---
     async function handleSaveAppointment(event) {
         event.preventDefault();
         const isEditMode = !!state.editingAppointmentId;
@@ -869,14 +868,11 @@
             return alert("Помилка: не знайдено послугу або майстра!");
         }
 
-        // 1. Розраховуємо базу для зарплати (ціна послуги + націнка майстра)
+        // --- ЗМІНА ДЛЯ ЗАРПЛАТИ ---
         const priceModifier = master.priceModifier || 0;
         const salaryBase = service.price * (1 + priceModifier / 100);
-
-        // 2. Фінальну ціну для клієнта рахуємо як і раніше
         const finalPrice = updateFinalPrice(); 
         
-        // 3. Формуємо об'єкт даних для збереження
         const appointmentData = {
             dateTime: Timestamp.fromDate(new Date(dateTimeString)),
             serviceId,
@@ -1187,62 +1183,62 @@
         }
         
         const masterTotals = {};
-        const allAdvances = [];
-        for (const master of state.masters) {
-            const advancesSnap = await getDocs(query(collection(db, 'masters', master.id, 'advances'), where('date', '>=', startDate), where('date', '<=', endDate)));
-            advancesSnap.forEach(advDoc => {
-                allAdvances.push({ masterId: master.id, ...advDoc.data() });
-            });
-        }
-
+        
         paidAppointments.forEach(appointment => {
             const masterId = appointment.masterId;
             if (!masterTotals[masterId]) {
                 const master = state.masters.find(m => m.id === masterId);
                 masterTotals[masterId] = {
                     name: master ? master.name : 'Невідомий',
-                    totalEarned: 0,
+                    totalRevenue: 0,
+                    totalSalaryBase: 0,
                     advances: 0,
                     byCash: 0,
                     byCard: 0,
                     byBlik: 0
                 };
             }
-            const price = appointment.finalPrice;
-            masterTotals[masterId].totalEarned += price;
+
+            // --- ОСНОВНА ЗМІНА ТУТ ---
+            const salaryBaseForThisAppointment = typeof appointment.salaryBase === 'number' ? appointment.salaryBase : appointment.finalPrice;
+            masterTotals[masterId].totalSalaryBase += salaryBaseForThisAppointment;
+            masterTotals[masterId].totalRevenue += appointment.finalPrice;
 
             if (appointment.paymentType === 'cash') {
-                masterTotals[masterId].byCash += price;
+                masterTotals[masterId].byCash += appointment.finalPrice;
             } else if (appointment.paymentType === 'card') {
-                masterTotals[masterId].byCard += price;
+                masterTotals[masterId].byCard += appointment.finalPrice;
             } else if (appointment.paymentType === 'blik') {
-                masterTotals[masterId].byBlik += price;
+                masterTotals[masterId].byBlik += appointment.finalPrice;
             }
         });
 
-        allAdvances.forEach(adv => {
-            if(masterTotals[adv.masterId]) {
-                masterTotals[adv.masterId].advances += adv.amount;
-            } else if (selectedMasterId === 'all' || selectedMasterId === adv.masterId) {
-                const master = state.masters.find(m => m.id === adv.masterId);
-                masterTotals[adv.masterId] = { name: master ? master.name : 'Невідомий', totalEarned: 0, advances: adv.amount, byCash: 0, byCard: 0, byBlik: 0 };
-            }
-        });
+        // Fetch advances for all relevant masters
+        const masterIds = Object.keys(masterTotals);
+        for(const masterId of masterIds) {
+            const advancesSnap = await getDocs(query(collection(db, 'masters', masterId, 'advances'), where('date', '>=', startDate), where('date', '<=', endDate)));
+            let totalAdvances = 0;
+            advancesSnap.forEach(doc => {
+                totalAdvances += doc.data().amount;
+            });
+            masterTotals[masterId].advances = totalAdvances;
+        }
 
         if (Object.keys(masterTotals).length === 0) { reportContainer.innerHTML = '<p>За обраний період немає даних для розрахунку.</p>'; return; }
 
         reportContainer.innerHTML = '';
         for (const masterId in masterTotals) {
             const data = masterTotals[masterId];
-            const applicableTier = salaryTiers.find(tier => data.totalEarned >= tier.threshold) || { rate: 0 };
+            const applicableTier = salaryTiers.find(tier => data.totalSalaryBase >= tier.threshold) || { rate: 0 };
             const salaryRate = applicableTier.rate;
-            const salary = data.totalEarned * (salaryRate / 100);
+            const salary = data.totalSalaryBase * (salaryRate / 100);
             const finalPayout = salary - data.advances;
             
             const cardHTML = `
                 <div class="salary-report-card">
                     <h3>${data.name}</h3>
-                    <p><span>Всього зароблено (каса):</span> <strong>${data.totalEarned.toFixed(0)} zł</strong></p>
+                    <p><span>Всього зароблено (каса):</span> <strong>${data.totalRevenue.toFixed(0)} zł</strong></p>
+                    <p><span>База для нарахування ЗП:</span> <strong>${data.totalSalaryBase.toFixed(0)} zł</strong></p>
                     
                     <div style="padding-left: 1rem; font-size: 0.9em; color: var(--gray-text); border-top: 1px dashed var(--border-color); margin-top: 0.5rem; padding-top: 0.5rem;">
                         <p style="margin: 0.2rem 0;"><span>- Готівкою:</span> <span>${data.byCash.toFixed(0)} zł</span></p>
