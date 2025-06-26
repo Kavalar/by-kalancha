@@ -875,7 +875,6 @@
             return alert("Помилка: не знайдено послугу або майстра!");
         }
 
-        // --- ЗМІНА ДЛЯ ЗАРПЛАТИ ---
         const priceModifier = master.priceModifier || 0;
         const salaryBase = service.price * (1 + priceModifier / 100);
         const finalPrice = updateFinalPrice(); 
@@ -1206,7 +1205,6 @@
                 };
             }
 
-            // --- ОСНОВНА ЗМІНА ТУТ ---
             const salaryBaseForThisAppointment = typeof appointment.salaryBase === 'number' ? appointment.salaryBase : appointment.finalPrice;
             masterTotals[masterId].totalSalaryBase += salaryBaseForThisAppointment;
             masterTotals[masterId].totalRevenue += appointment.finalPrice;
@@ -1262,7 +1260,6 @@
 
     // #region Expenses View
     function renderExpensesView(container) {
-        const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
         container.innerHTML = `
             <div class="content-card">
                 <h2>Додати витрату</h2>
@@ -1276,16 +1273,7 @@
                             <label for="expense-amount">Сума (zł)</label>
                             <input type="number" id="expense-amount" required min="0">
                         </div>
-                    </div>
-                    <div class="form-row">
                          <div class="form-group" style="flex:1;">
-                            <label for="expense-salon">Салон</label>
-                            <select id="expense-salon" required>
-                               <option value="">Оберіть салон</option>
-                               ${salonOptions}
-                            </select>
-                        </div>
-                        <div class="form-group" style="flex:1;">
                             <label for="expense-date">Дата</label>
                             <input type="date" id="expense-date" required>
                         </div>
@@ -1308,12 +1296,11 @@
             listEl.innerHTML = '<li>Витрат ще не було.</li>';
         } else {
             sortedExpenses.forEach(expense => {
-                const salon = state.salons.find(s => s.id === expense.salonId);
                 const li = document.createElement('li');
                 li.innerHTML = `
                     <div>
                         <strong>${expense.description}</strong><br>
-                        <small>${expense.date.toDate().toLocaleDateString('uk-UA')} (${salon?.name || 'Не вказано'})</small>
+                        <small>${expense.date.toDate().toLocaleDateString('uk-UA')}</small>
                     </div>
                     <div class="actions">
                         <strong>${expense.amount.toFixed(2)} zł</strong>
@@ -1336,9 +1323,8 @@
         const description = document.getElementById('expense-description').value.trim();
         const amount = parseFloat(document.getElementById('expense-amount').value);
         const date = document.getElementById('expense-date').value;
-        const salonId = document.getElementById('expense-salon').value;
 
-        if (!description || !amount || !date || !salonId) {
+        if (!description || !amount || !date) {
             return alert("Будь ласка, заповніть усі поля.");
         }
 
@@ -1346,7 +1332,6 @@
             await addDoc(collection(db, 'expenses'), {
                 description,
                 amount,
-                salonId,
                 date: Timestamp.fromDate(new Date(date))
             });
             event.target.reset();
