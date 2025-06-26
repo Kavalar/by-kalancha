@@ -176,6 +176,7 @@
     let state = {
         user: null,
         salons: [],
+        expenses: [],
         selectedCategoryId: null,
         categories: [],
         services: [],
@@ -231,10 +232,11 @@
             services: 'services', 
             masters: 'masters',
             appointments: 'appointments', 
-            clients: 'clients'
+            clients: 'clients',
+            expenses: 'expenses'
         };
-        Object.entries(collections).forEach(([col, stateKey]) => {
-            onSnapshot(collection(db, col), snapshot => {
+        Object.entries(collections).forEach(([stateKey, colName]) => { // Fixed order
+            onSnapshot(collection(db, colName), snapshot => {
                 state[stateKey] = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
                 if (stateKey === 'categories') state.categories.sort((a,b) => a.name.localeCompare(b.name));
                 if (state.user) renderView(state.currentView);
@@ -258,7 +260,11 @@
 
     function renderAppLayout(user) {
         const isAdmin = user.role === 'admin';
-        const adminTabs = `<li data-view="salary">Зарплата</li><li data-view="settings">Налаштування</li>`;
+        const adminTabs = `
+            <li data-view="salary">Зарплата</li>
+            <li data-view="expenses">Витрати</li>
+            <li data-view="settings">Налаштування</li>
+        `;
 
         appContainer.innerHTML = `
         <div class="crm-layout">
@@ -312,7 +318,7 @@
 
     function renderView(viewName) {
         if (!state.user) return;
-        if (state.user.role !== 'admin' && (viewName === 'salary' || viewName === 'settings')) {
+        if (state.user.role !== 'admin' && ['salary', 'settings', 'expenses'].includes(viewName)) {
             viewName = 'calendar';
         }
         if (state.currentView === 'appointments' && viewName !== 'appointments') {
@@ -332,7 +338,7 @@
 
         const headerTitle = document.getElementById('header-title');
         if(headerTitle) {
-            const viewTitles = { calendar: 'Календар', appointments: 'Запис', clients: 'Клієнти', services: 'Послуги та Категорії', masters: 'Майстри', salary: 'Зарплата', settings: 'Налаштування', clientDetail: 'Історія Клієнта', masterDetail: 'Картка Майстра' };
+            const viewTitles = { calendar: 'Календар', appointments: 'Запис', clients: 'Клієнти', services: 'Послуги та Категорії', masters: 'Майстри', salary: 'Зарплата', expenses: 'Витрати', settings: 'Налаштування', clientDetail: 'Історія Клієнта', masterDetail: 'Картка Майстра' };
             headerTitle.textContent = viewTitles[viewName] || 'Dashboard';
         }
 
@@ -355,6 +361,7 @@
             case 'masters': renderMastersView(contentWrapper); break;
             case 'masterDetail': renderMasterDetailView(contentWrapper); break;
             case 'salary': renderSalaryView(contentWrapper); break;
+            case 'expenses': renderExpensesView(contentWrapper); break;
             case 'settings': renderSettingsView(contentWrapper); break;
             default:
                 contentWrapper.innerHTML = `<h2>Невідомий розділ</h2>`;
@@ -1213,7 +1220,6 @@
             }
         });
 
-        // Fetch advances for all relevant masters
         const masterIds = Object.keys(masterTotals);
         for(const masterId of masterIds) {
             const advancesSnap = await getDocs(query(collection(db, 'masters', masterId, 'advances'), where('date', '>=', startDate), where('date', '<=', endDate)));
@@ -1253,6 +1259,114 @@
             reportContainer.innerHTML += cardHTML;
         }
     }
+
+    // #region Expenses View
+    function renderExpensesView(container) {
+        const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+        container.innerHTML = `
+            <div class="content-card">
+                <h2>Додати витрату</h2>
+                <form id="add-expense-form">
+                    <div class="form-row">
+                        <div class="form-group" style="flex:2;">
+                            <label for="expense-description">Опис</label>
+                            <input type="text" id="expense-description" required>
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label for="expense-amount">Сума (zł)</label>
+                            <input type="number" id="expense-amount" required min="0">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                         <div class="form-group" style="flex:1;">
+                            <label for="expense-salon">Салон</label>
+                            <select id="expense-salon" required>
+                               <option value="">Оберіть салон</option>
+                               ${salonOptions}
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label for="expense-date">Дата</label>
+                            <input type="date" id="expense-date" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn">Додати витрату</button>
+                </form>
+            </div>
+            <div class="content-card" style="margin-top:2rem;">
+                <h2>Історія витрат</h2>
+                <ul id="expenses-list" class="item-list"></ul>
+            </div>
+        `;
+
+        document.getElementById('add-expense-form').onsubmit = handleAddExpense;
+        
+        const listEl = document.getElementById('expenses-list');
+        listEl.innerHTML = '';
+        const sortedExpenses = state.expenses.sort((a,b) => b.date.toDate() - a.date.toDate());
+        if (sortedExpenses.length === 0) {
+            listEl.innerHTML = '<li>Витрат ще не було.</li>';
+        } else {
+            sortedExpenses.forEach(expense => {
+                const salon = state.salons.find(s => s.id === expense.salonId);
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <div>
+                        <strong>${expense.description}</strong><br>
+                        <small>${expense.date.toDate().toLocaleDateString('uk-UA')} (${salon?.name || 'Не вказано'})</small>
+                    </div>
+                    <div class="actions">
+                        <strong>${expense.amount.toFixed(2)} zł</strong>
+                        <button class="btn btn-delete" data-id="${expense.id}">🗑️</button>
+                    </div>`;
+                listEl.appendChild(li);
+            });
+        }
+        
+        listEl.onclick = (e) => {
+            const deleteBtn = e.target.closest('.btn-delete');
+            if (deleteBtn) {
+                handleDeleteExpense(deleteBtn.dataset.id);
+            }
+        };
+    }
+
+    async function handleAddExpense(event) {
+        event.preventDefault();
+        const description = document.getElementById('expense-description').value.trim();
+        const amount = parseFloat(document.getElementById('expense-amount').value);
+        const date = document.getElementById('expense-date').value;
+        const salonId = document.getElementById('expense-salon').value;
+
+        if (!description || !amount || !date || !salonId) {
+            return alert("Будь ласка, заповніть усі поля.");
+        }
+
+        try {
+            await addDoc(collection(db, 'expenses'), {
+                description,
+                amount,
+                salonId,
+                date: Timestamp.fromDate(new Date(date))
+            });
+            event.target.reset();
+        } catch (e) {
+            console.error("Помилка додавання витрати: ", e);
+            alert("Не вдалося додати витрату.");
+        }
+    }
+
+    async function handleDeleteExpense(id) {
+        if(confirm('Ви впевнені, що хочете видалити цю витрату?')) {
+            try {
+                await deleteDoc(doc(db, 'expenses', id));
+            } catch(e) {
+                console.error("Помилка видалення витрати: ", e);
+                alert("Не вдалося видалити витрату.");
+            }
+        }
+    }
+    // #endregion
 
     function renderSettingsView(container) {
         const tiers = state.settings.salaryTiers.sort((a,b) => a.threshold - b.threshold);
@@ -1320,8 +1434,7 @@
             btn.disabled = false; btn.textContent = 'Відправити звіт';
         }
     }
-    // #endregion
-
+    
     async function handleLogin(e) { e.preventDefault(); const email = document.getElementById('email').value.trim(); const password = document.getElementById('password').value; try { await signInWithEmailAndPassword(auth, email, password); } catch (err) { document.getElementById('login-error').innerText = "Неправильний email або пароль."; } }
 </script>
 </body>
