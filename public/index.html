@@ -228,25 +228,31 @@
         if (listenersAreActive) return;
         const collections = { 
             salons: 'salons',
-            Categories: 'serviceCategories', 
+            categories: 'serviceCategories', 
             services: 'services', 
             masters: 'masters',
             appointments: 'appointments', 
             clients: 'clients',
             expenses: 'expenses'
         };
-        Object.entries(collections).forEach(([stateKey, colName]) => { // Fixed order
+        Object.entries(collections).forEach(([stateKey, colName]) => {
             onSnapshot(collection(db, colName), snapshot => {
                 state[stateKey] = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
-                if (stateKey === 'categories') state.categories.sort((a,b) => a.name.localeCompare(b.name));
-                if (state.user) renderView(state.currentView);
+                if (stateKey === 'categories') {
+                    state.categories.sort((a,b) => a.name.localeCompare(b.name));
+                }
+                if (state.user) {
+                    renderView(state.currentView);
+                }
             });
         });
         
         if (state.user.role === 'admin') {
             onSnapshot(doc(db, 'settings', 'salaryRules'), (doc) => {
                 state.settings.salaryTiers = doc.exists() ? (doc.data().tiers || []) : [];
-                if (state.user && state.currentView === 'settings') renderView('settings');
+                if (state.user && state.currentView === 'settings') {
+                    renderView('settings');
+                }
             });
         }
         listenersAreActive = true;
@@ -1120,7 +1126,7 @@
     async function handleDeleteService(id) { if (!confirm('Видалити послугу?')) return; try { await deleteDoc(doc(db, 'services', id)); } catch (e) { alert('Не вдалося видалити.'); } }
     // #endregion
 
-    // #region Salary & Settings
+    // #region Salary & Settings & Expenses
     function renderSalaryView(container) {
         const today = new Date();
         const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
@@ -1258,7 +1264,6 @@
         }
     }
 
-    // #region Expenses View
     function renderExpensesView(container) {
         container.innerHTML = `
             <div class="content-card">
@@ -1271,7 +1276,7 @@
                         </div>
                         <div class="form-group" style="flex:1;">
                             <label for="expense-amount">Сума (zł)</label>
-                            <input type="number" id="expense-amount" required min="0">
+                            <input type="number" id="expense-amount" required min="0" step="0.01">
                         </div>
                          <div class="form-group" style="flex:1;">
                             <label for="expense-date">Дата</label>
@@ -1288,6 +1293,7 @@
         `;
 
         document.getElementById('add-expense-form').onsubmit = handleAddExpense;
+        document.getElementById('expense-date').valueAsDate = new Date();
         
         const listEl = document.getElementById('expenses-list');
         listEl.innerHTML = '';
@@ -1335,6 +1341,7 @@
                 date: Timestamp.fromDate(new Date(date))
             });
             event.target.reset();
+            document.getElementById('expense-date').valueAsDate = new Date();
         } catch (e) {
             console.error("Помилка додавання витрати: ", e);
             alert("Не вдалося додати витрату.");
@@ -1351,7 +1358,6 @@
             }
         }
     }
-    // #endregion
 
     function renderSettingsView(container) {
         const tiers = state.settings.salaryTiers.sort((a,b) => a.threshold - b.threshold);
@@ -1419,8 +1425,18 @@
             btn.disabled = false; btn.textContent = 'Відправити звіт';
         }
     }
-    
-    async function handleLogin(e) { e.preventDefault(); const email = document.getElementById('email').value.trim(); const password = document.getElementById('password').value; try { await signInWithEmailAndPassword(auth, email, password); } catch (err) { document.getElementById('login-error').innerText = "Неправильний email або пароль."; } }
+    // #endregion
+
+    async function handleLogin(e) { 
+        e.preventDefault(); 
+        const email = document.getElementById('email').value.trim(); 
+        const password = document.getElementById('password').value; 
+        try { 
+            await signInWithEmailAndPassword(auth, email, password); 
+        } catch (err) { 
+            document.getElementById('login-error').innerText = "Неправильний email або пароль."; 
+        } 
+    }
 </script>
 </body>
 </html>
