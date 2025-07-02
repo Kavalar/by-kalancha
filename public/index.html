@@ -855,45 +855,61 @@
     }
 
     function renderDailyAppointmentsList() {
-        const listEl = document.getElementById('daily-appointments-list');
-        const paginationControls = document.getElementById('pagination-controls');
-        if (!listEl) return;
-        const selectedDate = state.appointmentsListDate;
-        const startOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
-        const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
-        const dailyUnpaidAppointments = state.appointments.filter(app => {
-            if(!app.dateTime) return false;
-            const appDate = app.dateTime.toDate();
-            // CHANGE: Show not completed and partially paid appointments
-            return app.status !== 'completed' && appDate >= startOfDay && appDate <= endOfDay;
-        }).sort((a,b) => a.dateTime.toDate() - b.dateTime.toDate());
-        const itemsPerPage = 10;
-        const startIndex = (state.appointmentsPage - 1) * itemsPerPage;
-        const paginatedAppointments = dailyUnpaidAppointments.slice(startIndex, startIndex + itemsPerPage);
-        listEl.innerHTML = paginatedAppointments.length === 0 ? '<li>На цю дату немає незавершених записів.</li>' : '';
-        paginatedAppointments.forEach(appointment => {
-            const service = state.services.find(s => s.id === appointment.serviceId)?.name || 'Послуга';
-            const master = state.masters.find(m => m.id === appointment.masterId)?.name || 'Майстер';
-            const time = appointment.dateTime.toDate().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
-            
-            // CHANGE: Display remaining amount for partial payments
-            const remaining = (appointment.finalPrice || 0) - (appointment.totalPaid || 0);
-            const priceText = appointment.status === 'partially_paid' ? `Залишилось: ${remaining.toFixed(0)} zł` : `<strong>${appointment.finalPrice.toFixed(0)} zł</strong>`;
-            
-            const li = document.createElement('li');
-            li.innerHTML = `<div><strong>${time} - ${appointment.clientName}</strong><br><small>${service} (${master})</small></div><div class="actions">${priceText}<button class="btn btn-complete-payment">Оплатити</button></div>`;
-            
-            li.querySelector('.btn-complete-payment').onclick = () => openPaymentModal(appointment);
-            listEl.appendChild(li);
-        });
+    const listEl = document.getElementById('daily-appointments-list');
+    const paginationControls = document.getElementById('pagination-controls');
+    if (!listEl) return;
+
+    const selectedDate = state.appointmentsListDate;
+    const startOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
+    const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
+    
+    const dailyUnpaidAppointments = state.appointments.filter(app => {
+        if (!app.dateTime) return false;
+        const appDate = app.dateTime.toDate();
+        return app.status !== 'completed' && appDate >= startOfDay && appDate <= endOfDay;
+    }).sort((a, b) => a.dateTime.toDate() - b.dateTime.toDate());
+
+    // Якщо це перша сторінка, очищуємо список і перевіряємо, чи є записи
+    if (state.appointmentsPage === 1) {
+        listEl.innerHTML = ''; // Очищуємо тільки при першому завантаженні
+        if (dailyUnpaidAppointments.length === 0) {
+            listEl.innerHTML = '<li>На цю дату немає незавершених записів.</li>';
+            paginationControls.innerHTML = ''; // Ховаємо пагінацію, якщо записів немає
+            return;
+        }
+    }
+
+    const itemsPerPage = 10;
+    const startIndex = (state.appointmentsPage - 1) * itemsPerPage;
+    const paginatedAppointments = dailyUnpaidAppointments.slice(startIndex, startIndex + itemsPerPage);
+
+    // Додаємо нові елементи до списку, не видаляючи старі
+    paginatedAppointments.forEach(appointment => {
+        const service = state.services.find(s => s.id === appointment.serviceId)?.name || 'Послуга';
+        const master = state.masters.find(m => m.id === appointment.masterId)?.name || 'Майстер';
+        const time = appointment.dateTime.toDate().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
         
-        paginationControls.innerHTML = '';
-        if (dailyUnpaidAppointments.length > (startIndex + itemsPerPage)) {
-            const loadMoreBtn = document.createElement('button');
-            loadMoreBtn.className = 'btn';
-            loadMoreBtn.innerText = 'Завантажити ще';
-            loadMoreBtn.onclick = () => { state.appointmentsPage++; renderDailyAppointmentsList(); };
-            paginationControls.appendChild(loadMoreBtn);
+        const remaining = (appointment.finalPrice || 0) - (appointment.totalPaid || 0);
+        const priceText = appointment.status === 'partially_paid' ? `Залишилось: ${remaining.toFixed(0)} zł` : `<strong>${appointment.finalPrice.toFixed(0)} zł</strong>`;
+        
+        const li = document.createElement('li');
+        li.innerHTML = `<div><strong>${time} - ${appointment.clientName}</strong><br><small>${service} (${master})</small></div><div class="actions">${priceText}<button class="btn btn-complete-payment">Оплатити</button></div>`;
+        
+        li.querySelector('.btn-complete-payment').onclick = () => openPaymentModal(appointment);
+        listEl.appendChild(li); // Використовуємо appendChild для додавання
+    });
+    
+    // Оновлюємо кнопку "Завантажити ще"
+    paginationControls.innerHTML = '';
+    if (dailyUnpaidAppointments.length > startIndex + itemsPerPage) {
+        const loadMoreBtn = document.createElement('button');
+        loadMoreBtn.className = 'btn';
+        loadMoreBtn.innerText = 'Завантажити ще';
+        loadMoreBtn.onclick = () => { 
+            state.appointmentsPage++; 
+            renderDailyAppointmentsList(); 
+        };
+        paginationControls.appendChild(loadMoreBtn);
         }
     }
 
