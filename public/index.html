@@ -21,6 +21,7 @@
             --primary-hover: #34495e;
             --danger-color: #e74c3c;
             --success-color: #27ae60;
+            --warning-color: #f39c12; /* NEW */
             --shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
         body { font-family: 'Inter', Arial, sans-serif; background: var(--main-bg); margin: 0; padding: 0; color: var(--text-color); font-size: 16px; }
@@ -84,6 +85,12 @@
         .modal-header h2 { margin: 0; }
         .close-btn { font-size: 1.5rem; background: none; border: none; cursor: pointer; }
         
+        /* CHANGE: New payment summary styles */
+        .payment-summary p { margin: 0.5rem 0; display: flex; justify-content: space-between; font-size: 1.1rem;}
+        .payment-summary p.total { font-weight: bold; font-size: 1.2rem; border-top: 1px solid var(--border-color); padding-top: 0.5rem; margin-top: 0.5rem;}
+        .payment-summary p.remaining { color: var(--danger-color); font-weight: bold; font-size: 1.3rem;}
+
+
         .services-layout { display: grid; grid-template-columns: 300px 1fr; gap: 2rem; align-items: start; }
         .category-list-item { cursor: pointer; }
         .category-list-item.selected { font-weight: bold; background-color: var(--main-bg); }
@@ -103,6 +110,8 @@
         .status-badge { padding: 0.2em 0.6em; border-radius: 10px; font-size: 0.8em; color: white; }
         .status-completed { background-color: var(--success-color); }
         .status-upcoming { background-color: var(--gray-text); }
+        /* CHANGE: New status color */
+        .status-partially-paid { background-color: var(--warning-color); }
 
         #calendar-container { display: flex; flex-direction: column; gap: 1rem; }
         #calendar { height: 80vh; }
@@ -129,23 +138,36 @@
 
 <div class="modal-overlay" id="payment-modal">
     <div class="modal-panel">
-        <div class="modal-header"> <h2>Провести оплату</h2> <button class="close-btn">&times;</button> </div>
+        <div class="modal-header">
+            <h2>Внести оплату</h2>
+            <button class="close-btn">&times;</button>
+        </div>
+        <div id="payment-summary" class="payment-summary">
+            <p><span>Повна вартість:</span> <strong id="payment-total-price">0 zł</strong></p>
+            <p><span>Вже сплачено:</span> <strong id="payment-total-paid">0 zł</strong></p>
+            <p class="remaining"><span>Залишилось до сплати:</span> <strong id="payment-remaining">0 zł</strong></p>
+        </div>
+        <hr style="margin: 1.5rem 0;">
         <form id="payment-form">
             <input type="hidden" id="payment-appointment-id">
-            <p>Сума до оплати: <strong id="payment-modal-amount">0 zł</strong></p>
-            <div class="form-group">
-                <label for="payment-modal-type">Тип оплати</label>
-                <select id="payment-modal-type">
-                    <option value="cash">Готівка</option>
-                    <option value="card">Картка</option>
-                    <option value="blik">Blik</option>
-                </select>
+            <div class="form-row">
+                <div class="form-group" style="flex:2;">
+                    <label for="payment-amount">Сума до сплати зараз</label>
+                    <input type="number" id="payment-amount" required min="0.01" step="any">
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label for="payment-modal-type">Тип оплати</label>
+                    <select id="payment-modal-type">
+                        <option value="cash">Готівка</option>
+                        <option value="card">Картка</option>
+                        <option value="blik">Blik</option>
+                    </select>
+                </div>
             </div>
             <button type="submit">Підтвердити оплату</button>
         </form>
     </div>
 </div>
-
 <div class="modal-overlay" id="appointment-action-modal">
     <div class="modal-panel">
         <div class="modal-header">
@@ -162,7 +184,8 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, updatePassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, getDocs, getDoc, Timestamp, setDoc, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    // CHANGE: Import arrayUnion and increment
+    import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, getDocs, getDoc, Timestamp, setDoc, query, where, arrayUnion, increment } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
 
     const firebaseConfig = { apiKey: "AIzaSyBoGeREvdgrVSm-S4f3cW0HyB7Us9yh_us", authDomain: "bykalancha.firebaseapp.com", projectId: "bykalancha", storageBucket: "bykalancha.appspot.com", messagingSenderId: "196166318613", appId: "1:196166318613:web:0067f9de531e290e43ec1c", measurementId: "G-V72ECFLKFE" };
@@ -427,13 +450,22 @@
                 const events = filteredAppointments.map(app => {
                     const masterIndex = state.masters.findIndex(m => m.id === app.masterId);
                     const endTime = new Date(app.dateTime.toDate().getTime() + (app.duration || 60) * 60000);
+                    
+                    // CHANGE: Updated background color logic for partial payments
+                    let backgroundColor = colorPalette[masterIndex % colorPalette.length];
+                    if (app.status === 'completed') {
+                        backgroundColor = 'var(--success-color)';
+                    } else if (app.status === 'partially_paid') {
+                        backgroundColor = 'var(--warning-color)';
+                    }
+
                     return { 
                         id: app.id,
                         start: app.dateTime.toDate(), 
                         end: endTime, 
                         resourceId: app.masterId,
-                        backgroundColor: app.status === 'completed' ? 'var(--success-color)' : colorPalette[masterIndex % colorPalette.length],
-                        borderColor: app.status === 'completed' ? 'var(--success-color)' : colorPalette[masterIndex % colorPalette.length],
+                        backgroundColor: backgroundColor,
+                        borderColor: backgroundColor,
                         extendedProps: { appointment: app }
                     };
                 });
@@ -445,11 +477,11 @@
                 const salon = state.salons.find(s => s.id === appointment.salonId);
 
                 const html = `
-                  <div class="fc-event-main-frame">
-                    <div class="fc-event-title">${appointment.clientName}</div>
-                    <div class="fc-event-service">${service?.name || ''}</div>
-                    <div class="fc-event-service" style="opacity: 0.7;"><strong>${salon?.name || 'Не вказано'}</strong></div>
-                  </div>
+                    <div class="fc-event-main-frame">
+                        <div class="fc-event-title">${appointment.clientName}</div>
+                        <div class="fc-event-service">${service?.name || ''}</div>
+                        <div class="fc-event-service" style="opacity: 0.7;"><strong>${salon?.name || 'Не вказано'}</strong></div>
+                    </div>
                 `;
                 return { html: html };
             },
@@ -475,6 +507,25 @@
         salonFilter.onchange = (e) => { state.calendarSelectedSalonId = e.target.value; renderView('calendar'); };
     }
 
+    // CHANGE START: New function to open and populate the payment modal
+    function openPaymentModal(appointment) {
+        const totalPrice = appointment.finalPrice || 0;
+        const totalPaid = appointment.totalPaid || 0;
+        const remaining = totalPrice - totalPaid;
+
+        document.getElementById('payment-appointment-id').value = appointment.id;
+        document.getElementById('payment-total-price').textContent = `${totalPrice.toFixed(0)} zł`;
+        document.getElementById('payment-total-paid').textContent = `${totalPaid.toFixed(0)} zł`;
+        document.getElementById('payment-remaining').textContent = `${remaining.toFixed(0)} zł`;
+        
+        const amountInput = document.getElementById('payment-amount');
+        amountInput.value = remaining > 0 ? remaining.toFixed(2) : '0.00';
+        amountInput.max = remaining.toFixed(2);
+        
+        document.getElementById('payment-modal').style.display = 'flex';
+    }
+    // CHANGE END
+
     function showActionModal(appointment) {
         const modal = document.getElementById('appointment-action-modal');
         const detailsEl = document.getElementById('action-modal-details');
@@ -485,6 +536,15 @@
         const master = state.masters.find(m => m.id === appointment.masterId);
         const salon = state.salons.find(s => s.id === appointment.salonId);
 
+        // CHANGE: Status text updated to show remaining amount
+        let statusText = 'Очікує оплати';
+        if (appointment.status === 'completed') {
+            statusText = 'Оплачено';
+        } else if (appointment.status === 'partially_paid') {
+            const remaining = (appointment.finalPrice || 0) - (appointment.totalPaid || 0);
+            statusText = `Частково оплачено (залишилось ${remaining.toFixed(0)} zł)`;
+        }
+
         detailsEl.innerHTML = `
             <p><strong>Клієнт:</strong> ${appointment.clientName} (${client?.phone || 'не вказано'})</p>
             <p><strong>Послуга:</strong> ${service?.name || 'Невідома послуга'}</p>
@@ -492,16 +552,16 @@
             <p><strong>Салон:</strong> ${salon?.name || 'Не вказано'}</p>
             <p><strong>Дата:</strong> ${appointment.dateTime.toDate().toLocaleString('uk-UA')}</p>
             <p><strong>Сума:</strong> ${appointment.finalPrice.toFixed(0)} zł</p>
-            <p><strong>Статус:</strong> ${appointment.status === 'completed' ? 'Оплачено' : 'Очікує оплати'}</p>
+            <p><strong>Статус:</strong> ${statusText}</p>
         `;
 
         let buttonsHtml = '';
         if (appointment.status !== 'completed') {
-            buttonsHtml += `<button class="btn btn-complete-payment" data-action="pay" data-id="${appointment.id}" data-price="${appointment.finalPrice.toFixed(0)}">Провести оплату</button>`;
+            buttonsHtml += `<button class="btn btn-complete-payment" data-action="pay">Внести / Додати оплату</button>`;
         }
         
-        buttonsHtml += `<button class="btn btn-edit" data-action="edit" data-id="${appointment.id}">Редагувати / Перенести</button>`;
-        buttonsHtml += `<button class="btn btn-delete" data-action="cancel" data-id="${appointment.id}">Скасувати запис</button>`;
+        buttonsHtml += `<button class="btn btn-edit" data-action="edit">Редагувати / Перенести</button>`;
+        buttonsHtml += `<button class="btn btn-delete" data-action="cancel">Скасувати запис</button>`;
         
         buttonsEl.innerHTML = buttonsHtml;
         
@@ -510,18 +570,15 @@
             if (!button) return;
 
             const action = button.dataset.action;
-            const id = button.dataset.id;
 
             if (action === 'pay') {
-                const price = button.dataset.price;
-                document.getElementById('payment-appointment-id').value = id;
-                document.getElementById('payment-modal-amount').innerText = `${price} zł`;
-                document.getElementById('payment-modal').style.display = 'flex';
+                // CHANGE: Call the new function to open the payment modal
+                openPaymentModal(appointment);
                 document.getElementById('appointment-action-modal').style.display = 'none';
             } else if (action === 'edit') {
-                handleEditAppointment(id);
+                handleEditAppointment(appointment.id);
             } else if (action === 'cancel') {
-                handleCancelAppointment(id);
+                handleCancelAppointment(appointment.id);
             }
         };
         
@@ -583,14 +640,25 @@
         }
         const clientAppointments = state.appointments.filter(app => app.clientId === client.id).sort((a,b) => b.dateTime.toDate() - a.dateTime.toDate());
         const totalVisits = clientAppointments.length;
-        const totalSpent = clientAppointments.reduce((sum, app) => sum + (app.status === 'completed' ? app.finalPrice : 0), 0);
+        const totalSpent = clientAppointments.reduce((sum, app) => sum + (app.totalPaid || (app.status === 'completed' ? app.finalPrice : 0)), 0);
         const firstVisit = totalVisits > 0 ? clientAppointments[clientAppointments.length - 1].dateTime.toDate().toLocaleDateString('uk-UA') : 'Немає візитів';
         let historyHtml = clientAppointments.map(app => {
             const service = state.services.find(s => s.id === app.serviceId);
             const master = state.masters.find(m => m.id === app.masterId);
             const salon = state.salons.find(s => s.id === app.salonId); 
             const date = app.dateTime.toDate().toLocaleString('uk-UA', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            const statusBadge = app.status === 'completed' ? `<span class="status-badge status-completed">Оплачено</span>` : `<span class="status-badge status-upcoming">Очікує</span>`;
+            
+            // CHANGE: Updated status badge logic
+            let statusBadge;
+            if (app.status === 'completed') {
+                statusBadge = `<span class="status-badge status-completed">Оплачено</span>`;
+            } else if (app.status === 'partially_paid') {
+                const remaining = (app.finalPrice || 0) - (app.totalPaid || 0);
+                statusBadge = `<span class="status-badge status-partially-paid">Частково (ще ${remaining.toFixed(0)} zł)</span>`;
+            } else {
+                statusBadge = `<span class="status-badge status-upcoming">Очікує</span>`;
+            }
+
             return `<tr><td>${date}</td><td>${service?.name || 'Н/Д'}</td><td>${master?.name || 'Н/Д'}</td><td>${salon?.name || 'Н/Д'}</td><td>${app.finalPrice.toFixed(0)} zł</td><td>${statusBadge}</td></tr>`;
         }).join('');
         container.innerHTML = `<div class="content-card"><button id="back-to-clients-btn" class="btn" style="margin-bottom: 2rem;">&larr; Назад до списку клієнтів</button><h2>${client.name}</h2><p><strong>Телефон:</strong> ${client.phone || 'не вказано'}</p><div class="stats-grid"><div class="stat-card"><div class="value">${totalVisits}</div><div class="label">Всього візитів</div></div><div class="stat-card"><div class="value">${totalSpent.toFixed(0)} zł</div><div class="label">Всього витрачено</div></div><div class="stat-card"><div class="value">${firstVisit}</div><div class="label">Перший візит</div></div></div></div><div class="content-card"><h3>Історія відвідувань</h3><table><thead><tr><th>Дата</th><th>Послуга</th><th>Майстер</th><th>Салон</th><th>Сума</th><th>Статус</th></tr></thead><tbody>${historyHtml.length > 0 ? historyHtml : `<tr><td colspan="6" style="text-align:center;">Історія відвідувань порожня.</td></tr>`}</tbody></table></div>`;
@@ -666,7 +734,7 @@
             </div>
             ${!isEditMode ? `
             <div class="content-card" style="margin-top: 2rem;">
-                <h2>Неоплачені записи</h2>
+                <h2>Незавершені записи</h2>
                 <div class="form-group">
                     <label for="appointments-date-filter">Оберіть дату</label>
                     <input type="date" id="appointments-date-filter">
@@ -741,7 +809,7 @@
                 renderView('calendar');
             };
         } else {
-            document.getElementById('payment-form').onsubmit = handleConfirmPayment;
+            // document.getElementById('payment-form').onsubmit is set in renderAppLayout now
             const searchInput = document.getElementById('client-search-input');
             const searchResultsEl = document.getElementById('client-search-results');
             const phoneGroup = document.getElementById('client-phone-group');
@@ -796,28 +864,29 @@
         const dailyUnpaidAppointments = state.appointments.filter(app => {
             if(!app.dateTime) return false;
             const appDate = app.dateTime.toDate();
+            // CHANGE: Show not completed and partially paid appointments
             return app.status !== 'completed' && appDate >= startOfDay && appDate <= endOfDay;
         }).sort((a,b) => a.dateTime.toDate() - b.dateTime.toDate());
         const itemsPerPage = 10;
         const startIndex = (state.appointmentsPage - 1) * itemsPerPage;
         const paginatedAppointments = dailyUnpaidAppointments.slice(startIndex, startIndex + itemsPerPage);
-        listEl.innerHTML = paginatedAppointments.length === 0 ? '<li>На цю дату немає неоплачених записів.</li>' : '';
+        listEl.innerHTML = paginatedAppointments.length === 0 ? '<li>На цю дату немає незавершених записів.</li>' : '';
         paginatedAppointments.forEach(appointment => {
             const service = state.services.find(s => s.id === appointment.serviceId)?.name || 'Послуга';
             const master = state.masters.find(m => m.id === appointment.masterId)?.name || 'Майстер';
             const time = appointment.dateTime.toDate().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
+            
+            // CHANGE: Display remaining amount for partial payments
+            const remaining = (appointment.finalPrice || 0) - (appointment.totalPaid || 0);
+            const priceText = appointment.status === 'partially_paid' ? `Залишилось: ${remaining.toFixed(0)} zł` : `<strong>${appointment.finalPrice.toFixed(0)} zł</strong>`;
+            
             const li = document.createElement('li');
-            li.innerHTML = `<div><strong>${time} - ${appointment.clientName}</strong><br><small>${service} (${master})</small></div><div class="actions"><strong>${appointment.finalPrice.toFixed(0)} zł</strong><button class="btn btn-complete-payment" data-id="${appointment.id}" data-price="${appointment.finalPrice.toFixed(0)}">Оплатити</button></div>`;
+            li.innerHTML = `<div><strong>${time} - ${appointment.clientName}</strong><br><small>${service} (${master})</small></div><div class="actions">${priceText}<button class="btn btn-complete-payment">Оплатити</button></div>`;
+            
+            li.querySelector('.btn-complete-payment').onclick = () => openPaymentModal(appointment);
             listEl.appendChild(li);
         });
-        listEl.onclick = (e) => {
-            if (e.target.closest('.btn-complete-payment')) {
-                const btn = e.target.closest('.btn-complete-payment');
-                document.getElementById('payment-appointment-id').value = btn.dataset.id;
-                document.getElementById('payment-modal-amount').innerText = `${btn.dataset.price} zł`;
-                document.getElementById('payment-modal').style.display = 'flex';
-            }
-        };
+        
         paginationControls.innerHTML = '';
         if (dailyUnpaidAppointments.length > (startIndex + itemsPerPage)) {
             const loadMoreBtn = document.createElement('button');
@@ -902,6 +971,7 @@
         try {
             if (isEditMode) {
                 const appointmentId = state.editingAppointmentId;
+                // Note: Editing an appointment doesn't reset payment status.
                 await updateDoc(doc(db, 'appointments', appointmentId), appointmentData);
                 alert('Запис успішно оновлено!');
                 state.editingAppointmentId = null;
@@ -929,8 +999,9 @@
                     ...appointmentData,
                     clientName,
                     clientId,
-                    status: 'upcoming',
-                    paymentType: null,
+                    status: 'upcoming', // All new appointments start as upcoming
+                    totalPaid: 0,
+                    payments: [],
                     createdAt: Timestamp.now()
                 };
 
@@ -946,19 +1017,64 @@
         }
     }
      
-    async function handleConfirmPayment(event) { 
+    // CHANGE START: Rewritten payment handler
+    async function handleConfirmPayment(event) {
         event.preventDefault();
-        const appointmentId = document.getElementById('payment-appointment-id').value; 
-        const paymentType = document.getElementById('payment-modal-type').value; 
-        try { 
-            await updateDoc(doc(db, 'appointments', appointmentId), { status: 'completed', paymentType: paymentType, completedAt: Timestamp.now() }); 
-            document.getElementById('payment-modal').style.display = 'none'; 
-        } catch(e) { 
-            alert('Не вдалося провести оплату.'); 
-        } 
+        const appointmentId = document.getElementById('payment-appointment-id').value;
+        const paymentType = document.getElementById('payment-modal-type').value;
+        const amountToPay = parseFloat(document.getElementById('payment-amount').value);
+
+        if (!appointmentId || !amountToPay || amountToPay <= 0) {
+            alert('Будь ласка, введіть коректну суму.');
+            return;
+        }
+
+        const appointmentRef = doc(db, 'appointments', appointmentId);
+
+        try {
+            const appointmentSnap = await getDoc(appointmentRef);
+            if (!appointmentSnap.exists()) {
+                throw new Error("Запис не знайдено");
+            }
+
+            const appointmentData = appointmentSnap.data();
+            const currentTotalPaid = appointmentData.totalPaid || 0;
+            const finalPrice = appointmentData.finalPrice;
+            
+            if (amountToPay > (finalPrice - currentTotalPaid)) {
+                if(!confirm(`Сума оплати (${amountToPay.toFixed(2)} zł) більша за залишок (${(finalPrice - currentTotalPaid).toFixed(2)} zł). Продовжити?`)){
+                    return;
+                }
+            }
+
+            const newPayment = {
+                amount: amountToPay,
+                type: paymentType,
+                date: Timestamp.now()
+            };
+
+            const newTotalPaid = currentTotalPaid + amountToPay;
+            const newStatus = newTotalPaid >= finalPrice ? 'completed' : 'partially_paid';
+            
+            await updateDoc(appointmentRef, {
+                payments: arrayUnion(newPayment),
+                totalPaid: increment(amountToPay),
+                status: newStatus,
+                ...(newStatus === 'completed' && !appointmentData.completedAt && { completedAt: Timestamp.now() })
+            });
+
+            document.getElementById('payment-modal').style.display = 'none';
+        } catch (e) {
+            console.error("Помилка оплати:", e);
+            alert('Не вдалося провести оплату. Помилка: ' + e.message);
+        }
     }
+    // CHANGE END
+
     // #endregion
 
+    // ... (The rest of the JS code remains the same as in your file)
+    
     // #region Masters View
     function renderMastersView(container) { 
         container.innerHTML = `<div class="content-card"><h2>Додати нового майстра</h2><form id="add-master-form"><div class="form-group"><label for="new-master-name">Ім'я та прізвище</label><input type="text" id="new-master-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="new-master-tier">Ранг</label><input type="text" id="new-master-tier" placeholder="напр. Топ-майстер"></div><div class="form-group" style="flex:1;"><label for="new-master-modifier">Націнка (%)</label><input type="number" id="new-master-modifier" value="0" min="0"></div></div><div class="form-group"><label>Спеціалізації</label><div id="new-master-categories" class="category-checkbox-group"></div></div><button class="btn" type="submit">Додати майстра</button></form></div><div class="content-card" style="margin-top: 2rem;"><h2>Список майстрів</h2><ul id="masters-list" class="item-list"></ul></div><div class="modal-overlay" id="edit-master-modal"><div class="modal-panel"><div class="modal-header"><h2>Редагувати майстра</h2><button class="close-btn">&times;</button></div><form id="edit-master-form"><input type="hidden" id="edit-master-id"><div class="form-group"><label for="edit-master-name">Ім'я та прізвище</label><input type="text" id="edit-master-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="edit-master-tier">Ранг</label><input type="text" id="edit-master-tier"></div><div class="form-group" style="flex:1;"><label for="edit-master-modifier">Націнка (%)</label><input type="number" id="edit-master-modifier" min="0"></div></div><div class="form-group"><label>Спеціалізації</label><div id="edit-master-categories" class="category-checkbox-group"></div></div><div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem;"><label><input type="checkbox" id="edit-master-frozen"> Заморозити майстра (приховати з форм)</label></div><button type="submit" class="btn">Зберегти зміни</button></form></div></div>`; 
@@ -1184,7 +1300,11 @@
         const selectedSalonId = document.getElementById('salary-salon-filter').value;
         const salaryTiers = state.settings.salaryTiers.sort((a,b) => b.threshold - a.threshold);
 
-        let paidAppointments = state.appointments.filter(app => app.status === 'completed' && app.completedAt && app.completedAt.toDate() >= startDate && app.completedAt.toDate() <= endDate);
+        let paidAppointments = state.appointments.filter(app => {
+            const completedDate = app.completedAt?.toDate();
+            // CHANGE: Check for completed status and ensure completedAt is within range
+            return app.status === 'completed' && completedDate && completedDate >= startDate && completedDate <= endDate;
+        });
         
         if(selectedMasterId !== 'all'){
             paidAppointments = paidAppointments.filter(app => app.masterId === selectedMasterId);
@@ -1213,15 +1333,14 @@
 
             const salaryBaseForThisAppointment = typeof appointment.salaryBase === 'number' ? appointment.salaryBase : appointment.finalPrice;
             masterTotals[masterId].totalSalaryBase += salaryBaseForThisAppointment;
-            masterTotals[masterId].totalRevenue += appointment.finalPrice;
-
-            if (appointment.paymentType === 'cash') {
-                masterTotals[masterId].byCash += appointment.finalPrice;
-            } else if (appointment.paymentType === 'card') {
-                masterTotals[masterId].byCard += appointment.finalPrice;
-            } else if (appointment.paymentType === 'blik') {
-                masterTotals[masterId].byBlik += appointment.finalPrice;
-            }
+            
+            // Sum up total revenue from all payments
+            (appointment.payments || []).forEach(p => {
+                 masterTotals[masterId].totalRevenue += p.amount;
+                 if (p.type === 'cash') masterTotals[masterId].byCash += p.amount;
+                 else if (p.type === 'card') masterTotals[masterId].byCard += p.amount;
+                 else if (p.type === 'blik') masterTotals[masterId].byBlik += p.amount;
+            });
         });
 
         const masterIds = Object.keys(masterTotals);
