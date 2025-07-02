@@ -161,7 +161,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, updatePassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, getDocs, getDoc, Timestamp, setDoc, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
 
@@ -831,7 +831,7 @@
     function populateAppointmentFormDropdowns() { 
         const categorySelect = document.getElementById('appointment-category'); 
         if (categorySelect) { 
-            categorySelect.innerHTML = '<option value="">Оберіть категорію</option>' + state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join(''); 
+            categorySelect.innerHTML = '<option value="">Оберіть категорію</option>' + state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
         } 
     }
 
@@ -947,7 +947,7 @@
     }
      
     async function handleConfirmPayment(event) { 
-        event.preventDefault(); 
+        event.preventDefault();
         const appointmentId = document.getElementById('payment-appointment-id').value; 
         const paymentType = document.getElementById('payment-modal-type').value; 
         try { 
@@ -979,13 +979,13 @@
                 </div>
                 <div class="actions">
                     <button class="btn btn-edit" data-id="${master.id}" data-action="edit-profile">Ред.</button>
-                </div>`; 
+                </div>`;
             listEl.appendChild(li); 
         }); 
         listEl.onclick = (event) => { 
-            const button = event.target.closest('button[data-action="edit-profile"]'); 
+            const button = event.target.closest('button[data-action="edit-profile"]');
             if (button) { 
-                event.stopPropagation(); 
+                event.stopPropagation();
                 showEditMasterModal(button.dataset.id); 
             } else { 
                 const masterItem = event.target.closest('.master-info-clickable'); 
@@ -994,7 +994,7 @@
                     renderView('masterDetail'); 
                 } 
             } 
-        }; 
+        };
     }
 
     function renderMasterDetailView(container) {
@@ -1365,7 +1365,23 @@
         
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
 
-        container.innerHTML = `<div class="content-card"><h2>Налаштування відсотків зарплати</h2><table><thead><tr><th>Сума від (поріг)</th><th>Відсоток</th><th>Дія</th></tr></thead><tbody id="salary-tiers-table">${tableRows}</tbody></table><hr style="margin: 2rem 0;"><h3 id="tier-form-title">Додати новий рівень</h3><form id="tier-form" class="form-row"><div class="form-group" style="flex:1;"><label for="tier-threshold">Сума від (zł)</label><input type="number" id="tier-threshold" min="0" required></div><div class="form-group" style="flex:1;"><label for="tier-rate">Відсоток (%)</label><input type="number" id="tier-rate" min="0" max="100" required></div><div class="form-group"><button type="submit" id="tier-submit-btn" class="btn">Додати</button><button type="button" id="tier-cancel-btn" class="btn" style="display:none; margin-left: 1rem; background-color: var(--gray-text)">Скасувати</button></div></form></div><div class="content-card"><h2>Ручна відправка звіту</h2><p>Оберіть період та салон, за яким потрібно сформувати звіт та відправити його на пошту.</p><form id="manual-report-form"><div class="form-row"><div class="form-group" style="flex:1;"><label for="report-start-date">Дата початку</label><input type="date" id="report-start-date" required></div><div class="form-group" style="flex:1;"><label for="report-end-date">Дата кінця</label><input type="date" id="report-end-date" required></div></div><div class="form-group"><label for="report-salon-filter">Салон</label><select id="report-salon-filter"><option value="all">Всі салони (Разом)</option>${salonOptions}</select></div><button type="submit" class="btn">Відправити звіт</button></form></div>`;
+        container.innerHTML = `<div class="content-card"><h2>Налаштування відсотків зарплати</h2><table><thead><tr><th>Сума від (поріг)</th><th>Відсоток</th><th>Дія</th></tr></thead><tbody id="salary-tiers-table">${tableRows}</tbody></table><hr style="margin: 2rem 0;"><h3 id="tier-form-title">Додати новий рівень</h3><form id="tier-form" class="form-row"><div class="form-group" style="flex:1;"><label for="tier-threshold">Сума від (zł)</label><input type="number" id="tier-threshold" min="0" required></div><div class="form-group" style="flex:1;"><label for="tier-rate">Відсоток (%)</label><input type="number" id="tier-rate" min="0" max="100" required></div><div class="form-group"><button type="submit" id="tier-submit-btn" class="btn">Додати</button><button type="button" id="tier-cancel-btn" class="btn" style="display:none; margin-left: 1rem; background-color: var(--gray-text)">Скасувати</button></div></form></div><div class="content-card"><h2>Ручна відправка звіту</h2><p>Оберіть період та салон, за яким потрібно сформувати звіт та відправити його на пошту.</p><form id="manual-report-form"><div class="form-row"><div class="form-group" style="flex:1;"><label for="report-start-date">Дата початку</label><input type="date" id="report-start-date" required></div><div class="form-group" style="flex:1;"><label for="report-end-date">Дата кінця</label><input type="date" id="report-end-date" required></div></div><div class="form-group"><label for="report-salon-filter">Салон</label><select id="report-salon-filter"><option value="all">Всі салони (Разом)</option>${salonOptions}</select></div><button type="submit" class="btn">Відправити звіт</button></form></div>
+<div class="content-card">
+    <h2>Зміна паролю</h2>
+    <p>Тут ви можете змінити свій пароль для входу в систему.</p>
+    <form id="change-password-form">
+        <div class="form-group">
+            <label for="new-password">Новий пароль</label>
+            <input type="password" id="new-password" required minlength="6" autocomplete="new-password">
+        </div>
+        <div class="form-group">
+            <label for="confirm-password">Підтвердіть новий пароль</label>
+            <input type="password" id="confirm-password" required minlength="6" autocomplete="new-password">
+        </div>
+        <button type="submit" class="btn">Змінити пароль</button>
+        <p id="password-change-status" style="margin-top: 1rem; color: var(--gray-text);"></p>
+    </form>
+</div>`;
         document.getElementById('tier-form').onsubmit = handleSaveSalaryTier;
         document.getElementById('tier-cancel-btn').onclick = () => { state.editingTierIndex = null; renderView('settings'); };
         document.getElementById('salary-tiers-table').onclick = (e) => {
@@ -1373,6 +1389,7 @@
             if(e.target.classList.contains('btn-edit-tier')) { handleEditSalaryTier(parseInt(e.target.dataset.index)); }
         };
         document.getElementById('manual-report-form').onsubmit = handleManualReport;
+        document.getElementById('change-password-form').onsubmit = handleChangePassword;
     }
     function handleEditSalaryTier(index) {
         state.editingTierIndex = index;
@@ -1422,19 +1439,68 @@
             console.error("Помилка виклику хмарної функції:", error);
             alert(`Помилка: ${error.message}`);
         } finally {
-            btn.disabled = false; btn.textContent = 'Відправити звіт';
+            btn.disabled = false;
+            btn.textContent = 'Відправити звіт';
+        }
+    }
+    
+    async function handleChangePassword(event) {
+        event.preventDefault();
+        const newPasswordInput = document.getElementById('new-password');
+        const confirmPasswordInput = document.getElementById('confirm-password');
+        const statusEl = document.getElementById('password-change-status');
+        
+        const newPassword = newPasswordInput.value;
+        const confirmPassword = confirmPasswordInput.value;
+
+        if (newPassword.length < 6) {
+            statusEl.textContent = 'Пароль має бути не менше 6 символів.';
+            statusEl.style.color = 'var(--danger-color)';
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            statusEl.textContent = 'Паролі не співпадають.';
+            statusEl.style.color = 'var(--danger-color)';
+            return;
+        }
+
+        const user = auth.currentUser;
+        if (!user) {
+            statusEl.textContent = 'Помилка: користувач не автентифікований.';
+            statusEl.style.color = 'var(--danger-color)';
+            return;
+        }
+
+        statusEl.textContent = 'Зміна паролю...';
+        statusEl.style.color = 'var(--gray-text)';
+
+        try {
+            await updatePassword(user, newPassword);
+            statusEl.textContent = 'Пароль успішно змінено!';
+            statusEl.style.color = 'var(--success-color)';
+            newPasswordInput.value = '';
+            confirmPasswordInput.value = '';
+        } catch (error) {
+            console.error("Помилка зміни пароля:", error);
+            if (error.code === 'auth/requires-recent-login') {
+                statusEl.textContent = 'Ця операція вимагає нещодавнього входу. Будь ласка, вийдіть і увійдіть знову.';
+            } else {
+                statusEl.textContent = `Помилка: ${error.message}`;
+            }
+            statusEl.style.color = 'var(--danger-color)';
         }
     }
     // #endregion
 
     async function handleLogin(e) { 
-        e.preventDefault(); 
+        e.preventDefault();
         const email = document.getElementById('email').value.trim(); 
         const password = document.getElementById('password').value; 
         try { 
-            await signInWithEmailAndPassword(auth, email, password); 
+            await signInWithEmailAndPassword(auth, email, password);
         } catch (err) { 
-            document.getElementById('login-error').innerText = "Неправильний email або пароль."; 
+            document.getElementById('login-error').innerText = "Неправильний email або пароль.";
         } 
     }
 </script>
