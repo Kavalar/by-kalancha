@@ -85,11 +85,9 @@
         .modal-header h2 { margin: 0; }
         .close-btn { font-size: 1.5rem; background: none; border: none; cursor: pointer; }
         
-        /* CHANGE: New payment summary styles */
         .payment-summary p { margin: 0.5rem 0; display: flex; justify-content: space-between; font-size: 1.1rem;}
         .payment-summary p.total { font-weight: bold; font-size: 1.2rem; border-top: 1px solid var(--border-color); padding-top: 0.5rem; margin-top: 0.5rem;}
         .payment-summary p.remaining { color: var(--danger-color); font-weight: bold; font-size: 1.3rem;}
-
 
         .services-layout { display: grid; grid-template-columns: 300px 1fr; gap: 2rem; align-items: start; }
         .category-list-item { cursor: pointer; }
@@ -110,7 +108,6 @@
         .status-badge { padding: 0.2em 0.6em; border-radius: 10px; font-size: 0.8em; color: white; }
         .status-completed { background-color: var(--success-color); }
         .status-upcoming { background-color: var(--gray-text); }
-        /* CHANGE: New status color */
         .status-partially-paid { background-color: var(--warning-color); }
 
         #calendar-container { display: flex; flex-direction: column; gap: 1rem; }
@@ -131,6 +128,29 @@
         .stat-card { background-color: var(--main-bg); padding: 1.5rem; border-radius: 8px; text-align: center;}
         .stat-card .value { font-size: 2rem; font-weight: 600; color: var(--primary-color); }
         .stat-card .label { font-size: 0.9rem; color: var(--gray-text); }
+
+        /* NEW: Styles for the summary block */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1.5rem;
+            text-align: center;
+        }
+        .summary-card {
+            background-color: var(--main-bg);
+            padding: 1rem;
+            border-radius: 8px;
+        }
+        .summary-card .value {
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+        .summary-card .label {
+            font-size: 0.9rem;
+            color: var(--gray-text);
+            margin-top: 0.25rem;
+        }
     </style>
 </head>
 <body>
@@ -168,6 +188,7 @@
         </form>
     </div>
 </div>
+
 <div class="modal-overlay" id="appointment-action-modal">
     <div class="modal-panel">
         <div class="modal-header">
@@ -184,7 +205,6 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, updatePassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    // CHANGE: Import arrayUnion and increment
     import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, getDocs, getDoc, Timestamp, setDoc, query, where, arrayUnion, increment } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
 
@@ -398,36 +418,120 @@
     }
     // #endregion
 
+    // CHANGE START: New daily summary logic
+    function renderDailySummary() {
+        const dateInput = document.getElementById('summary-date-picker');
+        const salonInput = document.getElementById('summary-salon-filter');
+        if (!dateInput || !salonInput) return;
+
+        const selectedDate = new Date(dateInput.value);
+        const selectedSalonId = salonInput.value;
+
+        const startOfDay = new Date(selectedDate.setHours(0, 0, 0, 0));
+        const endOfDay = new Date(selectedDate.setHours(23, 59, 59, 999));
+        
+        let relevantAppointments = state.appointments;
+        
+        if (selectedSalonId !== 'all') {
+            relevantAppointments = relevantAppointments.filter(app => app.salonId === selectedSalonId);
+        }
+
+        let total = 0, cash = 0, card = 0, blik = 0;
+        const paidServices = new Set();
+
+        relevantAppointments.forEach(app => {
+            if (app.payments && app.payments.length > 0) {
+                app.payments.forEach(p => {
+                    const paymentDate = p.date.toDate();
+                    if (paymentDate >= startOfDay && paymentDate <= endOfDay) {
+                        total += p.amount;
+                        if(p.type === 'cash') cash += p.amount;
+                        else if(p.type === 'card') card += p.amount;
+                        else if(p.type === 'blik') blik += p.amount;
+                        paidServices.add(app.id);
+                    }
+                });
+            }
+        });
+
+        document.getElementById('summary-total').textContent = `${total.toFixed(0)} zł`;
+        document.getElementById('summary-cash').textContent = `${cash.toFixed(0)} zł`;
+        document.getElementById('summary-card').textContent = `${card.toFixed(0)} zł`;
+        document.getElementById('summary-blik').textContent = `${blik.toFixed(0)} zł`;
+        document.getElementById('summary-services-count').textContent = paidServices.size;
+    }
+    // CHANGE END
+
     // #region Calendar View
     function renderCalendarView(container) {
-        const activeMasters = state.masters.filter(m => !m.isFrozen);
-        const salonOptions = state.salons.map(s => `<option value="${s.id}" ${state.calendarSelectedSalonId === s.id ? 'selected' : ''}>${s.name}</option>`).join('');
+        const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
 
-        container.innerHTML = `<div class="content-card">
-            <div id="calendar-container">
-                <div class="form-row">
+        container.innerHTML = `
+            <div class="content-card">
+                <div id="calendar-container">
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1;">
+                            <label for="calendar-master-filter">Майстер:</label>
+                            <select id="calendar-master-filter"></select>
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label for="calendar-salon-filter">Салон:</label>
+                            <select id="calendar-salon-filter">
+                                <option value="all">Всі салони</option>
+                                ${salonOptions}
+                            </select>
+                        </div>
+                    </div>
+                    <div id="calendar"></div>
+                </div>
+            </div>
+            <div class="content-card">
+                <h2>Підсумок за день</h2>
+                <div class="form-row" style="margin-bottom: 2rem;">
                     <div class="form-group" style="flex:1;">
-                        <label for="calendar-master-filter">Майстер:</label>
-                        <select id="calendar-master-filter">
-                            <option value="all">Всі майстри</option>
-                            ${activeMasters.map(m => `<option value="${m.id}" ${state.calendarSelectedMasterId === m.id ? 'selected' : ''}>${m.name}</option>`).join('')}
-                        </select>
+                        <label for="summary-date-picker">Оберіть дату</label>
+                        <input type="date" id="summary-date-picker">
                     </div>
                     <div class="form-group" style="flex:1;">
-                        <label for="calendar-salon-filter">Салон:</label>
-                        <select id="calendar-salon-filter">
+                        <label for="summary-salon-filter">Оберіть салон</label>
+                        <select id="summary-salon-filter">
                             <option value="all">Всі салони</option>
                             ${salonOptions}
                         </select>
                     </div>
                 </div>
-                <div id="calendar"></div>
-            </div>
-        </div>`;
+                <div class="summary-grid">
+                    <div class="summary-card">
+                        <div class="value" id="summary-total">0 zł</div>
+                        <div class="label">Загальний дохід</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="value" id="summary-cash">0 zł</div>
+                        <div class="label">💵 Готівкою</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="value" id="summary-card">0 zł</div>
+                        <div class="label">💳 Карткою</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="value" id="summary-blik">0 zł</div>
+                        <div class="label">📱 Blik</div>
+                    </div>
+                     <div class="summary-card">
+                        <div class="value" id="summary-services-count">0</div>
+                        <div class="label">Кількість оплат</div>
+                    </div>
+                </div>
+            </div>`;
         
         const calendarEl = document.getElementById('calendar');
         const masterFilter = document.getElementById('calendar-master-filter');
         const salonFilter = document.getElementById('calendar-salon-filter');
+        
+        const activeMasters = state.masters.filter(m => !m.isFrozen);
+        masterFilter.innerHTML = '<option value="all">Всі майстри</option>' + activeMasters.map(m => `<option value="${m.id}" ${state.calendarSelectedMasterId === m.id ? 'selected' : ''}>${m.name}</option>`).join('');
+        salonFilter.value = state.calendarSelectedSalonId;
+
         if (!calendarEl || !masterFilter || !salonFilter) return;
 
         const colorPalette = ['#3788d8', '#e25141', '#4caf50', '#ff9800', '#9c27b0', '#795548', '#607d8b'];
@@ -451,7 +555,6 @@
                     const masterIndex = state.masters.findIndex(m => m.id === app.masterId);
                     const endTime = new Date(app.dateTime.toDate().getTime() + (app.duration || 60) * 60000);
                     
-                    // CHANGE: Updated background color logic for partial payments
                     let backgroundColor = colorPalette[masterIndex % colorPalette.length];
                     if (app.status === 'completed') {
                         backgroundColor = 'var(--success-color)';
@@ -505,9 +608,15 @@
         calendar.render();
         masterFilter.onchange = (e) => { state.calendarSelectedMasterId = e.target.value; renderView('calendar'); };
         salonFilter.onchange = (e) => { state.calendarSelectedSalonId = e.target.value; renderView('calendar'); };
+
+        const summaryDatePicker = document.getElementById('summary-date-picker');
+        const summarySalonFilter = document.getElementById('summary-salon-filter');
+        summaryDatePicker.valueAsDate = new Date(); 
+        summaryDatePicker.onchange = renderDailySummary;
+        summarySalonFilter.onchange = renderDailySummary;
+        renderDailySummary(); 
     }
 
-    // CHANGE START: New function to open and populate the payment modal
     function openPaymentModal(appointment) {
         const totalPrice = appointment.finalPrice || 0;
         const totalPaid = appointment.totalPaid || 0;
@@ -524,7 +633,6 @@
         
         document.getElementById('payment-modal').style.display = 'flex';
     }
-    // CHANGE END
 
     function showActionModal(appointment) {
         const modal = document.getElementById('appointment-action-modal');
@@ -536,7 +644,6 @@
         const master = state.masters.find(m => m.id === appointment.masterId);
         const salon = state.salons.find(s => s.id === appointment.salonId);
 
-        // CHANGE: Status text updated to show remaining amount
         let statusText = 'Очікує оплати';
         if (appointment.status === 'completed') {
             statusText = 'Оплачено';
@@ -572,7 +679,6 @@
             const action = button.dataset.action;
 
             if (action === 'pay') {
-                // CHANGE: Call the new function to open the payment modal
                 openPaymentModal(appointment);
                 document.getElementById('appointment-action-modal').style.display = 'none';
             } else if (action === 'edit') {
@@ -648,7 +754,6 @@
             const salon = state.salons.find(s => s.id === app.salonId); 
             const date = app.dateTime.toDate().toLocaleString('uk-UA', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
             
-            // CHANGE: Updated status badge logic
             let statusBadge;
             if (app.status === 'completed') {
                 statusBadge = `<span class="status-badge status-completed">Оплачено</span>`;
@@ -809,7 +914,6 @@
                 renderView('calendar');
             };
         } else {
-            // document.getElementById('payment-form').onsubmit is set in renderAppLayout now
             const searchInput = document.getElementById('client-search-input');
             const searchResultsEl = document.getElementById('client-search-results');
             const phoneGroup = document.getElementById('client-phone-group');
@@ -855,61 +959,58 @@
     }
 
     function renderDailyAppointmentsList() {
-    const listEl = document.getElementById('daily-appointments-list');
-    const paginationControls = document.getElementById('pagination-controls');
-    if (!listEl) return;
+        const listEl = document.getElementById('daily-appointments-list');
+        const paginationControls = document.getElementById('pagination-controls');
+        if (!listEl) return;
 
-    const selectedDate = state.appointmentsListDate;
-    const startOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
-    const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
-    
-    const dailyUnpaidAppointments = state.appointments.filter(app => {
-        if (!app.dateTime) return false;
-        const appDate = app.dateTime.toDate();
-        return app.status !== 'completed' && appDate >= startOfDay && appDate <= endOfDay;
-    }).sort((a, b) => a.dateTime.toDate() - b.dateTime.toDate());
+        const selectedDate = state.appointmentsListDate;
+        const startOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
+        const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
+        
+        const dailyUnpaidAppointments = state.appointments.filter(app => {
+            if (!app.dateTime) return false;
+            const appDate = app.dateTime.toDate();
+            return app.status !== 'completed' && appDate >= startOfDay && appDate <= endOfDay;
+        }).sort((a, b) => a.dateTime.toDate() - b.dateTime.toDate());
 
-    // Якщо це перша сторінка, очищуємо список і перевіряємо, чи є записи
-    if (state.appointmentsPage === 1) {
-        listEl.innerHTML = ''; // Очищуємо тільки при першому завантаженні
-        if (dailyUnpaidAppointments.length === 0) {
-            listEl.innerHTML = '<li>На цю дату немає незавершених записів.</li>';
-            paginationControls.innerHTML = ''; // Ховаємо пагінацію, якщо записів немає
-            return;
+        if (state.appointmentsPage === 1) {
+            listEl.innerHTML = '';
+            if (dailyUnpaidAppointments.length === 0) {
+                listEl.innerHTML = '<li>На цю дату немає незавершених записів.</li>';
+                paginationControls.innerHTML = '';
+                return;
+            }
         }
-    }
 
-    const itemsPerPage = 10;
-    const startIndex = (state.appointmentsPage - 1) * itemsPerPage;
-    const paginatedAppointments = dailyUnpaidAppointments.slice(startIndex, startIndex + itemsPerPage);
+        const itemsPerPage = 10;
+        const startIndex = (state.appointmentsPage - 1) * itemsPerPage;
+        const paginatedAppointments = dailyUnpaidAppointments.slice(startIndex, startIndex + itemsPerPage);
 
-    // Додаємо нові елементи до списку, не видаляючи старі
-    paginatedAppointments.forEach(appointment => {
-        const service = state.services.find(s => s.id === appointment.serviceId)?.name || 'Послуга';
-        const master = state.masters.find(m => m.id === appointment.masterId)?.name || 'Майстер';
-        const time = appointment.dateTime.toDate().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
+        paginatedAppointments.forEach(appointment => {
+            const service = state.services.find(s => s.id === appointment.serviceId)?.name || 'Послуга';
+            const master = state.masters.find(m => m.id === appointment.masterId)?.name || 'Майстер';
+            const time = appointment.dateTime.toDate().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
+            
+            const remaining = (appointment.finalPrice || 0) - (appointment.totalPaid || 0);
+            const priceText = appointment.status === 'partially_paid' ? `Залишилось: ${remaining.toFixed(0)} zł` : `<strong>${appointment.finalPrice.toFixed(0)} zł</strong>`;
+            
+            const li = document.createElement('li');
+            li.innerHTML = `<div><strong>${time} - ${appointment.clientName}</strong><br><small>${service} (${master})</small></div><div class="actions">${priceText}<button class="btn btn-complete-payment">Оплатити</button></div>`;
+            
+            li.querySelector('.btn-complete-payment').onclick = () => openPaymentModal(appointment);
+            listEl.appendChild(li);
+        });
         
-        const remaining = (appointment.finalPrice || 0) - (appointment.totalPaid || 0);
-        const priceText = appointment.status === 'partially_paid' ? `Залишилось: ${remaining.toFixed(0)} zł` : `<strong>${appointment.finalPrice.toFixed(0)} zł</strong>`;
-        
-        const li = document.createElement('li');
-        li.innerHTML = `<div><strong>${time} - ${appointment.clientName}</strong><br><small>${service} (${master})</small></div><div class="actions">${priceText}<button class="btn btn-complete-payment">Оплатити</button></div>`;
-        
-        li.querySelector('.btn-complete-payment').onclick = () => openPaymentModal(appointment);
-        listEl.appendChild(li); // Використовуємо appendChild для додавання
-    });
-    
-    // Оновлюємо кнопку "Завантажити ще"
-    paginationControls.innerHTML = '';
-    if (dailyUnpaidAppointments.length > startIndex + itemsPerPage) {
-        const loadMoreBtn = document.createElement('button');
-        loadMoreBtn.className = 'btn';
-        loadMoreBtn.innerText = 'Завантажити ще';
-        loadMoreBtn.onclick = () => { 
-            state.appointmentsPage++; 
-            renderDailyAppointmentsList(); 
-        };
-        paginationControls.appendChild(loadMoreBtn);
+        paginationControls.innerHTML = '';
+        if (dailyUnpaidAppointments.length > startIndex + itemsPerPage) {
+            const loadMoreBtn = document.createElement('button');
+            loadMoreBtn.className = 'btn';
+            loadMoreBtn.innerText = 'Завантажити ще';
+            loadMoreBtn.onclick = () => { 
+                state.appointmentsPage++; 
+                renderDailyAppointmentsList(); 
+            };
+            paginationControls.appendChild(loadMoreBtn);
         }
     }
 
@@ -986,9 +1087,7 @@
         
         try {
             if (isEditMode) {
-                const appointmentId = state.editingAppointmentId;
-                // Note: Editing an appointment doesn't reset payment status.
-                await updateDoc(doc(db, 'appointments', appointmentId), appointmentData);
+                await updateDoc(doc(db, 'appointments', state.editingAppointmentId), appointmentData);
                 alert('Запис успішно оновлено!');
                 state.editingAppointmentId = null;
                 renderView('calendar');
@@ -1015,7 +1114,7 @@
                     ...appointmentData,
                     clientName,
                     clientId,
-                    status: 'upcoming', // All new appointments start as upcoming
+                    status: 'upcoming',
                     totalPaid: 0,
                     payments: [],
                     createdAt: Timestamp.now()
@@ -1033,7 +1132,6 @@
         }
     }
      
-    // CHANGE START: Rewritten payment handler
     async function handleConfirmPayment(event) {
         event.preventDefault();
         const appointmentId = document.getElementById('payment-appointment-id').value;
@@ -1057,7 +1155,7 @@
             const currentTotalPaid = appointmentData.totalPaid || 0;
             const finalPrice = appointmentData.finalPrice;
             
-            if (amountToPay > (finalPrice - currentTotalPaid)) {
+            if (amountToPay > (finalPrice - currentTotalPaid) + 0.01) { 
                 if(!confirm(`Сума оплати (${amountToPay.toFixed(2)} zł) більша за залишок (${(finalPrice - currentTotalPaid).toFixed(2)} zł). Продовжити?`)){
                     return;
                 }
@@ -1085,12 +1183,9 @@
             alert('Не вдалося провести оплату. Помилка: ' + e.message);
         }
     }
-    // CHANGE END
-
     // #endregion
 
-    // ... (The rest of the JS code remains the same as in your file)
-    
+    // The rest of the JS code is identical to your GitHub file.
     // #region Masters View
     function renderMastersView(container) { 
         container.innerHTML = `<div class="content-card"><h2>Додати нового майстра</h2><form id="add-master-form"><div class="form-group"><label for="new-master-name">Ім'я та прізвище</label><input type="text" id="new-master-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="new-master-tier">Ранг</label><input type="text" id="new-master-tier" placeholder="напр. Топ-майстер"></div><div class="form-group" style="flex:1;"><label for="new-master-modifier">Націнка (%)</label><input type="number" id="new-master-modifier" value="0" min="0"></div></div><div class="form-group"><label>Спеціалізації</label><div id="new-master-categories" class="category-checkbox-group"></div></div><button class="btn" type="submit">Додати майстра</button></form></div><div class="content-card" style="margin-top: 2rem;"><h2>Список майстрів</h2><ul id="masters-list" class="item-list"></ul></div><div class="modal-overlay" id="edit-master-modal"><div class="modal-panel"><div class="modal-header"><h2>Редагувати майстра</h2><button class="close-btn">&times;</button></div><form id="edit-master-form"><input type="hidden" id="edit-master-id"><div class="form-group"><label for="edit-master-name">Ім'я та прізвище</label><input type="text" id="edit-master-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="edit-master-tier">Ранг</label><input type="text" id="edit-master-tier"></div><div class="form-group" style="flex:1;"><label for="edit-master-modifier">Націнка (%)</label><input type="number" id="edit-master-modifier" min="0"></div></div><div class="form-group"><label>Спеціалізації</label><div id="edit-master-categories" class="category-checkbox-group"></div></div><div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem;"><label><input type="checkbox" id="edit-master-frozen"> Заморозити майстра (приховати з форм)</label></div><button type="submit" class="btn">Зберегти зміни</button></form></div></div>`; 
@@ -1318,7 +1413,6 @@
 
         let paidAppointments = state.appointments.filter(app => {
             const completedDate = app.completedAt?.toDate();
-            // CHANGE: Check for completed status and ensure completedAt is within range
             return app.status === 'completed' && completedDate && completedDate >= startDate && completedDate <= endDate;
         });
         
@@ -1350,7 +1444,6 @@
             const salaryBaseForThisAppointment = typeof appointment.salaryBase === 'number' ? appointment.salaryBase : appointment.finalPrice;
             masterTotals[masterId].totalSalaryBase += salaryBaseForThisAppointment;
             
-            // Sum up total revenue from all payments
             (appointment.payments || []).forEach(p => {
                  masterTotals[masterId].totalRevenue += p.amount;
                  if (p.type === 'cash') masterTotals[masterId].byCash += p.amount;
