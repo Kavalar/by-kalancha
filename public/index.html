@@ -21,7 +21,7 @@
             --primary-hover: #34495e;
             --danger-color: #e74c3c;
             --success-color: #27ae60;
-            --warning-color: #f39c12; /* NEW */
+            --warning-color: #f39c12; 
             --shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
         body { font-family: 'Inter', Arial, sans-serif; background: var(--main-bg); margin: 0; padding: 0; color: var(--text-color); font-size: 16px; }
@@ -129,7 +129,6 @@
         .stat-card .value { font-size: 2rem; font-weight: 600; color: var(--primary-color); }
         .stat-card .label { font-size: 0.9rem; color: var(--gray-text); }
 
-        /* NEW: Styles for the summary block */
         .summary-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -290,7 +289,7 @@
             });
         });
         
-        if (state.user.role === 'admin') {
+        if (state.user.role === 'admin' || state.user.role === 'salon_admin') {
             onSnapshot(doc(db, 'settings', 'salaryRules'), (doc) => {
                 state.settings.salaryTiers = doc.exists() ? (doc.data().tiers || []) : [];
                 if (state.user && state.currentView === 'settings') {
@@ -308,7 +307,7 @@
     }
 
     function renderAppLayout(user) {
-        const isAdmin = user.role === 'admin';
+        const isAdmin = user.role === 'admin' || user.role === 'salon_admin';
         const adminTabs = `
             <li data-view="salary">Зарплата</li>
             <li data-view="expenses">Витрати</li>
@@ -367,7 +366,7 @@
 
     function renderView(viewName) {
         if (!state.user) return;
-        if (state.user.role !== 'admin' && ['salary', 'settings', 'expenses'].includes(viewName)) {
+        if (!(state.user.role === 'admin' || state.user.role === 'salon_admin') && ['salary', 'settings', 'expenses'].includes(viewName)) {
             viewName = 'calendar';
         }
         if (state.currentView === 'appointments' && viewName !== 'appointments') {
@@ -418,7 +417,6 @@
     }
     // #endregion
 
-    // CHANGE START: New daily summary logic
     function renderDailySummary() {
         const dateInput = document.getElementById('summary-date-picker');
         const salonInput = document.getElementById('summary-salon-filter');
@@ -427,29 +425,34 @@
         const selectedDate = new Date(dateInput.value);
         const selectedSalonId = salonInput.value;
 
-        const startOfDay = new Date(selectedDate.setHours(0, 0, 0, 0));
-        const endOfDay = new Date(selectedDate.setHours(23, 59, 59, 999));
+        const startOfDay = new Date(selectedDate);
+        startOfDay.setHours(0, 0, 0, 0);
         
-        let relevantAppointments = state.appointments;
+        const endOfDay = new Date(selectedDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        
+        // Filter appointments by their SERVICE date (dateTime)
+        let relevantAppointments = state.appointments.filter(app => {
+            if (!app.dateTime) return false;
+            const appointmentDate = app.dateTime.toDate();
+            return appointmentDate >= startOfDay && appointmentDate <= endOfDay;
+        });
         
         if (selectedSalonId !== 'all') {
             relevantAppointments = relevantAppointments.filter(app => app.salonId === selectedSalonId);
         }
 
         let total = 0, cash = 0, card = 0, blik = 0;
-        const paidServices = new Set();
+        let servicesWithPayment = 0;
 
         relevantAppointments.forEach(app => {
             if (app.payments && app.payments.length > 0) {
+                servicesWithPayment++;
                 app.payments.forEach(p => {
-                    const paymentDate = p.date.toDate();
-                    if (paymentDate >= startOfDay && paymentDate <= endOfDay) {
-                        total += p.amount;
-                        if(p.type === 'cash') cash += p.amount;
-                        else if(p.type === 'card') card += p.amount;
-                        else if(p.type === 'blik') blik += p.amount;
-                        paidServices.add(app.id);
-                    }
+                    total += p.amount;
+                    if(p.type === 'cash') cash += p.amount;
+                    else if(p.type === 'card') card += p.amount;
+                    else if(p.type === 'blik') blik += p.amount;
                 });
             }
         });
@@ -458,9 +461,8 @@
         document.getElementById('summary-cash').textContent = `${cash.toFixed(0)} zł`;
         document.getElementById('summary-card').textContent = `${card.toFixed(0)} zł`;
         document.getElementById('summary-blik').textContent = `${blik.toFixed(0)} zł`;
-        document.getElementById('summary-services-count').textContent = paidServices.size;
+        document.getElementById('summary-services-count').textContent = servicesWithPayment;
     }
-    // CHANGE END
 
     // #region Calendar View
     function renderCalendarView(container) {
@@ -712,6 +714,9 @@
     }
     // #endregion
     
+    // The rest of the functions from your GitHub file would follow here...
+    // I have included them below to ensure the file is complete.
+
     // #region Clients Views
     function renderClientsView(container) {
         container.innerHTML = `<div class="content-card"><h2>База клієнтів</h2><div class="form-group"><input type="text" id="client-search" placeholder="Пошук за іменем або телефоном..."></div><ul id="clients-list" class="item-list"></ul></div>`;
@@ -974,7 +979,7 @@
         }).sort((a, b) => a.dateTime.toDate() - b.dateTime.toDate());
 
         if (state.appointmentsPage === 1) {
-            listEl.innerHTML = '';
+            listEl.innerHTML = ''; 
             if (dailyUnpaidAppointments.length === 0) {
                 listEl.innerHTML = '<li>На цю дату немає незавершених записів.</li>';
                 paginationControls.innerHTML = '';
@@ -1185,7 +1190,6 @@
     }
     // #endregion
 
-    // The rest of the JS code is identical to your GitHub file.
     // #region Masters View
     function renderMastersView(container) { 
         container.innerHTML = `<div class="content-card"><h2>Додати нового майстра</h2><form id="add-master-form"><div class="form-group"><label for="new-master-name">Ім'я та прізвище</label><input type="text" id="new-master-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="new-master-tier">Ранг</label><input type="text" id="new-master-tier" placeholder="напр. Топ-майстер"></div><div class="form-group" style="flex:1;"><label for="new-master-modifier">Націнка (%)</label><input type="number" id="new-master-modifier" value="0" min="0"></div></div><div class="form-group"><label>Спеціалізації</label><div id="new-master-categories" class="category-checkbox-group"></div></div><button class="btn" type="submit">Додати майстра</button></form></div><div class="content-card" style="margin-top: 2rem;"><h2>Список майстрів</h2><ul id="masters-list" class="item-list"></ul></div><div class="modal-overlay" id="edit-master-modal"><div class="modal-panel"><div class="modal-header"><h2>Редагувати майстра</h2><button class="close-btn">&times;</button></div><form id="edit-master-form"><input type="hidden" id="edit-master-id"><div class="form-group"><label for="edit-master-name">Ім'я та прізвище</label><input type="text" id="edit-master-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="edit-master-tier">Ранг</label><input type="text" id="edit-master-tier"></div><div class="form-group" style="flex:1;"><label for="edit-master-modifier">Націнка (%)</label><input type="number" id="edit-master-modifier" min="0"></div></div><div class="form-group"><label>Спеціалізації</label><div id="edit-master-categories" class="category-checkbox-group"></div></div><div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem;"><label><input type="checkbox" id="edit-master-frozen"> Заморозити майстра (приховати з форм)</label></div><button type="submit" class="btn">Зберегти зміни</button></form></div></div>`; 
