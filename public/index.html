@@ -422,7 +422,9 @@
         const salonInput = document.getElementById('summary-salon-filter');
         if (!dateInput || !salonInput) return;
 
-        const selectedDate = new Date(dateInput.value);
+        // Take date as a string to avoid timezone issues, then construct date objects
+        const selectedDateStr = dateInput.value;
+        const selectedDate = new Date(selectedDateStr);
         const selectedSalonId = salonInput.value;
 
         const startOfDay = new Date(selectedDate);
@@ -431,7 +433,6 @@
         const endOfDay = new Date(selectedDate);
         endOfDay.setHours(23, 59, 59, 999);
         
-        // Filter appointments by their SERVICE date (dateTime)
         let relevantAppointments = state.appointments.filter(app => {
             if (!app.dateTime) return false;
             const appointmentDate = app.dateTime.toDate();
@@ -714,9 +715,6 @@
     }
     // #endregion
     
-    // The rest of the functions from your GitHub file would follow here...
-    // I have included them below to ensure the file is complete.
-
     // #region Clients Views
     function renderClientsView(container) {
         container.innerHTML = `<div class="content-card"><h2>База клієнтів</h2><div class="form-group"><input type="text" id="client-search" placeholder="Пошук за іменем або телефоном..."></div><ul id="clients-list" class="item-list"></ul></div>`;
@@ -979,7 +977,7 @@
         }).sort((a, b) => a.dateTime.toDate() - b.dateTime.toDate());
 
         if (state.appointmentsPage === 1) {
-            listEl.innerHTML = ''; 
+            listEl.innerHTML = '';
             if (dailyUnpaidAppointments.length === 0) {
                 listEl.innerHTML = '<li>На цю дату немає незавершених записів.</li>';
                 paginationControls.innerHTML = '';
@@ -1415,22 +1413,22 @@
         const selectedSalonId = document.getElementById('salary-salon-filter').value;
         const salaryTiers = state.settings.salaryTiers.sort((a,b) => b.threshold - a.threshold);
 
-        let paidAppointments = state.appointments.filter(app => {
-            const completedDate = app.completedAt?.toDate();
-            return app.status === 'completed' && completedDate && completedDate >= startDate && completedDate <= endDate;
+        let appointmentsForSalary = state.appointments.filter(app => {
+            const appointmentDate = app.dateTime.toDate();
+            return app.status !== 'upcoming' && appointmentDate >= startDate && appointmentDate <= endDate;
         });
         
         if(selectedMasterId !== 'all'){
-            paidAppointments = paidAppointments.filter(app => app.masterId === selectedMasterId);
+            appointmentsForSalary = appointmentsForSalary.filter(app => app.masterId === selectedMasterId);
         }
 
         if(selectedSalonId !== 'all'){
-            paidAppointments = paidAppointments.filter(app => app.salonId === selectedSalonId);
+            appointmentsForSalary = appointmentsForSalary.filter(app => app.salonId === selectedSalonId);
         }
         
         const masterTotals = {};
         
-        paidAppointments.forEach(appointment => {
+        appointmentsForSalary.forEach(appointment => {
             const masterId = appointment.masterId;
             if (!masterTotals[masterId]) {
                 const master = state.masters.find(m => m.id === masterId);
@@ -1665,7 +1663,7 @@
         }
         try {
             const generateReport = httpsCallable(functions, 'generateAndSendReport');
-            const result = await generateReport({ startDate, endDate, salonId, isManualTrigger: true });
+            const result = await generateReport({ startDate, endDate, salonId });
             alert(result.data.message);
         } catch (error) {
             console.error("Помилка виклику хмарної функції:", error);
