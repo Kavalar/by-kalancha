@@ -204,7 +204,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, updatePassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, getDocs, getDoc, Timestamp, setDoc, query, where, arrayUnion, increment } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, getDocs, getDoc, Timestamp, setDoc, query, where, arrayUnion, increment, collectionGroup } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
 
     const firebaseConfig = { apiKey: "AIzaSyBoGeREvdgrVSm-S4f3cW0HyB7Us9yh_us", authDomain: "bykalancha.firebaseapp.com", projectId: "bykalancha", storageBucket: "bykalancha.appspot.com", messagingSenderId: "196166318613", appId: "1:196166318613:web:0067f9de531e290e43ec1c", measurementId: "G-V72ECFLKFE" };
@@ -219,6 +219,7 @@
         user: null,
         salons: [],
         expenses: [],
+        advances: [], // NEW: For summary
         selectedCategoryId: null,
         categories: [],
         services: [],
@@ -294,6 +295,14 @@
                 state.settings.salaryTiers = doc.exists() ? (doc.data().tiers || []) : [];
                 if (state.user && state.currentView === 'settings') {
                     renderView('settings');
+                }
+            });
+            
+            // NEW: Listener for all advances for the summary dashboard
+            onSnapshot(query(collectionGroup(db, 'advances')), snapshot => {
+                state.advances = snapshot.docs.map(d => d.data());
+                if (state.user && state.currentView === 'calendar') {
+                    renderDailySummary();
                 }
             });
         }
@@ -422,9 +431,7 @@
         const salonInput = document.getElementById('summary-salon-filter');
         if (!dateInput || !salonInput) return;
 
-        // Take date as a string to avoid timezone issues, then construct date objects
-        const selectedDateStr = dateInput.value;
-        const selectedDate = new Date(selectedDateStr);
+        const selectedDate = new Date(dateInput.value);
         const selectedSalonId = salonInput.value;
 
         const startOfDay = new Date(selectedDate);
@@ -457,11 +464,20 @@
                 });
             }
         });
+        
+        let totalAdvances = 0;
+        state.advances.forEach(advance => {
+            const advanceDate = advance.date.toDate();
+            if (advanceDate >= startOfDay && advanceDate <= endOfDay) {
+                totalAdvances += advance.amount;
+            }
+        });
 
         document.getElementById('summary-total').textContent = `${total.toFixed(0)} zł`;
         document.getElementById('summary-cash').textContent = `${cash.toFixed(0)} zł`;
         document.getElementById('summary-card').textContent = `${card.toFixed(0)} zł`;
         document.getElementById('summary-blik').textContent = `${blik.toFixed(0)} zł`;
+        document.getElementById('summary-advances').textContent = `-${totalAdvances.toFixed(0)} zł`;
         document.getElementById('summary-services-count').textContent = servicesWithPayment;
     }
 
@@ -519,6 +535,10 @@
                     <div class="summary-card">
                         <div class="value" id="summary-blik">0 zł</div>
                         <div class="label">📱 Blik</div>
+                    </div>
+                     <div class="summary-card">
+                        <div class="value" id="summary-advances">0 zł</div>
+                        <div class="label">💸 Видано авансів</div>
                     </div>
                      <div class="summary-card">
                         <div class="value" id="summary-services-count">0</div>
