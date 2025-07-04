@@ -227,7 +227,7 @@
         user: null,
         salons: [],
         expenses: [],
-        advances: [], 
+        advances: [],
         salaryGroups: [],
         selectedCategoryId: null,
         categories: [],
@@ -327,11 +327,15 @@
 
     function renderAppLayout(user) {
         const isAdminOrSalonAdmin = user.role === 'admin' || user.role === 'salon_admin';
-        const adminTabs = `
-            <li data-view="salary">Зарплата</li>
-            <li data-view="expenses">Витрати</li>
-            ${user.role === 'admin' ? '<li data-view="settings">Налаштування</li>' : ''}
-        `;
+        
+        let adminTabs = '';
+        if (isAdminOrSalonAdmin) {
+            adminTabs += `<li data-view="salary">Зарплата</li><li data-view="expenses">Витрати</li>`;
+        }
+        if (user.role === 'admin') {
+            adminTabs += `<li data-view="settings">Налаштування</li>`;
+        }
+
 
         appContainer.innerHTML = `
         <div class="crm-layout">
@@ -343,7 +347,7 @@
                     <li data-view="clients">Клієнти</li>
                     <li data-view="services">Послуги</li>
                     <li data-view="masters">Майстри</li>
-                    ${isAdminOrSalonAdmin ? adminTabs : ''}
+                    ${adminTabs}
                 </ul>
                 <div class="user-info">
                     <span>${user.email} (${user.role})</span>
@@ -389,8 +393,10 @@
 
     function renderView(viewName) {
         if (!state.user) return;
+        
         if (state.user.role === 'master') {
-             viewName = 'calendar';
+             const allowedViews = ['calendar', 'appointments'];
+             if (!allowedViews.includes(viewName)) viewName = 'calendar';
         }
         if (state.user.role === 'salon_admin' && viewName === 'settings') {
              viewName = 'calendar';
@@ -1015,7 +1021,7 @@
         }).sort((a, b) => a.dateTime.toDate() - b.dateTime.toDate());
 
         if (state.appointmentsPage === 1) {
-            listEl.innerHTML = ''; 
+            listEl.innerHTML = '';
             if (dailyUnpaidAppointments.length === 0) {
                 listEl.innerHTML = '<li>На цю дату немає незавершених записів.</li>';
                 paginationControls.innerHTML = '';
@@ -1395,7 +1401,6 @@
 
     // #region Salary & Settings & Expenses
     function renderSalaryView(container) {
-        // This function is now fully functional with the new salary group logic
         const masterOptions = state.masters
             .filter(m => !m.isFrozen)
             .map(m => `<option value="${m.id}">${m.name}</option>`)
@@ -1647,7 +1652,7 @@
         container.innerHTML = `
             <div class="content-card">
                 <h2>Керування групами зарплат</h2>
-                <ul id="salary-groups-list" class="item-list">${groupsListHtml}</ul>
+                <ul id="salary-groups-list" class="item-list">${groupsListHtml || "<li>Немає створених груп</li>"}</ul>
                 <button id="add-new-group-btn" class="btn" style="margin-top: 1rem;">Створити нову групу</button>
             </div>
             <div class="content-card">
@@ -1668,7 +1673,6 @@
                 </form>
             </div>`;
         
-        // Add event listeners after rendering
         document.getElementById('add-new-group-btn').onclick = () => showSalaryGroupModal();
         
         document.querySelectorAll('.btn-edit-group').forEach(btn => {
@@ -1715,7 +1719,7 @@
     function renderSalaryGroupTiersInModal(tiers = []) {
         const container = document.getElementById('salary-group-tiers-table');
         container.innerHTML = '';
-        tiers.forEach((tier, index) => {
+        tiers.sort((a, b) => a.threshold - b.threshold).forEach(tier => {
             const tierRow = document.createElement('div');
             tierRow.className = 'form-row';
             tierRow.innerHTML = `
@@ -1800,7 +1804,7 @@
     
     async function handleAssignGroupToMaster(masterId, groupId) {
         try {
-            await updateDoc(doc(db, 'masters', masterId), { salaryGroupId: groupId });
+            await updateDoc(doc(db, 'masters', masterId), { salaryGroupId: groupId || null });
         } catch(e) {
             console.error("Помилка призначення групи:", e);
             alert('Не вдалося призначити групу.');
