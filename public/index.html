@@ -234,7 +234,7 @@
         salons: [],
         expenses: [],
         salonExpenses: [],
-        productSales: [], // --- ЗМІНА: Додано новий стан для продажів товарів
+        productSales: [],
         advances: [],
         salaryGroups: [],
         notepadEntries: [],
@@ -284,7 +284,6 @@
 
     function setupRealtimeListeners() {
         if (listenersAreActive) return;
-        // --- ЗМІНА: Додано відстеження колекції productSales ---
         const collections = { 
             salons: 'salons',
             categories: 'serviceCategories', 
@@ -295,12 +294,12 @@
             expenses: 'expenses',
             salonExpenses: 'salonExpenses',
             notepadEntries: 'notepadEntries',
-            productSales: 'productSales', // Нова колекція
+            productSales: 'productSales',
         };
         Object.entries(collections).forEach(([stateKey, colName]) => {
             const q = (colName === 'notepadEntries' || colName === 'productSales') 
                 ? query(collection(db, colName), orderBy("date", "desc")) 
-                : collection(db, colName);
+                : (colName === 'appointments' ? query(collection(db, colName), orderBy("dateTime", "desc")) : collection(db, colName));
 
             onSnapshot(q, snapshot => {
                 state[stateKey] = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
@@ -310,6 +309,8 @@
                 if (state.user) {
                     renderView(state.currentView);
                 }
+            }, (error) => {
+                console.error(`Error listening to ${colName}: `, error);
             });
         });
         const isAdminOrSalonAdmin = state.user.role === 'admin' || state.user.role === 'salon_admin';
@@ -340,22 +341,29 @@
     }
 
     function renderAppLayout(user) {
-        let adminTabs = '';
+        let adminOnlyTabs = '';
         if (user.role === 'admin') {
-            adminTabs = `
+            adminOnlyTabs = `
                 <li data-view="salary">Зарплата</li>
                 <li data-view="expenses">Загальні витрати</li>
                 <li data-view="settings">Налаштування</li>
             `;
         }
 
-        // --- ЗМІНА: Додано вкладку "Магазин" для адмінів ---
-        let shopTab = '';
+        let salonAdminTabs = '';
         if (user.role === 'admin' || user.role === 'salon_admin') {
-            shopTab = '<li data-view="shop">Магазин</li>';
+            salonAdminTabs = `
+                <li data-view="clients">Клієнти</li>
+                <li data-view="services">Послуги</li>
+                <li data-view="masters">Майстри</li>
+            `;
         }
         
+        // --- ЗМІНА: Вкладка "Магазин" тепер доступна для всіх ---
         const allUserTabs = `
+            <li data-view="calendar">Календар</li>
+            <li data-view="appointments">Запис</li>
+            <li data-view="shop">Магазин</li>
             <li data-view="salonExpenses">Витрати в салоні</li>
             <li data-view="notepad">Блокнот</li>
         `;
@@ -365,14 +373,9 @@
             <nav class="crm-nav" id="main-nav">
                 <h1>Lashroom CRM</h1>
                 <ul>
-                    <li data-view="calendar">Календар</li>
-                    <li data-view="appointments">Запис</li>
-                    <li data-view="clients">Клієнти</li>
-                    <li data-view="services">Послуги</li>
-                    <li data-view="masters">Майстри</li>
-                    ${shopTab}
                     ${allUserTabs}
-                    ${adminTabs}
+                    ${salonAdminTabs}
+                    ${adminOnlyTabs}
                 </ul>
                 <div class="user-info">
                     <span>${user.email} (${user.role})</span>
@@ -418,8 +421,9 @@
 
     function renderView(viewName) {
         if (!state.user) return;
-
-        const masterViews = ['calendar', 'appointments', 'notepad', 'salonExpenses'];
+        
+        // --- ЗМІНА: Додано "shop" до дозволених сторінок для майстрів ---
+        const masterViews = ['calendar', 'appointments', 'notepad', 'salonExpenses', 'shop'];
         if (state.user.role === 'master' && !masterViews.includes(viewName)) {
              viewName = 'calendar';
         }
@@ -446,7 +450,6 @@
 
         const headerTitle = document.getElementById('header-title');
         if(headerTitle) {
-            // --- ЗМІНА: Додано заголовок для "Магазин" ---
             const viewTitles = { calendar: 'Календар', appointments: 'Запис', clients: 'Клієнти', services: 'Послуги та Категорії', masters: 'Майстри', shop: 'Магазин', salary: 'Зарплата', expenses: 'Загальні витрати', salonExpenses: 'Витрати в салоні', notepad: 'Блокнот', settings: 'Налаштування', clientDetail: 'Історія Клієнта', masterDetail: 'Картка Майстра' };
             headerTitle.textContent = viewTitles[viewName] || 'Dashboard';
         }
@@ -462,20 +465,19 @@
         if(!contentWrapper) return;
         
         switch (viewName) {
-            case 'calendar': renderCalendarView(contentWrapper); break;
-            case 'appointments': renderAppointmentsView(contentWrapper); break;
-            case 'clients': renderClientsView(contentWrapper); break;
-            case 'clientDetail': renderClientDetailView(contentWrapper); break;
-            case 'services': renderServicesView(contentWrapper); break;
-            case 'masters': renderMastersView(contentWrapper); break;
-            case 'masterDetail': renderMasterDetailView(contentWrapper); break;
-            case 'salary': renderSalaryView(contentWrapper); break;
-            case 'expenses': renderExpensesView(contentWrapper); break;
-            case 'salonExpenses': renderSalonExpensesView(contentWrapper); break;
-            case 'notepad': renderNotepadView(contentWrapper); break;
-            // --- ЗМІНА: Додано виклик рендеру для "Магазин" ---
-            case 'shop': renderShopView(contentWrapper); break;
-            case 'settings': renderSettingsView(contentWrapper); break;
+            case 'calendar': renderCalendarView(container); break;
+            case 'appointments': renderAppointmentsView(container); break;
+            case 'clients': renderClientsView(container); break;
+            case 'clientDetail': renderClientDetailView(container); break;
+            case 'services': renderServicesView(container); break;
+            case 'masters': renderMastersView(container); break;
+            case 'masterDetail': renderMasterDetailView(container); break;
+            case 'salary': renderSalaryView(container); break;
+            case 'expenses': renderExpensesView(container); break;
+            case 'salonExpenses': renderSalonExpensesView(container); break;
+            case 'notepad': renderNotepadView(container); break;
+            case 'shop': renderShopView(container); break;
+            case 'settings': renderSettingsView(container); break;
             default:
                 contentWrapper.innerHTML = `<h2>Невідомий розділ</h2>`;
         }
@@ -487,7 +489,6 @@
         const salonInput = document.getElementById('summary-salon-filter');
         const advancesEl = document.getElementById('summary-advances');
         const salonExpensesEl = document.getElementById('summary-salon-expenses');
-        // --- ЗМІНА: Отримання елемента для продажів товарів ---
         const productSalesEl = document.getElementById('summary-product-sales');
 
         if (!dateInput || !salonInput || !advancesEl || !salonExpensesEl || !productSalesEl) return;
@@ -525,7 +526,6 @@
             }
         });
 
-        // --- ЗМІНА: Розрахунок продажів товарів за день ---
         let totalProductSales = 0;
         let filteredProductSales = state.productSales;
         if (selectedSalonId !== 'all') {
@@ -538,9 +538,7 @@
             }
         });
         
-        // Додаємо продажі товарів до загального доходу
         total += totalProductSales;
-        // --- КІНЕЦЬ ЗМІНИ ---
 
         let totalAdvances = 0;
         state.advances.forEach(advance => {
@@ -560,8 +558,6 @@
                 totalSalonExpenses += expense.amount;
             }
         });
-
-        // --- ЗМІНА: Відображення нових даних ---
         document.getElementById('summary-total').textContent = `${total.toFixed(0)} zł`;
         document.getElementById('summary-cash').textContent = `${cash.toFixed(0)} zł`;
         document.getElementById('summary-card').textContent = `${card.toFixed(0)} zł`;
@@ -797,7 +793,6 @@
             <p><strong>Статус:</strong> ${statusText}</p>
         `;
 
-        // --- ЗМІНА: Додано блок з деталями оплат ---
         if (appointment.payments && appointment.payments.length > 0) {
             const paymentTypes = {
                 cash: 'Готівка',
@@ -813,7 +808,6 @@
             paymentsHtml += '</ul>';
             detailsEl.innerHTML += paymentsHtml;
         }
-        // --- КІНЕЦЬ ЗМІНИ ---
 
         let buttonsHtml = '';
         if (appointment.status !== 'completed') {
@@ -1874,7 +1868,7 @@
             await addDoc(collection(db, 'notepadEntries'), {
                 content,
                 authorEmail: state.user.email,
-                createdAt: Timestamp.now()
+                date: Timestamp.now() // Use 'date' for consistency with productSales
             });
             contentInput.value = '';
         } catch (e) {
@@ -1895,20 +1889,21 @@
         }
     }
     
-    // --- ПОЧАТОК НОВОГО КОДУ ДЛЯ МАГАЗИНУ ---
+    // --- ПОЧАТОК КОДУ ДЛЯ МАГАЗИНУ ---
     function renderShopView(container) {
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-        const recentSalesHtml = state.productSales.slice(0, 10).map(sale => {
+        const recentSalesHtml = state.productSales.slice(0, 20).map(sale => {
             const salon = state.salons.find(s => s.id === sale.salonId);
             return `
-                <li>
-                    <div>
+                <li data-id="${sale.id}">
+                    <div style="flex-grow: 1;">
                         <strong>${sale.description}</strong><br>
                         <small>${sale.date.toDate().toLocaleString('uk-UA')} (${salon ? salon.name : 'Невідомий салон'})</small>
                     </div>
                     <div class="actions">
                         <strong>${sale.amount.toFixed(2)} zł</strong>
-                        </div>
+                        ${state.user.role === 'admin' ? `<button class="btn btn-delete btn-delete-sale">🗑️</button>` : ''}
+                    </div>
                 </li>
             `;
         }).join('');
@@ -1946,6 +1941,17 @@
         `;
 
         document.getElementById('add-product-sale-form').onsubmit = handleAddProductSale;
+        
+        const salesListEl = document.getElementById('product-sales-list');
+        if (salesListEl) {
+            salesListEl.onclick = (event) => {
+                const deleteBtn = event.target.closest('.btn-delete-sale');
+                if (deleteBtn) {
+                    const saleId = deleteBtn.closest('li').dataset.id;
+                    handleDeleteProductSale(saleId);
+                }
+            };
+        }
     }
 
     async function handleAddProductSale(event) {
@@ -1973,7 +1979,19 @@
             alert("Не вдалося зареєструвати продаж.");
         }
     }
-    // --- КІНЕЦЬ НОВОГО КОДУ ДЛЯ МАГАЗИНУ ---
+
+    async function handleDeleteProductSale(saleId) {
+        if (!saleId) return;
+        if (confirm('Ви впевнені, що хочете видалити цей продаж?')) {
+            try {
+                await deleteDoc(doc(db, "productSales", saleId));
+            } catch (e) {
+                console.error("Помилка видалення продажу:", e);
+                alert("Не вдалося видалити продаж.");
+            }
+        }
+    }
+    // --- КІНЕЦЬ КОДУ ДЛЯ МАГАЗИНУ ---
 
     function renderSettingsView(container) {
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
