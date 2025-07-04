@@ -72,15 +72,15 @@
         .btn-complete-payment:hover { background-color: var(--success-color); color: #fff; }
         
         .form-group { margin-bottom: 1.5rem; }
-        .form-group input, .form-group select { appearance: none; -webkit-appearance: none; width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; background-color: #fff; transition: border-color .2s; }
+        .form-group input, .form-group select, .form-group textarea { appearance: none; -webkit-appearance: none; width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; background-color: #fff; transition: border-color .2s; }
         .form-group select { background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%236c757d%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22/%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right .7em top 50%; background-size: .65em auto; padding-right: 2.5em; }
-        .form-group input:focus, .form-group select:focus { border-color: var(--primary-color); outline: none; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--primary-color); outline: none; }
         .form-row { display: flex; gap: 1rem; align-items: flex-end; }
         form button[type="submit"] { background: var(--primary-color); color: #fff; border: none; }
         form button[type="submit"]:hover { background: var(--primary-hover); }
 
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
-        .modal-panel { background: #fff; padding: 2rem; border-radius: 8px; width: 450px; max-width: 90vw; }
+        .modal-panel { background: #fff; padding: 2rem; border-radius: 8px; width: 550px; max-width: 90vw; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
         .modal-header h2 { margin: 0; }
         .close-btn { font-size: 1.5rem; background: none; border: none; cursor: pointer; }
@@ -136,13 +136,15 @@
         
         #salary-group-tiers-table .form-row { margin-bottom: 0.5rem; }
         #salary-group-tiers-table input { font-size: 0.9em; padding: 0.5rem; }
+        #notepad-entries li { padding: 1rem; border-bottom: 1px solid var(--border-color); }
+        #notepad-entries small { color: var(--gray-text); }
     </style>
 </head>
 <body>
 <div id="app"></div>
 
 <div class="modal-overlay" id="payment-modal">
-    <div class="modal-panel">
+    <div class="modal-panel" style="width: 450px;">
         <div class="modal-header">
             <h2>Внести оплату</h2>
             <button class="close-btn">&times;</button>
@@ -166,8 +168,13 @@
                         <option value="cash">Готівка</option>
                         <option value="card">Картка</option>
                         <option value="blik">Blik</option>
+                        <option value="settlement">Взаємозалік (з ЗП)</option>
                     </select>
                 </div>
+            </div>
+            <div class="form-group" id="settlement-master-selector" style="display: none;">
+                <label for="settlement-master-id">Списати з зарплати майстра:</label>
+                <select id="settlement-master-id"></select>
             </div>
             <button type="submit">Підтвердити оплату</button>
         </form>
@@ -188,7 +195,7 @@
 </div>
 
 <div class="modal-overlay" id="salary-group-modal">
-    <div class="modal-panel">
+    <div class="modal-panel" style="width: 550px;">
         <div class="modal-header">
             <h2 id="salary-group-modal-title">Створити групу</h2>
             <button class="close-btn">&times;</button>
@@ -212,7 +219,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, updatePassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, getDocs, getDoc, Timestamp, setDoc, query, where, arrayUnion, increment, collectionGroup } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, getDocs, getDoc, Timestamp, setDoc, query, where, arrayUnion, increment, collectionGroup, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
 
     const firebaseConfig = { apiKey: "AIzaSyBoGeREvdgrVSm-S4f3cW0HyB7Us9yh_us", authDomain: "bykalancha.firebaseapp.com", projectId: "bykalancha", storageBucket: "bykalancha.appspot.com", messagingSenderId: "196166318613", appId: "1:196166318613:web:0067f9de531e290e43ec1c", measurementId: "G-V72ECFLKFE" };
@@ -227,8 +234,10 @@
         user: null,
         salons: [],
         expenses: [],
+        salonExpenses: [],
         advances: [],
         salaryGroups: [],
+        notepadEntries: [],
         selectedCategoryId: null,
         categories: [],
         services: [],
@@ -283,10 +292,17 @@
             masters: 'masters',
             appointments: 'appointments', 
             clients: 'clients',
-            expenses: 'expenses'
+            expenses: 'expenses',
+            salonExpenses: 'salonExpenses',
+            notepadEntries: 'notepadEntries',
         };
+
         Object.entries(collections).forEach(([stateKey, colName]) => {
-            onSnapshot(collection(db, colName), snapshot => {
+            const q = (colName === 'notepadEntries') 
+                ? query(collection(db, colName), orderBy("createdAt", "desc")) 
+                : collection(db, colName);
+
+            onSnapshot(q, snapshot => {
                 state[stateKey] = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
                 if (stateKey === 'categories') {
                     state.categories.sort((a,b) => a.name.localeCompare(b.name));
@@ -330,12 +346,16 @@
         
         let adminTabs = '';
         if (isAdminOrSalonAdmin) {
-            adminTabs += `<li data-view="salary">Зарплата</li><li data-view="expenses">Витрати</li>`;
+            adminTabs += `<li data-view="salary">Зарплата</li><li data-view="expenses">Загальні витрати</li>`;
         }
         if (user.role === 'admin') {
             adminTabs += `<li data-view="settings">Налаштування</li>`;
         }
-
+        
+        const allUserTabs = `
+            <li data-view="salonExpenses">Витрати в салоні</li>
+            <li data-view="notepad">Блокнот</li>
+        `;
 
         appContainer.innerHTML = `
         <div class="crm-layout">
@@ -348,6 +368,7 @@
                     <li data-view="services">Послуги</li>
                     <li data-view="masters">Майстри</li>
                     ${adminTabs}
+                    ${allUserTabs}
                 </ul>
                 <div class="user-info">
                     <span>${user.email} (${user.role})</span>
@@ -394,9 +415,11 @@
     function renderView(viewName) {
         if (!state.user) return;
         
-        if (state.user.role === 'master') {
-             const allowedViews = ['calendar', 'appointments'];
-             if (!allowedViews.includes(viewName)) viewName = 'calendar';
+        const masterViews = ['calendar', 'appointments', 'notepad', 'salonExpenses'];
+        const salonAdminViews = [...masterViews, 'clients', 'services', 'masters', 'salary', 'expenses'];
+
+        if (state.user.role === 'master' && !masterViews.includes(viewName)) {
+             viewName = 'calendar';
         }
         if (state.user.role === 'salon_admin' && viewName === 'settings') {
              viewName = 'calendar';
@@ -419,7 +442,7 @@
 
         const headerTitle = document.getElementById('header-title');
         if(headerTitle) {
-            const viewTitles = { calendar: 'Календар', appointments: 'Запис', clients: 'Клієнти', services: 'Послуги та Категорії', masters: 'Майстри', salary: 'Зарплата', expenses: 'Витрати', settings: 'Налаштування', clientDetail: 'Історія Клієнта', masterDetail: 'Картка Майстра' };
+            const viewTitles = { calendar: 'Календар', appointments: 'Запис', clients: 'Клієнти', services: 'Послуги та Категорії', masters: 'Майстри', salary: 'Зарплата', expenses: 'Загальні витрати', salonExpenses: 'Витрати в салоні', notepad: 'Блокнот', settings: 'Налаштування', clientDetail: 'Історія Клієнта', masterDetail: 'Картка Майстра' };
             headerTitle.textContent = viewTitles[viewName] || 'Dashboard';
         }
 
@@ -443,6 +466,8 @@
             case 'masterDetail': renderMasterDetailView(contentWrapper); break;
             case 'salary': renderSalaryView(contentWrapper); break;
             case 'expenses': renderExpensesView(contentWrapper); break;
+            case 'salonExpenses': renderSalonExpensesView(contentWrapper); break;
+            case 'notepad': renderNotepadView(contentWrapper); break;
             case 'settings': renderSettingsView(contentWrapper); break;
             default:
                 contentWrapper.innerHTML = `<h2>Невідомий розділ</h2>`;
@@ -453,7 +478,10 @@
     function renderDailySummary() {
         const dateInput = document.getElementById('summary-date-picker');
         const salonInput = document.getElementById('summary-salon-filter');
-        if (!dateInput || !salonInput) return;
+        const advancesEl = document.getElementById('summary-advances');
+        const salonExpensesEl = document.getElementById('summary-salon-expenses');
+
+        if (!dateInput || !salonInput || !advancesEl || !salonExpensesEl) return;
 
         const selectedDate = new Date(dateInput.value);
         const selectedSalonId = salonInput.value;
@@ -481,10 +509,12 @@
             if (app.payments && app.payments.length > 0) {
                 servicesWithPayment++;
                 app.payments.forEach(p => {
-                    total += p.amount;
-                    if(p.type === 'cash') cash += p.amount;
-                    else if(p.type === 'card') card += p.amount;
-                    else if(p.type === 'blik') blik += p.amount;
+                    if (p.type !== 'settlement') { 
+                        total += p.amount;
+                        if(p.type === 'cash') cash += p.amount;
+                        else if(p.type === 'card') card += p.amount;
+                        else if(p.type === 'blik') blik += p.amount;
+                    }
                 });
             }
         });
@@ -497,11 +527,24 @@
             }
         });
 
+        let totalSalonExpenses = 0;
+        let filteredSalonExpenses = state.salonExpenses;
+        if (selectedSalonId !== 'all') {
+            filteredSalonExpenses = filteredSalonExpenses.filter(e => e.salonId === selectedSalonId);
+        }
+        filteredSalonExpenses.forEach(expense => {
+            const expenseDate = expense.date.toDate();
+            if (expenseDate >= startOfDay && expenseDate <= endOfDay) {
+                totalSalonExpenses += expense.amount;
+            }
+        });
+
         document.getElementById('summary-total').textContent = `${total.toFixed(0)} zł`;
         document.getElementById('summary-cash').textContent = `${cash.toFixed(0)} zł`;
         document.getElementById('summary-card').textContent = `${card.toFixed(0)} zł`;
         document.getElementById('summary-blik').textContent = `${blik.toFixed(0)} zł`;
-        document.getElementById('summary-advances').textContent = `-${totalAdvances.toFixed(0)} zł`;
+        advancesEl.textContent = `-${totalAdvances.toFixed(0)} zł`;
+        salonExpensesEl.textContent = `-${totalSalonExpenses.toFixed(0)} zł`;
         document.getElementById('summary-services-count').textContent = servicesWithPayment;
     }
 
@@ -563,6 +606,10 @@
                      <div class="summary-card">
                         <div class="value" id="summary-advances">0 zł</div>
                         <div class="label">💸 Видано авансів</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="value" id="summary-salon-expenses">0 zł</div>
+                        <div class="label">Витрати салону</div>
                     </div>
                      <div class="summary-card">
                         <div class="value" id="summary-services-count">0</div>
@@ -678,6 +725,26 @@
         amountInput.value = remaining > 0 ? remaining.toFixed(2) : '0.00';
         amountInput.max = remaining.toFixed(2);
         
+        const paymentTypeSelect = document.getElementById('payment-modal-type');
+        const settlementSelector = document.getElementById('settlement-master-selector');
+        const settlementMasterSelect = document.getElementById('settlement-master-id');
+        
+        paymentTypeSelect.onchange = () => {
+            if (paymentTypeSelect.value === 'settlement') {
+                settlementSelector.style.display = 'block';
+                settlementMasterSelect.required = true;
+            } else {
+                settlementSelector.style.display = 'none';
+                settlementMasterSelect.required = false;
+            }
+        };
+        paymentTypeSelect.dispatchEvent(new Event('change'));
+
+        const currentMasterId = appointment.masterId;
+        settlementMasterSelect.innerHTML = state.masters
+            .filter(m => m.id !== currentMasterId && !m.isFrozen)
+            .map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+
         document.getElementById('payment-modal').style.display = 'flex';
     }
 
@@ -1184,9 +1251,15 @@
         const appointmentId = document.getElementById('payment-appointment-id').value;
         const paymentType = document.getElementById('payment-modal-type').value;
         const amountToPay = parseFloat(document.getElementById('payment-amount').value);
+        const receivingMasterId = paymentType === 'settlement' ? document.getElementById('settlement-master-id').value : null;
+
 
         if (!appointmentId || !amountToPay || amountToPay <= 0) {
             alert('Будь ласка, введіть коректну суму.');
+            return;
+        }
+        if (paymentType === 'settlement' && !receivingMasterId) {
+            alert('Будь ласка, оберіть майстра для взаємозаліку.');
             return;
         }
 
@@ -1211,7 +1284,8 @@
             const newPayment = {
                 amount: amountToPay,
                 type: paymentType,
-                date: Timestamp.now()
+                date: Timestamp.now(),
+                ...(paymentType === 'settlement' && { receivingMasterId })
             };
 
             const newTotalPaid = currentTotalPaid + amountToPay;
@@ -1399,7 +1473,7 @@
     async function handleDeleteService(id) { if (!confirm('Видалити послугу?')) return; try { await deleteDoc(doc(db, 'services', id)); } catch (e) { alert('Не вдалося видалити.'); } }
     // #endregion
 
-    // #region Salary & Settings & Expenses
+    // #region Salary, Expenses, Notepad & Settings
     function renderSalaryView(container) {
         const masterOptions = state.masters
             .filter(m => !m.isFrozen)
@@ -1481,12 +1555,19 @@
                     name: masterInfo ? masterInfo.name : 'Невідомий',
                     totalSalaryBase: 0,
                     advances: 0,
+                    settlements: 0,
                     salaryGroupId: masterInfo ? masterInfo.salaryGroupId : null
                 };
             }
 
             const salaryBaseForThisAppointment = typeof appointment.salaryBase === 'number' ? appointment.salaryBase : appointment.finalPrice;
             masterTotals[masterId].totalSalaryBase += salaryBaseForThisAppointment;
+
+            (appointment.payments || []).forEach(p => {
+                if (p.type === 'settlement' && p.receivingMasterId === masterId) {
+                    masterTotals[masterId].settlements += p.amount;
+                }
+            });
         });
 
         const masterIds = Object.keys(masterTotals);
@@ -1512,7 +1593,7 @@
             const applicableTier = tiers.find(tier => data.totalSalaryBase >= tier.threshold) || { rate: 0 };
             
             const salary = data.totalSalaryBase * (applicableTier.rate / 100);
-            const finalPayout = salary - data.advances;
+            const finalPayout = salary - data.advances - data.settlements;
             
             const cardHTML = `
                 <div class="salary-report-card">
@@ -1522,6 +1603,7 @@
                     <p><span>Ставка:</span> <strong>${applicableTier.rate}%</strong></p>
                     <p><span>Нарахована ЗП:</span> <span>${salary.toFixed(0)} zł</span></p>
                     <p><span>Видано авансів:</span> <span>-${data.advances.toFixed(0)} zł</span></p>
+                    <p><span>Внутрішні послуги:</span> <span>-${data.settlements.toFixed(0)} zł</span></p>
                     <p class="total-salary"><span>До виплати:</span> <strong>${finalPayout.toFixed(0)} zł</strong></p>
                 </div>`;
             reportContainer.innerHTML += cardHTML;
@@ -1531,7 +1613,7 @@
     function renderExpensesView(container) {
         container.innerHTML = `
             <div class="content-card">
-                <h2>Додати витрату</h2>
+                <h2>Додати загальну витрату</h2>
                 <form id="add-expense-form">
                     <div class="form-row">
                         <div class="form-group" style="flex:2;">
@@ -1551,7 +1633,7 @@
                 </form>
             </div>
             <div class="content-card" style="margin-top:2rem;">
-                <h2>Історія витрат</h2>
+                <h2>Історія загальних витрат</h2>
                 <ul id="expenses-list" class="item-list"></ul>
             </div>
         `;
@@ -1620,6 +1702,161 @@
                 console.error("Помилка видалення витрати: ", e);
                 alert("Не вдалося видалити витрату.");
             }
+        }
+    }
+
+    function renderSalonExpensesView(container) {
+        const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+
+        container.innerHTML = `
+            <div class="content-card">
+                <h2>Додати витрату в салоні</h2>
+                <form id="add-salon-expense-form">
+                    <div class="form-row">
+                        <div class="form-group" style="flex:2;">
+                            <label for="salon-expense-description">Опис</label>
+                            <input type="text" id="salon-expense-description" required>
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label for="salon-expense-amount">Сума (zł)</label>
+                            <input type="number" id="salon-expense-amount" required min="0" step="0.01">
+                        </div>
+                         <div class="form-group" style="flex:1;">
+                            <label for="salon-expense-date">Дата</label>
+                            <input type="date" id="salon-expense-date" required>
+                        </div>
+                         <div class="form-group" style="flex:1;">
+                            <label for="salon-expense-salon">Салон</label>
+                            <select id="salon-expense-salon" required>
+                                <option value="">Оберіть салон</option>
+                                ${salonOptions}
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn">Додати витрату</button>
+                </form>
+            </div>
+            <div class="content-card" style="margin-top:2rem;">
+                <h2>Історія витрат в салонах</h2>
+                <ul id="salon-expenses-list" class="item-list"></ul>
+            </div>
+        `;
+
+        document.getElementById('add-salon-expense-form').onsubmit = handleAddSalonExpense;
+        document.getElementById('salon-expense-date').valueAsDate = new Date();
+        
+        const listEl = document.getElementById('salon-expenses-list');
+        listEl.innerHTML = '';
+        const sortedExpenses = state.salonExpenses.sort((a,b) => b.date.toDate() - a.date.toDate());
+        if (sortedExpenses.length === 0) {
+            listEl.innerHTML = '<li>Витрат ще не було.</li>';
+        } else {
+            sortedExpenses.forEach(expense => {
+                const salon = state.salons.find(s => s.id === expense.salonId);
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <div>
+                        <strong>${expense.description}</strong><br>
+                        <small>${expense.date.toDate().toLocaleDateString('uk-UA')} (${salon ? salon.name : 'Невідомий салон'})</small>
+                    </div>
+                    <div class="actions">
+                        <strong>${expense.amount.toFixed(2)} zł</strong>
+                        ${state.user.role === 'admin' ? `<button class="btn btn-delete" data-id="${expense.id}">🗑️</button>` : ''}
+                    </div>`;
+                listEl.appendChild(li);
+            });
+        }
+        
+        listEl.onclick = (e) => {
+            const deleteBtn = e.target.closest('.btn-delete');
+            if (deleteBtn) {
+                handleDeleteSalonExpense(deleteBtn.dataset.id);
+            }
+        };
+    }
+
+    async function handleAddSalonExpense(event) {
+        event.preventDefault();
+        const description = document.getElementById('salon-expense-description').value.trim();
+        const amount = parseFloat(document.getElementById('salon-expense-amount').value);
+        const date = document.getElementById('salon-expense-date').value;
+        const salonId = document.getElementById('salon-expense-salon').value;
+
+        if (!description || !amount || !date || !salonId) {
+            return alert("Будь ласка, заповніть усі поля.");
+        }
+
+        try {
+            await addDoc(collection(db, 'salonExpenses'), {
+                description,
+                amount,
+                date: Timestamp.fromDate(new Date(date)),
+                salonId,
+                authorEmail: state.user.email
+            });
+            event.target.reset();
+            document.getElementById('salon-expense-date').valueAsDate = new Date();
+        } catch (e) {
+            console.error("Помилка додавання витрати: ", e);
+            alert("Не вдалося додати витрату.");
+        }
+    }
+    
+    async function handleDeleteSalonExpense(id) {
+        if(confirm('Ви впевнені, що хочете видалити цю витрату?')) {
+            try {
+                await deleteDoc(doc(db, 'salonExpenses', id));
+            } catch(e) {
+                console.error("Помилка видалення витрати: ", e);
+                alert("Не вдалося видалити витрату.");
+            }
+        }
+    }
+
+    function renderNotepadView(container) {
+        const entriesHtml = state.notepadEntries.map(entry => `
+            <li>
+                <p>${entry.content.replace(/\n/g, '<br>')}</p>
+                <small>${entry.authorEmail} - ${entry.createdAt.toDate().toLocaleString('uk-UA')}</small>
+            </li>
+        `).join('');
+
+        container.innerHTML = `
+            <div class="content-card">
+                <h2>Блокнот / Журнал записів</h2>
+                <form id="add-notepad-entry-form">
+                    <div class="form-group">
+                        <label for="notepad-content">Новий запис</label>
+                        <textarea id="notepad-content" rows="4" required></textarea>
+                    </div>
+                    <button type="submit" class="btn">Додати запис</button>
+                </form>
+            </div>
+            <div class="content-card">
+                <h3>Останні записи</h3>
+                <ul id="notepad-entries" class="item-list">${entriesHtml || '<li>Записів ще немає.</li>'}</ul>
+            </div>
+        `;
+
+        document.getElementById('add-notepad-entry-form').onsubmit = handleAddNotepadEntry;
+    }
+
+    async function handleAddNotepadEntry(event) {
+        event.preventDefault();
+        const contentInput = document.getElementById('notepad-content');
+        const content = contentInput.value.trim();
+        if (!content) return;
+
+        try {
+            await addDoc(collection(db, 'notepadEntries'), {
+                content,
+                authorEmail: state.user.email,
+                createdAt: Timestamp.now()
+            });
+            contentInput.value = '';
+        } catch (e) {
+            console.error("Помилка додавання запису:", e);
+            alert("Не вдалося додати запис.");
         }
     }
 
