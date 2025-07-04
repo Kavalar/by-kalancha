@@ -234,6 +234,7 @@
         salons: [],
         expenses: [],
         salonExpenses: [],
+        productSales: [], // --- ЗМІНА: Додано новий стан для продажів товарів
         advances: [],
         salaryGroups: [],
         notepadEntries: [],
@@ -283,6 +284,7 @@
 
     function setupRealtimeListeners() {
         if (listenersAreActive) return;
+        // --- ЗМІНА: Додано відстеження колекції productSales ---
         const collections = { 
             salons: 'salons',
             categories: 'serviceCategories', 
@@ -293,10 +295,11 @@
             expenses: 'expenses',
             salonExpenses: 'salonExpenses',
             notepadEntries: 'notepadEntries',
+            productSales: 'productSales', // Нова колекція
         };
         Object.entries(collections).forEach(([stateKey, colName]) => {
-            const q = (colName === 'notepadEntries') 
-                ? query(collection(db, colName), orderBy("createdAt", "desc")) 
+            const q = (colName === 'notepadEntries' || colName === 'productSales') 
+                ? query(collection(db, colName), orderBy("date", "desc")) 
                 : collection(db, colName);
 
             onSnapshot(q, snapshot => {
@@ -345,6 +348,12 @@
                 <li data-view="settings">Налаштування</li>
             `;
         }
+
+        // --- ЗМІНА: Додано вкладку "Магазин" для адмінів ---
+        let shopTab = '';
+        if (user.role === 'admin' || user.role === 'salon_admin') {
+            shopTab = '<li data-view="shop">Магазин</li>';
+        }
         
         const allUserTabs = `
             <li data-view="salonExpenses">Витрати в салоні</li>
@@ -361,8 +370,9 @@
                     <li data-view="clients">Клієнти</li>
                     <li data-view="services">Послуги</li>
                     <li data-view="masters">Майстри</li>
-                    ${adminTabs}
+                    ${shopTab}
                     ${allUserTabs}
+                    ${adminTabs}
                 </ul>
                 <div class="user-info">
                     <span>${user.email} (${user.role})</span>
@@ -436,7 +446,8 @@
 
         const headerTitle = document.getElementById('header-title');
         if(headerTitle) {
-            const viewTitles = { calendar: 'Календар', appointments: 'Запис', clients: 'Клієнти', services: 'Послуги та Категорії', masters: 'Майстри', salary: 'Зарплата', expenses: 'Загальні витрати', salonExpenses: 'Витрати в салоні', notepad: 'Блокнот', settings: 'Налаштування', clientDetail: 'Історія Клієнта', masterDetail: 'Картка Майстра' };
+            // --- ЗМІНА: Додано заголовок для "Магазин" ---
+            const viewTitles = { calendar: 'Календар', appointments: 'Запис', clients: 'Клієнти', services: 'Послуги та Категорії', masters: 'Майстри', shop: 'Магазин', salary: 'Зарплата', expenses: 'Загальні витрати', salonExpenses: 'Витрати в салоні', notepad: 'Блокнот', settings: 'Налаштування', clientDetail: 'Історія Клієнта', masterDetail: 'Картка Майстра' };
             headerTitle.textContent = viewTitles[viewName] || 'Dashboard';
         }
 
@@ -462,6 +473,8 @@
             case 'expenses': renderExpensesView(contentWrapper); break;
             case 'salonExpenses': renderSalonExpensesView(contentWrapper); break;
             case 'notepad': renderNotepadView(contentWrapper); break;
+            // --- ЗМІНА: Додано виклик рендеру для "Магазин" ---
+            case 'shop': renderShopView(contentWrapper); break;
             case 'settings': renderSettingsView(contentWrapper); break;
             default:
                 contentWrapper.innerHTML = `<h2>Невідомий розділ</h2>`;
@@ -474,7 +487,10 @@
         const salonInput = document.getElementById('summary-salon-filter');
         const advancesEl = document.getElementById('summary-advances');
         const salonExpensesEl = document.getElementById('summary-salon-expenses');
-        if (!dateInput || !salonInput || !advancesEl || !salonExpensesEl) return;
+        // --- ЗМІНА: Отримання елемента для продажів товарів ---
+        const productSalesEl = document.getElementById('summary-product-sales');
+
+        if (!dateInput || !salonInput || !advancesEl || !salonExpensesEl || !productSalesEl) return;
 
         const selectedDate = new Date(dateInput.value);
         const selectedSalonId = salonInput.value;
@@ -508,6 +524,24 @@
                 });
             }
         });
+
+        // --- ЗМІНА: Розрахунок продажів товарів за день ---
+        let totalProductSales = 0;
+        let filteredProductSales = state.productSales;
+        if (selectedSalonId !== 'all') {
+            filteredProductSales = filteredProductSales.filter(s => s.salonId === selectedSalonId);
+        }
+        filteredProductSales.forEach(sale => {
+            const saleDate = sale.date.toDate();
+            if (saleDate >= startOfDay && saleDate <= endOfDay) {
+                totalProductSales += sale.amount;
+            }
+        });
+        
+        // Додаємо продажі товарів до загального доходу
+        total += totalProductSales;
+        // --- КІНЕЦЬ ЗМІНИ ---
+
         let totalAdvances = 0;
         state.advances.forEach(advance => {
             const advanceDate = advance.date.toDate();
@@ -526,12 +560,15 @@
                 totalSalonExpenses += expense.amount;
             }
         });
+
+        // --- ЗМІНА: Відображення нових даних ---
         document.getElementById('summary-total').textContent = `${total.toFixed(0)} zł`;
         document.getElementById('summary-cash').textContent = `${cash.toFixed(0)} zł`;
         document.getElementById('summary-card').textContent = `${card.toFixed(0)} zł`;
         document.getElementById('summary-blik').textContent = `${blik.toFixed(0)} zł`;
         advancesEl.textContent = `-${totalAdvances.toFixed(0)} zł`;
         salonExpensesEl.textContent = `-${totalSalonExpenses.toFixed(0)} zł`;
+        productSalesEl.textContent = `${totalProductSales.toFixed(0)} zł`;
         document.getElementById('summary-services-count').textContent = servicesWithPayment;
     }
 
@@ -588,6 +625,10 @@
                     <div class="summary-card">
                         <div class="value" id="summary-blik">0 zł</div>
                         <div class="label">📱 Blik</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="value" id="summary-product-sales">0 zł</div>
+                        <div class="label">🛍️ Продаж товарів</div>
                     </div>
                      <div class="summary-card">
                         <div class="value" id="summary-advances">0 zł</div>
@@ -755,6 +796,25 @@
             <p><strong>Сума:</strong> ${appointment.finalPrice.toFixed(0)} zł</p>
             <p><strong>Статус:</strong> ${statusText}</p>
         `;
+
+        // --- ЗМІНА: Додано блок з деталями оплат ---
+        if (appointment.payments && appointment.payments.length > 0) {
+            const paymentTypes = {
+                cash: 'Готівка',
+                card: 'Картка',
+                blik: 'Blik',
+                settlement: 'Взаємозалік'
+            };
+            let paymentsHtml = '<hr style="margin: 1rem 0;"><p><strong>Історія оплат:</strong></p><ul style="padding-left: 20px; margin: 0;">';
+            appointment.payments.forEach(p => {
+                const paymentTypeStr = paymentTypes[p.type] || p.type;
+                paymentsHtml += `<li>${p.amount.toFixed(0)} zł (${paymentTypeStr})</li>`;
+            });
+            paymentsHtml += '</ul>';
+            detailsEl.innerHTML += paymentsHtml;
+        }
+        // --- КІНЕЦЬ ЗМІНИ ---
+
         let buttonsHtml = '';
         if (appointment.status !== 'completed') {
             buttonsHtml += `<button class="btn btn-complete-payment" data-action="pay">Внести / Додати оплату</button>`;
@@ -1765,7 +1825,6 @@
     }
 
     function renderNotepadView(container) {
-        // ЗМІНА #1: Додано кнопку видалення для admin
         const entriesHtml = state.notepadEntries.map(entry => `
             <li data-id="${entry.id}">
                 <div style="flex-grow: 1; word-break: break-word;">
@@ -1794,7 +1853,6 @@
         `;
         document.getElementById('add-notepad-entry-form').onsubmit = handleAddNotepadEntry;
 
-        // ЗМІНА #2: Додано обробник кліку для видалення
         const listEl = document.getElementById('notepad-entries');
         if (listEl) {
             listEl.onclick = (event) => {
@@ -1825,7 +1883,6 @@
         }
     }
 
-    // ЗМІНА #3: Нова функція для видалення запису з блокнота
     async function handleDeleteNotepadEntry(entryId) {
         if (!entryId) return;
         if (confirm('Ви впевнені, що хочете видалити цей запис?')) {
@@ -1837,6 +1894,86 @@
             }
         }
     }
+    
+    // --- ПОЧАТОК НОВОГО КОДУ ДЛЯ МАГАЗИНУ ---
+    function renderShopView(container) {
+        const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+        const recentSalesHtml = state.productSales.slice(0, 10).map(sale => {
+            const salon = state.salons.find(s => s.id === sale.salonId);
+            return `
+                <li>
+                    <div>
+                        <strong>${sale.description}</strong><br>
+                        <small>${sale.date.toDate().toLocaleString('uk-UA')} (${salon ? salon.name : 'Невідомий салон'})</small>
+                    </div>
+                    <div class="actions">
+                        <strong>${sale.amount.toFixed(2)} zł</strong>
+                        </div>
+                </li>
+            `;
+        }).join('');
+
+        container.innerHTML = `
+            <div class="content-card">
+                <h2>Продаж товару</h2>
+                <form id="add-product-sale-form">
+                    <div class="form-group">
+                        <label for="product-sale-description">Назва або опис товару</label>
+                        <input type="text" id="product-sale-description" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1;">
+                            <label for="product-sale-amount">Сума продажу (zł)</label>
+                            <input type="number" id="product-sale-amount" required min="0" step="0.01">
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label for="product-sale-salon">Салон</label>
+                            <select id="product-sale-salon" required>
+                                <option value="">Оберіть салон</option>
+                                ${salonOptions}
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn">Зареєструвати продаж</button>
+                </form>
+            </div>
+            <div class="content-card" style="margin-top:2rem;">
+                <h2>Останні продажі</h2>
+                <ul id="product-sales-list" class="item-list">
+                    ${recentSalesHtml || '<li>Продажів ще не було.</li>'}
+                </ul>
+            </div>
+        `;
+
+        document.getElementById('add-product-sale-form').onsubmit = handleAddProductSale;
+    }
+
+    async function handleAddProductSale(event) {
+        event.preventDefault();
+        const description = document.getElementById('product-sale-description').value.trim();
+        const amount = parseFloat(document.getElementById('product-sale-amount').value);
+        const salonId = document.getElementById('product-sale-salon').value;
+
+        if (!description || !amount || amount <= 0 || !salonId) {
+            return alert("Будь ласка, заповніть усі поля коректно.");
+        }
+
+        try {
+            await addDoc(collection(db, 'productSales'), {
+                description,
+                amount,
+                salonId,
+                date: Timestamp.now(),
+                authorEmail: state.user.email
+            });
+            alert('Продаж успішно зареєстровано!');
+            event.target.reset();
+        } catch (e) {
+            console.error("Помилка реєстрації продажу: ", e);
+            alert("Не вдалося зареєструвати продаж.");
+        }
+    }
+    // --- КІНЕЦЬ НОВОГО КОДУ ДЛЯ МАГАЗИНУ ---
 
     function renderSettingsView(container) {
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
