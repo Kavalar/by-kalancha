@@ -21,7 +21,7 @@
             --primary-hover: #34495e;
             --danger-color: #e74c3c;
             --success-color: #27ae60;
-            --warning-color: #f39c12; 
+            --warning-color: #f39c12;
             --shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
         body { font-family: 'Inter', Arial, sans-serif; background: var(--main-bg); margin: 0; padding: 0; color: var(--text-color); font-size: 16px; }
@@ -164,7 +164,7 @@
                 </div>
                 <div class="form-group" style="flex:1;">
                     <label for="payment-modal-type">Тип оплати</label>
-                    <select id="payment-modal-type">
+                     <select id="payment-modal-type">
                         <option value="cash">Готівка</option>
                         <option value="card">Картка</option>
                         <option value="blik">Blik</option>
@@ -202,7 +202,7 @@
         </div>
         <form id="salary-group-form">
             <input type="hidden" id="edit-salary-group-id">
-            <div class="form-group">
+             <div class="form-group">
                 <label for="salary-group-name">Назва групи</label>
                 <input type="text" id="salary-group-name" required>
             </div>
@@ -223,7 +223,6 @@
     import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
 
     const firebaseConfig = { apiKey: "AIzaSyBoGeREvdgrVSm-S4f3cW0HyB7Us9yh_us", authDomain: "bykalancha.firebaseapp.com", projectId: "bykalancha", storageBucket: "bykalancha.appspot.com", messagingSenderId: "196166318613", appId: "1:196166318613:web:0067f9de531e290e43ec1c", measurementId: "G-V72ECFLKFE" };
-
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
@@ -256,7 +255,6 @@
         appointmentsPage: 1,
         appointmentsListDate: new Date(),
     };
-
     let listenersAreActive = false;
     let masterAdvancesUnsubscribe = null;
     
@@ -296,7 +294,6 @@
             salonExpenses: 'salonExpenses',
             notepadEntries: 'notepadEntries',
         };
-
         Object.entries(collections).forEach(([stateKey, colName]) => {
             const q = (colName === 'notepadEntries') 
                 ? query(collection(db, colName), orderBy("createdAt", "desc")) 
@@ -312,9 +309,7 @@
                 }
             });
         });
-        
         const isAdminOrSalonAdmin = state.user.role === 'admin' || state.user.role === 'salon_admin';
-        
         if (isAdminOrSalonAdmin) {
             onSnapshot(query(collectionGroup(db, 'advances')), snapshot => {
                 state.advances = snapshot.docs.map(d => d.data());
@@ -328,7 +323,7 @@
             onSnapshot(collection(db, 'salaryGroups'), snapshot => {
                 state.salaryGroups = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
                 if (state.currentView === 'settings' || state.currentView === 'salary') {
-                     renderView(state.currentView);
+                    renderView(state.currentView);
                 }
             });
         }
@@ -342,14 +337,15 @@
     }
 
     function renderAppLayout(user) {
-        const isAdminOrSalonAdmin = user.role === 'admin' || user.role === 'salon_admin';
-        
+        // ### ЗМІНА #1: ЛОГІКА СТВОРЕННЯ МЕНЮ ###
+        // Тепер ці вкладки з'являться тільки для ролі 'admin'
         let adminTabs = '';
-        if (isAdminOrSalonAdmin) {
-            adminTabs += `<li data-view="salary">Зарплата</li><li data-view="expenses">Загальні витрати</li>`;
-        }
         if (user.role === 'admin') {
-            adminTabs += `<li data-view="settings">Налаштування</li>`;
+            adminTabs = `
+                <li data-view="salary">Зарплата</li>
+                <li data-view="expenses">Загальні витрати</li>
+                <li data-view="settings">Налаштування</li>
+            `;
         }
         
         const allUserTabs = `
@@ -414,14 +410,17 @@
 
     function renderView(viewName) {
         if (!state.user) return;
-        
-        const masterViews = ['calendar', 'appointments', 'notepad', 'salonExpenses'];
-        const salonAdminViews = [...masterViews, 'clients', 'services', 'masters', 'salary', 'expenses'];
 
+        // ### ЗМІНА #2: ЛОГІКА ДОСТУПУ ДО СТОРІНОК ###
+        const masterViews = ['calendar', 'appointments', 'notepad', 'salonExpenses'];
         if (state.user.role === 'master' && !masterViews.includes(viewName)) {
              viewName = 'calendar';
         }
-        if (state.user.role === 'salon_admin' && viewName === 'settings') {
+        
+        // Перелік заборонених сторінок для 'salon_admin'
+        const salonAdminForbiddenViews = ['settings', 'salary', 'expenses'];
+        if (state.user.role === 'salon_admin' && salonAdminForbiddenViews.includes(viewName)) {
+             // Якщо користувач намагається відкрити заборонену сторінку, перекидаємо його на календар
              viewName = 'calendar';
         }
 
@@ -480,24 +479,20 @@
         const salonInput = document.getElementById('summary-salon-filter');
         const advancesEl = document.getElementById('summary-advances');
         const salonExpensesEl = document.getElementById('summary-salon-expenses');
-
         if (!dateInput || !salonInput || !advancesEl || !salonExpensesEl) return;
 
         const selectedDate = new Date(dateInput.value);
         const selectedSalonId = salonInput.value;
-
         const startOfDay = new Date(selectedDate);
         startOfDay.setHours(0, 0, 0, 0);
         
         const endOfDay = new Date(selectedDate);
         endOfDay.setHours(23, 59, 59, 999);
-        
         let relevantAppointments = state.appointments.filter(app => {
             if (!app.dateTime) return false;
             const appointmentDate = app.dateTime.toDate();
             return appointmentDate >= startOfDay && appointmentDate <= endOfDay;
         });
-        
         if (selectedSalonId !== 'all') {
             relevantAppointments = relevantAppointments.filter(app => app.salonId === selectedSalonId);
         }
@@ -518,7 +513,6 @@
                 });
             }
         });
-        
         let totalAdvances = 0;
         state.advances.forEach(advance => {
             const advanceDate = advance.date.toDate();
@@ -526,7 +520,6 @@
                 totalAdvances += advance.amount;
             }
         });
-
         let totalSalonExpenses = 0;
         let filteredSalonExpenses = state.salonExpenses;
         if (selectedSalonId !== 'all') {
@@ -538,7 +531,6 @@
                 totalSalonExpenses += expense.amount;
             }
         });
-
         document.getElementById('summary-total').textContent = `${total.toFixed(0)} zł`;
         document.getElementById('summary-cash').textContent = `${cash.toFixed(0)} zł`;
         document.getElementById('summary-card').textContent = `${card.toFixed(0)} zł`;
@@ -551,7 +543,6 @@
     // #region Calendar View
     function renderCalendarView(container) {
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-
         container.innerHTML = `
             <div class="content-card">
                 <div id="calendar-container">
@@ -617,7 +608,6 @@
                     </div>
                 </div>
             </div>`;
-        
         const calendarEl = document.getElementById('calendar');
         const masterFilter = document.getElementById('calendar-master-filter');
         const salonFilter = document.getElementById('calendar-salon-filter');
@@ -625,11 +615,9 @@
         const activeMasters = state.masters.filter(m => !m.isFrozen);
         masterFilter.innerHTML = '<option value="all">Всі майстри</option>' + activeMasters.map(m => `<option value="${m.id}" ${state.calendarSelectedMasterId === m.id ? 'selected' : ''}>${m.name}</option>`).join('');
         salonFilter.value = state.calendarSelectedSalonId;
-
         if (!calendarEl || !masterFilter || !salonFilter) return;
 
         const colorPalette = ['#3788d8', '#e25141', '#4caf50', '#ff9800', '#9c27b0', '#795548', '#607d8b'];
-        
         const calendar = new FullCalendar.Calendar(calendarEl, {
             locale: 'uk', initialView: 'timeGridWeek',
             headerToolbar: { left: 'prev,next today', center: 'title', right: 'timeGridWeek,timeGridDay' },
@@ -672,7 +660,6 @@
                 const appointment = arg.event.extendedProps.appointment;
                 const service = state.services.find(s => s.id === appointment.serviceId);
                 const salon = state.salons.find(s => s.id === appointment.salonId);
-
                 const html = `
                     <div class="fc-event-main-frame">
                         <div class="fc-event-title">${appointment.clientName}</div>
@@ -708,7 +695,7 @@
         summaryDatePicker.valueAsDate = new Date(); 
         summaryDatePicker.onchange = renderDailySummary;
         summarySalonFilter.onchange = renderDailySummary;
-        renderDailySummary(); 
+        renderDailySummary();
     }
 
     function openPaymentModal(appointment) {
@@ -728,7 +715,6 @@
         const paymentTypeSelect = document.getElementById('payment-modal-type');
         const settlementSelector = document.getElementById('settlement-master-selector');
         const settlementMasterSelect = document.getElementById('settlement-master-id');
-        
         paymentTypeSelect.onchange = () => {
             if (paymentTypeSelect.value === 'settlement') {
                 settlementSelector.style.display = 'block';
@@ -744,7 +730,6 @@
         settlementMasterSelect.innerHTML = state.masters
             .filter(m => m.id !== currentMasterId && !m.isFrozen)
             .map(m => `<option value="${m.id}">${m.name}</option>`).join('');
-
         document.getElementById('payment-modal').style.display = 'flex';
     }
 
@@ -775,7 +760,6 @@
             <p><strong>Сума:</strong> ${appointment.finalPrice.toFixed(0)} zł</p>
             <p><strong>Статус:</strong> ${statusText}</p>
         `;
-
         let buttonsHtml = '';
         if (appointment.status !== 'completed') {
             buttonsHtml += `<button class="btn btn-complete-payment" data-action="pay">Внести / Додати оплату</button>`;
@@ -785,7 +769,6 @@
         buttonsHtml += `<button class="btn btn-delete" data-action="cancel">Скасувати запис</button>`;
         
         buttonsEl.innerHTML = buttonsHtml;
-        
         buttonsEl.onclick = function(event) {
             const button = event.target.closest('button');
             if (!button) return;
@@ -894,7 +877,6 @@
         }
         
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-
         container.innerHTML = `
             <div class="content-card">
                 <h2 id="appointment-form-title">${isEditMode ? 'Редагувати запис' : 'Новий запис'}</h2>
@@ -974,7 +956,6 @@
             
             document.getElementById('manual-discount-value').value = appointmentToEdit.manualDiscount?.value || 0;
             document.getElementById('manual-discount-type').value = appointmentToEdit.manualDiscount?.type || 'percent';
-
             const service = state.services.find(s => s.id === appointmentToEdit.serviceId);
             if (service) {
                 const categorySelect = document.getElementById('appointment-category');
@@ -1021,7 +1002,6 @@
 
     function setupAppointmentsLogic() {
         document.getElementById('appointment-form').onsubmit = handleSaveAppointment;
-
         if (state.editingAppointmentId) {
             document.getElementById('appointment-cancel-edit-btn').onclick = () => {
                 state.editingAppointmentId = null;
@@ -1053,7 +1033,6 @@
         }
         
         populateAppointmentFormDropdowns();
-
         const categorySelect = document.getElementById('appointment-category');
         categorySelect.onchange = () => {
             const categoryId = categorySelect.value;
@@ -1065,7 +1044,6 @@
             masterSelect.innerHTML = '<option value="">Оберіть майстра</option>' + mastersForCategory.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
             updateFinalPrice();
         };
-        
         ['appointment-service', 'appointment-master', 'appointment-salon', 'manual-discount-value', 'manual-discount-type'].forEach(id => {
             const el = document.getElementById(id);
             if(el) el.oninput = updateFinalPrice;
@@ -1080,13 +1058,11 @@
         const selectedDate = state.appointmentsListDate;
         const startOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
         const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
-        
         const dailyUnpaidAppointments = state.appointments.filter(app => {
             if (!app.dateTime) return false;
             const appDate = app.dateTime.toDate();
             return app.status !== 'completed' && appDate >= startOfDay && appDate <= endOfDay;
         }).sort((a, b) => a.dateTime.toDate() - b.dateTime.toDate());
-
         if (state.appointmentsPage === 1) {
             listEl.innerHTML = '';
             if (dailyUnpaidAppointments.length === 0) {
@@ -1099,7 +1075,6 @@
         const itemsPerPage = 10;
         const startIndex = (state.appointmentsPage - 1) * itemsPerPage;
         const paginatedAppointments = dailyUnpaidAppointments.slice(startIndex, startIndex + itemsPerPage);
-
         paginatedAppointments.forEach(appointment => {
             const service = state.services.find(s => s.id === appointment.serviceId)?.name || 'Послуга';
             const master = state.masters.find(m => m.id === appointment.masterId)?.name || 'Майстер';
@@ -1121,7 +1096,7 @@
             loadMoreBtn.className = 'btn';
             loadMoreBtn.innerText = 'Завантажити ще';
             loadMoreBtn.onclick = () => { 
-                state.appointmentsPage++; 
+                state.appointmentsPage++;
                 renderDailyAppointmentsList(); 
             };
             paginationControls.appendChild(loadMoreBtn);
@@ -1129,48 +1104,46 @@
     }
 
     function populateAppointmentFormDropdowns() { 
-        const categorySelect = document.getElementById('appointment-category'); 
+        const categorySelect = document.getElementById('appointment-category');
         if (categorySelect) { 
             categorySelect.innerHTML = '<option value="">Оберіть категорію</option>' + state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
         } 
     }
 
     function updateFinalPrice() { 
-        const serviceId = document.getElementById('appointment-service').value; 
+        const serviceId = document.getElementById('appointment-service').value;
         const masterId = document.getElementById('appointment-master').value; 
         const manualDiscountValue = parseFloat(document.getElementById('manual-discount-value').value) || 0; 
         const manualDiscountType = document.getElementById('manual-discount-type').value; 
-        const priceDisplay = document.getElementById('final-price-display'); 
+        const priceDisplay = document.getElementById('final-price-display');
         if (!serviceId || !masterId) { 
-            priceDisplay.innerText = `Сума до оплати: 0 zł`; 
+            priceDisplay.innerText = `Сума до оплати: 0 zł`;
             return 0; 
         } 
-        const service = state.services.find(s => s.id === serviceId); 
+        const service = state.services.find(s => s.id === serviceId);
         const category = state.categories.find(c => c.id === service?.categoryId); 
         const master = state.masters.find(m => m.id === masterId); 
-        let price = service.price; 
+        let price = service.price;
         const discountPercent = service.discount > 0 ? service.discount : (category?.discount || 0); 
-        price *= (1 - discountPercent / 100); 
+        price *= (1 - discountPercent / 100);
         const markupPercent = master.priceModifier || 0; 
-        price *= (1 + markupPercent / 100); 
+        price *= (1 + markupPercent / 100);
         if (manualDiscountType === 'percent') { 
-            price *= (1 - manualDiscountValue / 100); 
+            price *= (1 - manualDiscountValue / 100);
         } else { 
-            price -= manualDiscountValue; 
+            price -= manualDiscountValue;
         } 
         priceDisplay.innerText = `Сума до оплати: ${price.toFixed(0)} zł`; 
-        return price; 
+        return price;
     }
 
     async function handleSaveAppointment(event) {
         event.preventDefault();
         const isEditMode = !!state.editingAppointmentId;
-        
         const serviceId = document.getElementById('appointment-service').value;
         const masterId = document.getElementById('appointment-master').value;
         const dateTimeString = document.getElementById('appointment-datetime').value;
         const salonId = document.getElementById('appointment-salon').value;
-
         if (!serviceId || !masterId || !dateTimeString || !salonId) {
             return alert("Будь ласка, заповніть усі поля, включно з салоном.");
         }
@@ -1183,8 +1156,7 @@
 
         const priceModifier = master.priceModifier || 0;
         const salaryBase = service.price * (1 + priceModifier / 100);
-        const finalPrice = updateFinalPrice(); 
-        
+        const finalPrice = updateFinalPrice();
         const appointmentData = {
             dateTime: Timestamp.fromDate(new Date(dateTimeString)),
             serviceId,
@@ -1198,7 +1170,6 @@
             finalPrice,
             salaryBase: salaryBase
         };
-        
         try {
             if (isEditMode) {
                 await updateDoc(doc(db, 'appointments', state.editingAppointmentId), appointmentData);
@@ -1264,7 +1235,6 @@
         }
 
         const appointmentRef = doc(db, 'appointments', appointmentId);
-
         try {
             const appointmentSnap = await getDoc(appointmentRef);
             if (!appointmentSnap.exists()) {
@@ -1274,7 +1244,6 @@
             const appointmentData = appointmentSnap.data();
             const currentTotalPaid = appointmentData.totalPaid || 0;
             const finalPrice = appointmentData.finalPrice;
-            
             if (amountToPay > (finalPrice - currentTotalPaid) + 0.01) { 
                 if(!confirm(`Сума оплати (${amountToPay.toFixed(2)} zł) більша за залишок (${(finalPrice - currentTotalPaid).toFixed(2)} zł). Продовжити?`)){
                     return;
@@ -1290,14 +1259,12 @@
 
             const newTotalPaid = currentTotalPaid + amountToPay;
             const newStatus = newTotalPaid >= finalPrice ? 'completed' : 'partially_paid';
-            
             await updateDoc(appointmentRef, {
                 payments: arrayUnion(newPayment),
                 totalPaid: increment(amountToPay),
                 status: newStatus,
                 ...(newStatus === 'completed' && !appointmentData.completedAt && { completedAt: Timestamp.now() })
             });
-
             document.getElementById('payment-modal').style.display = 'none';
         } catch (e) {
             console.error("Помилка оплати:", e);
@@ -1317,7 +1284,7 @@
         listEl.innerHTML = state.masters.length > 0 ? '' : '<li>Немає майстрів.</li>'; 
         state.masters.sort((a,b) => a.name.localeCompare(b.name)).forEach(master => { 
             const categories = (master.categoryIds || []).map(id => state.categories.find(c => c.id === id)?.name || '').filter(Boolean).join(', '); 
-            const li = document.createElement('li'); 
+            const li = document.createElement('li');
             li.className = master.isFrozen ? 'is-frozen no-hover' : 'no-hover'; 
             li.innerHTML = `
                 <div class="master-info-clickable" data-id="${master.id}" style="flex-grow: 1; cursor: pointer;">
@@ -1335,9 +1302,9 @@
                 event.stopPropagation();
                 showEditMasterModal(button.dataset.id); 
             } else { 
-                const masterItem = event.target.closest('.master-info-clickable'); 
+                const masterItem = event.target.closest('.master-info-clickable');
                 if (masterItem) { 
-                    state.viewingMasterId = masterItem.dataset.id; 
+                    state.viewingMasterId = masterItem.dataset.id;
                     renderView('masterDetail'); 
                 } 
             } 
@@ -1376,16 +1343,15 @@
                         <input type="number" id="advance-amount" min="1" required>
                     </div>
                     <div class="form-group">
-                        <button type="submit" class="btn">Видати аванс</button>
+                         <button type="submit" class="btn">Видати аванс</button>
                     </div>
                 </form>
             </div>
             <div class="content-card">
-                <h3>Історія авансів</h3>
+                 <h3>Історія авансів</h3>
                 <ul id="master-advances-list" class="item-list"><li>Завантаження...</li></ul>
             </div>
         `;
-
         container.onclick = function(event) {
             if (event.target.closest('#detail-view-back-btn')) {
                 renderView('masters');
@@ -1479,7 +1445,6 @@
             .filter(m => !m.isFrozen)
             .map(m => `<option value="${m.id}">${m.name}</option>`)
             .join('');
-            
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
 
         const today = new Date();
@@ -1536,7 +1501,6 @@
             const appointmentDate = app.dateTime.toDate();
             return app.status !== 'upcoming' && appointmentDate >= startDate && appointmentDate <= endDate;
         });
-        
         if(selectedMasterId !== 'all'){
             appointmentsForSalary = appointmentsForSalary.filter(app => app.masterId === selectedMasterId);
         }
@@ -1546,7 +1510,6 @@
         }
         
         const masterTotals = {};
-        
         appointmentsForSalary.forEach(appointment => {
             const masterId = appointment.masterId;
             if (!masterTotals[masterId]) {
@@ -1557,7 +1520,7 @@
                     advances: 0,
                     settlements: 0,
                     salaryGroupId: masterInfo ? masterInfo.salaryGroupId : null
-                };
+                 };
             }
 
             const salaryBaseForThisAppointment = typeof appointment.salaryBase === 'number' ? appointment.salaryBase : appointment.finalPrice;
@@ -1591,10 +1554,8 @@
             const group = state.salaryGroups.find(g => g.id === data.salaryGroupId);
             const tiers = group?.tiers?.sort((a,b) => b.threshold - a.threshold) || [];
             const applicableTier = tiers.find(tier => data.totalSalaryBase >= tier.threshold) || { rate: 0 };
-            
             const salary = data.totalSalaryBase * (applicableTier.rate / 100);
             const finalPayout = salary - data.advances - data.settlements;
-            
             const cardHTML = `
                 <div class="salary-report-card">
                     <h3>${data.name}</h3>
@@ -1637,7 +1598,6 @@
                 <ul id="expenses-list" class="item-list"></ul>
             </div>
         `;
-
         document.getElementById('add-expense-form').onsubmit = handleAddExpense;
         document.getElementById('expense-date').valueAsDate = new Date();
         
@@ -1675,7 +1635,6 @@
         const description = document.getElementById('expense-description').value.trim();
         const amount = parseFloat(document.getElementById('expense-amount').value);
         const date = document.getElementById('expense-date').value;
-
         if (!description || !amount || !date) {
             return alert("Будь ласка, заповніть усі поля.");
         }
@@ -1707,7 +1666,6 @@
 
     function renderSalonExpensesView(container) {
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-
         container.innerHTML = `
             <div class="content-card">
                 <h2>Додати витрату в салоні</h2>
@@ -1721,7 +1679,7 @@
                             <label for="salon-expense-amount">Сума (zł)</label>
                             <input type="number" id="salon-expense-amount" required min="0" step="0.01">
                         </div>
-                         <div class="form-group" style="flex:1;">
+                        <div class="form-group" style="flex:1;">
                             <label for="salon-expense-date">Дата</label>
                             <input type="date" id="salon-expense-date" required>
                         </div>
@@ -1737,11 +1695,10 @@
                 </form>
             </div>
             <div class="content-card" style="margin-top:2rem;">
-                <h2>Історія витрат в салонах</h2>
+                 <h2>Історія витрат в салонах</h2>
                 <ul id="salon-expenses-list" class="item-list"></ul>
             </div>
         `;
-
         document.getElementById('add-salon-expense-form').onsubmit = handleAddSalonExpense;
         document.getElementById('salon-expense-date').valueAsDate = new Date();
         
@@ -1781,7 +1738,6 @@
         const amount = parseFloat(document.getElementById('salon-expense-amount').value);
         const date = document.getElementById('salon-expense-date').value;
         const salonId = document.getElementById('salon-expense-salon').value;
-
         if (!description || !amount || !date || !salonId) {
             return alert("Будь ласка, заповніть усі поля.");
         }
@@ -1832,12 +1788,11 @@
                     <button type="submit" class="btn">Додати запис</button>
                 </form>
             </div>
-            <div class="content-card">
+             <div class="content-card">
                 <h3>Останні записи</h3>
                 <ul id="notepad-entries" class="item-list">${entriesHtml || '<li>Записів ще немає.</li>'}</ul>
             </div>
         `;
-
         document.getElementById('add-notepad-entry-form').onsubmit = handleAddNotepadEntry;
     }
 
@@ -1846,7 +1801,6 @@
         const contentInput = document.getElementById('notepad-content');
         const content = contentInput.value.trim();
         if (!content) return;
-
         try {
             await addDoc(collection(db, 'notepadEntries'), {
                 content,
@@ -1873,7 +1827,6 @@
                 </div>
             </li>
         `).join('');
-
         const masterAssignmentHtml = state.masters.map(master => `
             <li data-master-id="${master.id}">
                 <span>${master.name}</span>
@@ -1885,7 +1838,6 @@
                 </div>
             </li>
         `).join('');
-
         container.innerHTML = `
             <div class="content-card">
                 <h2>Керування групами зарплат</h2>
@@ -1896,16 +1848,16 @@
                 <h2>Призначення груп майстрам</h2>
                 <ul id="master-group-assignment-list" class="item-list">${masterAssignmentHtml}</ul>
             </div>
-            <div class="content-card">
+             <div class="content-card">
                 <h2>Ручна відправка звіту</h2>
                 <form id="manual-report-form"><div class="form-row"><div class="form-group" style="flex:1;"><label for="report-start-date">Дата початку</label><input type="date" id="report-start-date" required></div><div class="form-group" style="flex:1;"><label for="report-end-date">Дата кінця</label><input type="date" id="report-end-date" required></div></div><div class="form-group"><label for="report-salon-filter">Салон</label><select id="report-salon-filter"><option value="all">Всі салони (Разом)</option>${salonOptions}</select></div><button type="submit" class="btn">Відправити звіт</button></form>
             </div>
             <div class="content-card">
-                <h2>Зміна паролю</h2>
+                 <h2>Зміна паролю</h2>
                 <form id="change-password-form">
                     <div class="form-group"><label for="new-password">Новий пароль</label><input type="password" id="new-password" required minlength="6" autocomplete="new-password"></div>
                     <div class="form-group"><label for="confirm-password">Підтвердіть новий пароль</label><input type="password" id="confirm-password" required minlength="6" autocomplete="new-password"></div>
-                    <button type="submit" class="btn">Змінити пароль</button>
+                     <button type="submit" class="btn">Змінити пароль</button>
                     <p id="password-change-status" style="margin-top: 1rem; color: var(--gray-text);"></p>
                 </form>
             </div>`;
@@ -1924,11 +1876,10 @@
             const masterId = select.closest('li').dataset.masterId;
             const master = state.masters.find(m => m.id === masterId);
             if (master && master.salaryGroupId) {
-                select.value = master.salaryGroupId;
+                 select.value = master.salaryGroupId;
             }
             select.onchange = (e) => handleAssignGroupToMaster(masterId, e.target.value);
         });
-
         document.getElementById('manual-report-form').onsubmit = handleManualReport;
         document.getElementById('change-password-form').onsubmit = handleChangePassword;
     }
@@ -1944,7 +1895,6 @@
         title.textContent = group ? 'Редагувати групу' : 'Створити нову групу';
         document.getElementById('edit-salary-group-id').value = groupId || '';
         document.getElementById('salary-group-name').value = group ? group.name : '';
-        
         renderSalaryGroupTiersInModal(group ? group.tiers : [{ threshold: 0, rate: 0 }]);
 
         document.getElementById('add-tier-to-group-btn').onclick = handleAddTierRowToModal;
@@ -1962,7 +1912,7 @@
             tierRow.innerHTML = `
                 <div class="form-group" style="flex:1;">
                     <label>Сума від (zł)</label>
-                    <input type="number" class="tier-threshold" value="${tier.threshold}" min="0" required>
+                     <input type="number" class="tier-threshold" value="${tier.threshold}" min="0" required>
                 </div>
                 <div class="form-group" style="flex:1;">
                     <label>Відсоток (%)</label>
@@ -2013,9 +1963,7 @@
                 tiers.push({ threshold, rate });
             }
         });
-
         const data = { name, tiers: tiers.sort((a,b) => a.threshold - b.threshold) };
-
         try {
             if (groupId) {
                 await updateDoc(doc(db, 'salaryGroups', groupId), data);
@@ -2082,7 +2030,6 @@
         
         const newPassword = newPasswordInput.value;
         const confirmPassword = confirmPasswordInput.value;
-
         if (newPassword.length < 6) {
             statusEl.textContent = 'Пароль має бути не менше 6 символів.';
             statusEl.style.color = 'var(--danger-color)';
@@ -2104,7 +2051,6 @@
 
         statusEl.textContent = 'Зміна паролю...';
         statusEl.style.color = 'var(--gray-text)';
-
         try {
             await updatePassword(user, newPassword);
             statusEl.textContent = 'Пароль успішно змінено!';
