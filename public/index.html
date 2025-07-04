@@ -337,8 +337,6 @@
     }
 
     function renderAppLayout(user) {
-        // ### ЗМІНА #1: ЛОГІКА СТВОРЕННЯ МЕНЮ ###
-        // Тепер ці вкладки з'являться тільки для ролі 'admin'
         let adminTabs = '';
         if (user.role === 'admin') {
             adminTabs = `
@@ -411,16 +409,13 @@
     function renderView(viewName) {
         if (!state.user) return;
 
-        // ### ЗМІНА #2: ЛОГІКА ДОСТУПУ ДО СТОРІНОК ###
         const masterViews = ['calendar', 'appointments', 'notepad', 'salonExpenses'];
         if (state.user.role === 'master' && !masterViews.includes(viewName)) {
              viewName = 'calendar';
         }
         
-        // Перелік заборонених сторінок для 'salon_admin'
         const salonAdminForbiddenViews = ['settings', 'salary', 'expenses'];
         if (state.user.role === 'salon_admin' && salonAdminForbiddenViews.includes(viewName)) {
-             // Якщо користувач намагається відкрити заборонену сторінку, перекидаємо його на календар
              viewName = 'calendar';
         }
 
@@ -1770,10 +1765,14 @@
     }
 
     function renderNotepadView(container) {
+        // ЗМІНА #1: Додано кнопку видалення для admin
         const entriesHtml = state.notepadEntries.map(entry => `
-            <li>
-                <p>${entry.content.replace(/\n/g, '<br>')}</p>
-                <small>${entry.authorEmail} - ${entry.createdAt.toDate().toLocaleString('uk-UA')}</small>
+            <li data-id="${entry.id}">
+                <div style="flex-grow: 1; word-break: break-word;">
+                    <p>${entry.content.replace(/\n/g, '<br>')}</p>
+                    <small>${entry.authorEmail} - ${entry.createdAt.toDate().toLocaleString('uk-UA')}</small>
+                </div>
+                ${state.user.role === 'admin' ? `<div class="actions"><button class="btn btn-delete btn-delete-notepad">🗑️</button></div>` : ''}
             </li>
         `).join('');
 
@@ -1794,6 +1793,18 @@
             </div>
         `;
         document.getElementById('add-notepad-entry-form').onsubmit = handleAddNotepadEntry;
+
+        // ЗМІНА #2: Додано обробник кліку для видалення
+        const listEl = document.getElementById('notepad-entries');
+        if (listEl) {
+            listEl.onclick = (event) => {
+                const deleteBtn = event.target.closest('.btn-delete-notepad');
+                if (deleteBtn) {
+                    const entryId = deleteBtn.closest('li').dataset.id;
+                    handleDeleteNotepadEntry(entryId);
+                }
+            };
+        }
     }
 
     async function handleAddNotepadEntry(event) {
@@ -1811,6 +1822,19 @@
         } catch (e) {
             console.error("Помилка додавання запису:", e);
             alert("Не вдалося додати запис.");
+        }
+    }
+
+    // ЗМІНА #3: Нова функція для видалення запису з блокнота
+    async function handleDeleteNotepadEntry(entryId) {
+        if (!entryId) return;
+        if (confirm('Ви впевнені, що хочете видалити цей запис?')) {
+            try {
+                await deleteDoc(doc(db, 'notepadEntries', entryId));
+            } catch (e) {
+                console.error("Помилка видалення запису з блокнота: ", e);
+                alert("Не вдалося видалити запис.");
+            }
         }
     }
 
