@@ -129,27 +129,13 @@
         .stat-card .value { font-size: 2rem; font-weight: 600; color: var(--primary-color); }
         .stat-card .label { font-size: 0.9rem; color: var(--gray-text); }
 
-        .summary-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 1.5rem;
-            text-align: center;
-        }
-        .summary-card {
-            background-color: var(--main-bg);
-            padding: 1rem;
-            border-radius: 8px;
-        }
-        .summary-card .value {
-            font-size: 2rem;
-            font-weight: 600;
-            color: var(--primary-color);
-        }
-        .summary-card .label {
-            font-size: 0.9rem;
-            color: var(--gray-text);
-            margin-top: 0.25rem;
-        }
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.5rem; text-align: center; }
+        .summary-card { background-color: var(--main-bg); padding: 1rem; border-radius: 8px; }
+        .summary-card .value { font-size: 2rem; font-weight: 600; color: var(--primary-color); }
+        .summary-card .label { font-size: 0.9rem; color: var(--gray-text); margin-top: 0.25rem; }
+        
+        #salary-group-tiers-table .form-row { margin-bottom: 0.5rem; }
+        #salary-group-tiers-table input { font-size: 0.9em; padding: 0.5rem; }
     </style>
 </head>
 <body>
@@ -201,6 +187,28 @@
     </div>
 </div>
 
+<div class="modal-overlay" id="salary-group-modal">
+    <div class="modal-panel">
+        <div class="modal-header">
+            <h2 id="salary-group-modal-title">Створити групу</h2>
+            <button class="close-btn">&times;</button>
+        </div>
+        <form id="salary-group-form">
+            <input type="hidden" id="edit-salary-group-id">
+            <div class="form-group">
+                <label for="salary-group-name">Назва групи</label>
+                <input type="text" id="salary-group-name" required>
+            </div>
+            <h3>Рівні зарплати</h3>
+            <div id="salary-group-tiers-table"></div>
+            <button type="button" class="btn" id="add-tier-to-group-btn" style="margin-bottom: 1.5rem;">+ Додати рівень</button>
+            <hr>
+            <button type="submit" class="btn" style="margin-top: 1.5rem;">Зберегти групу</button>
+        </form>
+    </div>
+</div>
+
+
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, updatePassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -219,20 +227,19 @@
         user: null,
         salons: [],
         expenses: [],
-        advances: [], // NEW: For summary
+        advances: [], 
+        salaryGroups: [],
         selectedCategoryId: null,
         categories: [],
         services: [],
         masters: [],
         appointments: [],
         clients: [],
-        settings: { salaryTiers: [] },
         currentView: 'calendar',
         preselectedAppointment: null,
         calendarSelectedMasterId: 'all',
         calendarSelectedSalonId: 'all',
         editingAppointmentId: null,
-        editingTierIndex: null,
         selectedClientForAppointment: null,
         viewingClientId: null,
         viewingMasterId: null,
@@ -290,19 +297,22 @@
             });
         });
         
-        if (state.user.role === 'admin' || state.user.role === 'salon_admin') {
-            onSnapshot(doc(db, 'settings', 'salaryRules'), (doc) => {
-                state.settings.salaryTiers = doc.exists() ? (doc.data().tiers || []) : [];
-                if (state.user && state.currentView === 'settings') {
-                    renderView('settings');
-                }
-            });
-            
-            // NEW: Listener for all advances for the summary dashboard
+        const isAdminOrSalonAdmin = state.user.role === 'admin' || state.user.role === 'salon_admin';
+        
+        if (isAdminOrSalonAdmin) {
             onSnapshot(query(collectionGroup(db, 'advances')), snapshot => {
                 state.advances = snapshot.docs.map(d => d.data());
                 if (state.user && state.currentView === 'calendar') {
                     renderDailySummary();
+                }
+            });
+        }
+        
+        if (state.user.role === 'admin') {
+            onSnapshot(collection(db, 'salaryGroups'), snapshot => {
+                state.salaryGroups = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
+                if (state.currentView === 'settings' || state.currentView === 'salary') {
+                     renderView(state.currentView);
                 }
             });
         }
@@ -316,11 +326,11 @@
     }
 
     function renderAppLayout(user) {
-        const isAdmin = user.role === 'admin' || user.role === 'salon_admin';
+        const isAdminOrSalonAdmin = user.role === 'admin' || user.role === 'salon_admin';
         const adminTabs = `
             <li data-view="salary">Зарплата</li>
             <li data-view="expenses">Витрати</li>
-            <li data-view="settings">Налаштування</li>
+            ${user.role === 'admin' ? '<li data-view="settings">Налаштування</li>' : ''}
         `;
 
         appContainer.innerHTML = `
@@ -333,7 +343,7 @@
                     <li data-view="clients">Клієнти</li>
                     <li data-view="services">Послуги</li>
                     <li data-view="masters">Майстри</li>
-                    ${isAdmin ? adminTabs : ''}
+                    ${isAdminOrSalonAdmin ? adminTabs : ''}
                 </ul>
                 <div class="user-info">
                     <span>${user.email} (${user.role})</span>
@@ -363,6 +373,10 @@
             document.getElementById('payment-modal').style.display = 'none';
         };
         document.getElementById('payment-form').onsubmit = handleConfirmPayment;
+
+        document.getElementById('salary-group-modal').querySelector('.close-btn').onclick = () => {
+            document.getElementById('salary-group-modal').style.display = 'none';
+        };
         
         const actionModal = document.getElementById('appointment-action-modal');
         if(actionModal) {
@@ -375,9 +389,13 @@
 
     function renderView(viewName) {
         if (!state.user) return;
-        if (!(state.user.role === 'admin' || state.user.role === 'salon_admin') && ['salary', 'settings', 'expenses'].includes(viewName)) {
-            viewName = 'calendar';
+        if (state.user.role === 'master') {
+             viewName = 'calendar';
         }
+        if (state.user.role === 'salon_admin' && viewName === 'settings') {
+             viewName = 'calendar';
+        }
+
         if (state.currentView === 'appointments' && viewName !== 'appointments') {
             state.editingAppointmentId = null;
         }
@@ -997,7 +1015,7 @@
         }).sort((a, b) => a.dateTime.toDate() - b.dateTime.toDate());
 
         if (state.appointmentsPage === 1) {
-            listEl.innerHTML = '';
+            listEl.innerHTML = ''; 
             if (dailyUnpaidAppointments.length === 0) {
                 listEl.innerHTML = '<li>На цю дату немає незавершених записів.</li>';
                 paginationControls.innerHTML = '';
@@ -1377,16 +1395,17 @@
 
     // #region Salary & Settings & Expenses
     function renderSalaryView(container) {
-        const today = new Date();
-        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-        const todayStr = today.toISOString().split('T')[0];
-        
+        // This function is now fully functional with the new salary group logic
         const masterOptions = state.masters
             .filter(m => !m.isFrozen)
             .map(m => `<option value="${m.id}">${m.name}</option>`)
             .join('');
             
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+
+        const today = new Date();
+        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+        const todayStr = today.toISOString().split('T')[0];
 
         container.innerHTML = `
             <div class="content-card">
@@ -1427,11 +1446,12 @@
         const startDate = new Date(document.getElementById('salary-start-date').value);
         const endDate = new Date(document.getElementById('salary-end-date').value);
         endDate.setHours(23, 59, 59, 999);
+        
         const reportContainer = document.getElementById('salary-report');
         reportContainer.innerHTML = '<p>Розрахунок...</p>';
+
         const selectedMasterId = document.getElementById('salary-master-filter').value;
         const selectedSalonId = document.getElementById('salary-salon-filter').value;
-        const salaryTiers = state.settings.salaryTiers.sort((a,b) => b.threshold - a.threshold);
 
         let appointmentsForSalary = state.appointments.filter(app => {
             const appointmentDate = app.dateTime.toDate();
@@ -1451,27 +1471,17 @@
         appointmentsForSalary.forEach(appointment => {
             const masterId = appointment.masterId;
             if (!masterTotals[masterId]) {
-                const master = state.masters.find(m => m.id === masterId);
+                const masterInfo = state.masters.find(m => m.id === masterId);
                 masterTotals[masterId] = {
-                    name: master ? master.name : 'Невідомий',
-                    totalRevenue: 0,
+                    name: masterInfo ? masterInfo.name : 'Невідомий',
                     totalSalaryBase: 0,
                     advances: 0,
-                    byCash: 0,
-                    byCard: 0,
-                    byBlik: 0
+                    salaryGroupId: masterInfo ? masterInfo.salaryGroupId : null
                 };
             }
 
             const salaryBaseForThisAppointment = typeof appointment.salaryBase === 'number' ? appointment.salaryBase : appointment.finalPrice;
             masterTotals[masterId].totalSalaryBase += salaryBaseForThisAppointment;
-            
-            (appointment.payments || []).forEach(p => {
-                 masterTotals[masterId].totalRevenue += p.amount;
-                 if (p.type === 'cash') masterTotals[masterId].byCash += p.amount;
-                 else if (p.type === 'card') masterTotals[masterId].byCard += p.amount;
-                 else if (p.type === 'blik') masterTotals[masterId].byBlik += p.amount;
-            });
         });
 
         const masterIds = Object.keys(masterTotals);
@@ -1484,29 +1494,28 @@
             masterTotals[masterId].advances = totalAdvances;
         }
 
-        if (Object.keys(masterTotals).length === 0) { reportContainer.innerHTML = '<p>За обраний період немає даних для розрахунку.</p>'; return; }
+        if (Object.keys(masterTotals).length === 0) {
+            reportContainer.innerHTML = '<p>За обраний період немає даних для розрахунку.</p>';
+            return;
+        }
 
         reportContainer.innerHTML = '';
         for (const masterId in masterTotals) {
             const data = masterTotals[masterId];
-            const applicableTier = salaryTiers.find(tier => data.totalSalaryBase >= tier.threshold) || { rate: 0 };
-            const salaryRate = applicableTier.rate;
-            const salary = data.totalSalaryBase * (salaryRate / 100);
+            const group = state.salaryGroups.find(g => g.id === data.salaryGroupId);
+            const tiers = group?.tiers?.sort((a,b) => b.threshold - a.threshold) || [];
+            const applicableTier = tiers.find(tier => data.totalSalaryBase >= tier.threshold) || { rate: 0 };
+            
+            const salary = data.totalSalaryBase * (applicableTier.rate / 100);
             const finalPayout = salary - data.advances;
             
             const cardHTML = `
                 <div class="salary-report-card">
                     <h3>${data.name}</h3>
-                    <p><span>Всього зароблено (каса):</span> <strong>${data.totalRevenue.toFixed(0)} zł</strong></p>
+                    <p><span>Група зарплати:</span> <strong>${group ? group.name : 'Не призначено'}</strong></p>
                     <p><span>База для нарахування ЗП:</span> <strong>${data.totalSalaryBase.toFixed(0)} zł</strong></p>
-                    
-                    <div style="padding-left: 1rem; font-size: 0.9em; color: var(--gray-text); border-top: 1px dashed var(--border-color); margin-top: 0.5rem; padding-top: 0.5rem;">
-                        <p style="margin: 0.2rem 0;"><span>- Готівкою:</span> <span>${data.byCash.toFixed(0)} zł</span></p>
-                        <p style="margin: 0.2rem 0;"><span>- Карткою:</span> <span>${data.byCard.toFixed(0)} zł</span></p>
-                        <p style="margin: 0.2rem 0;"><span>- Blik:</span> <span>${data.byBlik.toFixed(0)} zł</span></p>
-                    </div>
-
-                    <p style="margin-top: 1rem;"><span>Нарахована ЗП (${salaryRate}%):</span> <span>${salary.toFixed(0)} zł</span></p>
+                    <p><span>Ставка:</span> <strong>${applicableTier.rate}%</strong></p>
+                    <p><span>Нарахована ЗП:</span> <span>${salary.toFixed(0)} zł</span></p>
                     <p><span>Видано авансів:</span> <span>-${data.advances.toFixed(0)} zł</span></p>
                     <p class="total-salary"><span>До виплати:</span> <strong>${finalPayout.toFixed(0)} zł</strong></p>
                 </div>`;
@@ -1610,62 +1619,192 @@
     }
 
     function renderSettingsView(container) {
-        const tiers = state.settings.salaryTiers.sort((a,b) => a.threshold - b.threshold);
-        let tableRows = tiers.map((tier, index) => `<tr><td>Від ${tier.threshold} zł</td><td>${tier.rate}%</td><td class="actions"><button class="btn-edit btn-edit-tier" data-index="${index}">Редагувати</button><button class="btn-delete btn-delete-tier" data-index="${index}">Видалити</button></td></tr>`).join('');
-        
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+        const salaryGroupOptions = state.salaryGroups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
 
-        container.innerHTML = `<div class="content-card"><h2>Налаштування відсотків зарплати</h2><table><thead><tr><th>Сума від (поріг)</th><th>Відсоток</th><th>Дія</th></tr></thead><tbody id="salary-tiers-table">${tableRows}</tbody></table><hr style="margin: 2rem 0;"><h3 id="tier-form-title">Додати новий рівень</h3><form id="tier-form" class="form-row"><div class="form-group" style="flex:1;"><label for="tier-threshold">Сума від (zł)</label><input type="number" id="tier-threshold" min="0" required></div><div class="form-group" style="flex:1;"><label for="tier-rate">Відсоток (%)</label><input type="number" id="tier-rate" min="0" max="100" required></div><div class="form-group"><button type="submit" id="tier-submit-btn" class="btn">Додати</button><button type="button" id="tier-cancel-btn" class="btn" style="display:none; margin-left: 1rem; background-color: var(--gray-text)">Скасувати</button></div></form></div><div class="content-card"><h2>Ручна відправка звіту</h2><p>Оберіть період та салон, за яким потрібно сформувати звіт та відправити його на пошту.</p><form id="manual-report-form"><div class="form-row"><div class="form-group" style="flex:1;"><label for="report-start-date">Дата початку</label><input type="date" id="report-start-date" required></div><div class="form-group" style="flex:1;"><label for="report-end-date">Дата кінця</label><input type="date" id="report-end-date" required></div></div><div class="form-group"><label for="report-salon-filter">Салон</label><select id="report-salon-filter"><option value="all">Всі салони (Разом)</option>${salonOptions}</select></div><button type="submit" class="btn">Відправити звіт</button></form></div>
-<div class="content-card">
-    <h2>Зміна паролю</h2>
-    <p>Тут ви можете змінити свій пароль для входу в систему.</p>
-    <form id="change-password-form">
-        <div class="form-group">
-            <label for="new-password">Новий пароль</label>
-            <input type="password" id="new-password" required minlength="6" autocomplete="new-password">
-        </div>
-        <div class="form-group">
-            <label for="confirm-password">Підтвердіть новий пароль</label>
-            <input type="password" id="confirm-password" required minlength="6" autocomplete="new-password">
-        </div>
-        <button type="submit" class="btn">Змінити пароль</button>
-        <p id="password-change-status" style="margin-top: 1rem; color: var(--gray-text);"></p>
-    </form>
-</div>`;
-        document.getElementById('tier-form').onsubmit = handleSaveSalaryTier;
-        document.getElementById('tier-cancel-btn').onclick = () => { state.editingTierIndex = null; renderView('settings'); };
-        document.getElementById('salary-tiers-table').onclick = (e) => {
-            if(e.target.classList.contains('btn-delete-tier')) { handleDeleteSalaryTier(parseInt(e.target.dataset.index)); }
-            if(e.target.classList.contains('btn-edit-tier')) { handleEditSalaryTier(parseInt(e.target.dataset.index)); }
-        };
+        const groupsListHtml = state.salaryGroups.map(group => `
+            <li data-group-id="${group.id}">
+                <span><strong>${group.name}</strong></span>
+                <div class="actions">
+                    <button class="btn btn-edit btn-edit-group">Редагувати</button>
+                    <button class="btn btn-delete btn-delete-group">Видалити</button>
+                </div>
+            </li>
+        `).join('');
+
+        const masterAssignmentHtml = state.masters.map(master => `
+            <li data-master-id="${master.id}">
+                <span>${master.name}</span>
+                <div class="actions">
+                    <select class="master-group-select">
+                        <option value="">Не призначено</option>
+                        ${salaryGroupOptions}
+                    </select>
+                </div>
+            </li>
+        `).join('');
+
+        container.innerHTML = `
+            <div class="content-card">
+                <h2>Керування групами зарплат</h2>
+                <ul id="salary-groups-list" class="item-list">${groupsListHtml}</ul>
+                <button id="add-new-group-btn" class="btn" style="margin-top: 1rem;">Створити нову групу</button>
+            </div>
+            <div class="content-card">
+                <h2>Призначення груп майстрам</h2>
+                <ul id="master-group-assignment-list" class="item-list">${masterAssignmentHtml}</ul>
+            </div>
+            <div class="content-card">
+                <h2>Ручна відправка звіту</h2>
+                <form id="manual-report-form"><div class="form-row"><div class="form-group" style="flex:1;"><label for="report-start-date">Дата початку</label><input type="date" id="report-start-date" required></div><div class="form-group" style="flex:1;"><label for="report-end-date">Дата кінця</label><input type="date" id="report-end-date" required></div></div><div class="form-group"><label for="report-salon-filter">Салон</label><select id="report-salon-filter"><option value="all">Всі салони (Разом)</option>${salonOptions}</select></div><button type="submit" class="btn">Відправити звіт</button></form>
+            </div>
+            <div class="content-card">
+                <h2>Зміна паролю</h2>
+                <form id="change-password-form">
+                    <div class="form-group"><label for="new-password">Новий пароль</label><input type="password" id="new-password" required minlength="6" autocomplete="new-password"></div>
+                    <div class="form-group"><label for="confirm-password">Підтвердіть новий пароль</label><input type="password" id="confirm-password" required minlength="6" autocomplete="new-password"></div>
+                    <button type="submit" class="btn">Змінити пароль</button>
+                    <p id="password-change-status" style="margin-top: 1rem; color: var(--gray-text);"></p>
+                </form>
+            </div>`;
+        
+        // Add event listeners after rendering
+        document.getElementById('add-new-group-btn').onclick = () => showSalaryGroupModal();
+        
+        document.querySelectorAll('.btn-edit-group').forEach(btn => {
+            btn.onclick = () => showSalaryGroupModal(btn.closest('li').dataset.groupId);
+        });
+
+        document.querySelectorAll('.btn-delete-group').forEach(btn => {
+            btn.onclick = () => handleDeleteSalaryGroup(btn.closest('li').dataset.groupId);
+        });
+        
+        document.querySelectorAll('.master-group-select').forEach(select => {
+            const masterId = select.closest('li').dataset.masterId;
+            const master = state.masters.find(m => m.id === masterId);
+            if (master && master.salaryGroupId) {
+                select.value = master.salaryGroupId;
+            }
+            select.onchange = (e) => handleAssignGroupToMaster(masterId, e.target.value);
+        });
+
         document.getElementById('manual-report-form').onsubmit = handleManualReport;
         document.getElementById('change-password-form').onsubmit = handleChangePassword;
     }
-    function handleEditSalaryTier(index) {
-        state.editingTierIndex = index;
-        const tier = state.settings.salaryTiers[index];
-        document.getElementById('tier-form-title').innerText = 'Редагувати рівень';
-        document.getElementById('tier-threshold').value = tier.threshold;
-        document.getElementById('tier-rate').value = tier.rate;
-        document.getElementById('tier-submit-btn').innerText = 'Зберегти зміни';
-        document.getElementById('tier-cancel-btn').style.display = 'inline-block';
+
+    function showSalaryGroupModal(groupId = null) {
+        const modal = document.getElementById('salary-group-modal');
+        const form = document.getElementById('salary-group-form');
+        const title = document.getElementById('salary-group-modal-title');
+        form.reset();
+
+        const group = groupId ? state.salaryGroups.find(g => g.id === groupId) : null;
+        
+        title.textContent = group ? 'Редагувати групу' : 'Створити нову групу';
+        document.getElementById('edit-salary-group-id').value = groupId || '';
+        document.getElementById('salary-group-name').value = group ? group.name : '';
+        
+        renderSalaryGroupTiersInModal(group ? group.tiers : [{ threshold: 0, rate: 0 }]);
+
+        document.getElementById('add-tier-to-group-btn').onclick = handleAddTierRowToModal;
+        form.onsubmit = handleSaveSalaryGroup;
+
+        modal.style.display = 'flex';
     }
-    async function handleSaveSalaryTier(event) {
+
+    function renderSalaryGroupTiersInModal(tiers = []) {
+        const container = document.getElementById('salary-group-tiers-table');
+        container.innerHTML = '';
+        tiers.forEach((tier, index) => {
+            const tierRow = document.createElement('div');
+            tierRow.className = 'form-row';
+            tierRow.innerHTML = `
+                <div class="form-group" style="flex:1;">
+                    <label>Сума від (zł)</label>
+                    <input type="number" class="tier-threshold" value="${tier.threshold}" min="0" required>
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label>Відсоток (%)</label>
+                    <input type="number" class="tier-rate" value="${tier.rate}" min="0" max="100" required>
+                </div>
+                <button type="button" class="btn btn-delete remove-tier-btn">&times;</button>
+            `;
+            container.appendChild(tierRow);
+        });
+        document.querySelectorAll('.remove-tier-btn').forEach(btn => {
+            btn.onclick = () => btn.closest('.form-row').remove();
+        });
+    }
+
+    function handleAddTierRowToModal() {
+        const container = document.getElementById('salary-group-tiers-table');
+        const tierRow = document.createElement('div');
+        tierRow.className = 'form-row';
+        tierRow.innerHTML = `
+            <div class="form-group" style="flex:1;">
+                <label>Сума від (zł)</label>
+                <input type="number" class="tier-threshold" value="0" min="0" required>
+            </div>
+            <div class="form-group" style="flex:1;">
+                <label>Відсоток (%)</label>
+                <input type="number" class="tier-rate" value="0" min="0" max="100" required>
+            </div>
+            <button type="button" class="btn btn-delete remove-tier-btn">&times;</button>
+        `;
+        tierRow.querySelector('.remove-tier-btn').onclick = () => tierRow.remove();
+        container.appendChild(tierRow);
+    }
+
+    async function handleSaveSalaryGroup(event) {
         event.preventDefault();
-        const threshold = parseInt(document.getElementById('tier-threshold').value);
-        const rate = parseInt(document.getElementById('tier-rate').value);
-        let newTiers = [...state.settings.salaryTiers];
-        if (state.editingTierIndex !== null) { newTiers[state.editingTierIndex] = { threshold, rate }; } 
-        else { newTiers.push({ threshold, rate }); }
-        state.editingTierIndex = null;
-        try { await setDoc(doc(db, 'settings', 'salaryRules'), { tiers: newTiers }); } 
-        catch(e) { console.error("Помилка збереження рівня:", e); alert('Не вдалося зберегти рівень.'); }
+        const groupId = document.getElementById('edit-salary-group-id').value;
+        const name = document.getElementById('salary-group-name').value.trim();
+        if (!name) {
+            alert('Назва групи не може бути порожньою.');
+            return;
+        }
+
+        const tiers = [];
+        document.querySelectorAll('#salary-group-tiers-table .form-row').forEach(row => {
+            const threshold = parseFloat(row.querySelector('.tier-threshold').value);
+            const rate = parseFloat(row.querySelector('.tier-rate').value);
+            if (!isNaN(threshold) && !isNaN(rate)) {
+                tiers.push({ threshold, rate });
+            }
+        });
+
+        const data = { name, tiers: tiers.sort((a,b) => a.threshold - b.threshold) };
+
+        try {
+            if (groupId) {
+                await updateDoc(doc(db, 'salaryGroups', groupId), data);
+            } else {
+                await addDoc(collection(db, 'salaryGroups'), data);
+            }
+            document.getElementById('salary-group-modal').style.display = 'none';
+        } catch (e) {
+            console.error("Помилка збереження групи зарплат:", e);
+            alert('Не вдалося зберегти групу.');
+        }
     }
-    async function handleDeleteSalaryTier(index) {
-        if (!confirm('Ви впевнені, що хочете видалити цей рівень?')) return;
-        const newTiers = state.settings.salaryTiers.filter((_, i) => i !== index);
-        try { await setDoc(doc(db, 'settings', 'salaryRules'), { tiers: newTiers }); } 
-        catch(e) { console.error("Помилка видалення рівня:", e); alert('Не вдалося видалити рівень.'); }
+
+    async function handleDeleteSalaryGroup(groupId) {
+        if (!confirm('Ви впевнені, що хочете видалити цю групу? Майстри, призначені до неї, залишаться без групи.')) return;
+        try {
+            await deleteDoc(doc(db, 'salaryGroups', groupId));
+        } catch(e) {
+            console.error("Помилка видалення групи:", e);
+            alert('Не вдалося видалити групу.');
+        }
+    }
+    
+    async function handleAssignGroupToMaster(masterId, groupId) {
+        try {
+            await updateDoc(doc(db, 'masters', masterId), { salaryGroupId: groupId });
+        } catch(e) {
+            console.error("Помилка призначення групи:", e);
+            alert('Не вдалося призначити групу.');
+        }
     }
     
     async function handleManualReport(event) {
