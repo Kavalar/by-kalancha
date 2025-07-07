@@ -296,11 +296,7 @@
             let q;
             if (colName === 'notepadEntries') {
                 q = query(collection(db, colName), orderBy("createdAt", "desc"));
-            } else if (colName === 'productSales') {
-                 q = query(collection(db, colName), orderBy("date", "desc"));
-            } else if (colName === 'salonExpenses') {
-                 q = query(collection(db, colName), orderBy("date", "desc"));
-            } else if (colName === 'expenses') {
+            } else if (colName === 'productSales' || colName === 'salonExpenses' || colName === 'expenses') {
                  q = query(collection(db, colName), orderBy("date", "desc"));
             } else {
                 q = collection(db, colName);
@@ -521,7 +517,6 @@
             }
         });
         
-        // ### ПОЧАТОК ЗМІН: Розбивка продажів по типу оплати ###
         let productSalesCash = 0, productSalesCard = 0, productSalesBlik = 0;
         let filteredProductSales = state.productSales;
         if (selectedSalonId !== 'all') {
@@ -541,7 +536,6 @@
         cash += productSalesCash;
         card += productSalesCard;
         blik += productSalesBlik;
-        // ### КІНЕЦЬ ЗМІН ###
 
         let totalAdvances = 0;
         state.advances.forEach(advance => {
@@ -1878,7 +1872,6 @@
         }
     }
     
-    // ### ПОЧАТОК ЗМІН: Функції для Магазину ###
     function renderShopView(container) {
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
         const paymentTypes = { cash: '💵', card: '💳', blik: '📱' };
@@ -1894,6 +1887,7 @@
                     <div class="actions">
                         <strong>${sale.amount.toFixed(2)} zł</strong>
                         <small>(${paymentTypes[sale.paymentType] || 'Н/Д'})</small>
+                        ${state.user.role === 'admin' ? `<button class="btn btn-delete btn-delete-sale" data-id="${sale.id}">🗑️</button>` : ''}
                     </div>
                 </li>
             `;
@@ -1938,6 +1932,16 @@
             </div>
         `;
         document.getElementById('add-product-sale-form').onsubmit = handleAddProductSale;
+        
+        const salesList = document.getElementById('product-sales-list');
+        if(salesList) {
+            salesList.onclick = (event) => {
+                const deleteBtn = event.target.closest('.btn-delete-sale');
+                if(deleteBtn) {
+                    handleDeleteProductSale(deleteBtn.dataset.id);
+                }
+            };
+        }
     }
 
     async function handleAddProductSale(event) {
@@ -1967,8 +1971,19 @@
             alert("Не вдалося зареєструвати продаж.");
         }
     }
-    // ### КІНЕЦЬ ЗМІН ###
 
+    async function handleDeleteProductSale(saleId) {
+        if(!saleId) return;
+        if(confirm('Ви впевнені, що хочете видалити цей продаж? Цю дію не можна скасувати.')) {
+            try {
+                await deleteDoc(doc(db, "productSales", saleId));
+            } catch (e) {
+                console.error("Помилка видалення продажу:", e);
+                alert('Не вдалося видалити продаж.');
+            }
+        }
+    }
+    
     function renderSettingsView(container) {
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
         const salaryGroupOptions = state.salaryGroups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
