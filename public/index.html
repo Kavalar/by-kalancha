@@ -783,9 +783,12 @@
         }
 
         let buttonsHtml = '';
-        if (appointment.status !== 'completed') {
+        // ### ПОЧАТОК ВИПРАВЛЕННЯ: Більш надійна перевірка, чи потрібна кнопка оплати ###
+        const remainingToPay = (appointment.finalPrice || 0) - (appointment.totalPaid || 0);
+        if (appointment.status !== 'completed' && remainingToPay > 0.001) {
             buttonsHtml += `<button class="btn btn-complete-payment" data-action="pay">Внести / Додати оплату</button>`;
         }
+        // ### КІНЕЦЬ ВИПРАВЛЕННЯ ###
         
         buttonsHtml += `<button class="btn btn-edit" data-action="edit">Редагувати / Перенести</button>`;
         buttonsHtml += `<button class="btn btn-delete" data-action="cancel">Скасувати запис</button>`;
@@ -1299,9 +1302,7 @@
             };
 
             const newTotalPaid = currentTotalPaid + amountToPay;
-            // ### ПОЧАТОК ВИПРАВЛЕННЯ: Більш точна перевірка статусу ###
             const newStatus = (newTotalPaid >= finalPrice - 0.001) ? 'completed' : 'partially_paid';
-            // ### КІНЕЦЬ ВИПРАВЛЕННЯ ###
             await updateDoc(appointmentRef, {
                 payments: arrayUnion(newPayment),
                 totalPaid: increment(amountToPay),
