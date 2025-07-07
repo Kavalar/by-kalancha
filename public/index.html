@@ -520,7 +520,9 @@
                 });
             }
         });
-        let totalProductSales = 0;
+        
+        // ### ПОЧАТОК ЗМІН: Розбивка продажів по типу оплати ###
+        let productSalesCash = 0, productSalesCard = 0, productSalesBlik = 0;
         let filteredProductSales = state.productSales;
         if (selectedSalonId !== 'all') {
             filteredProductSales = filteredProductSales.filter(s => s.salonId === selectedSalonId);
@@ -528,10 +530,18 @@
         filteredProductSales.forEach(sale => {
             const saleDate = sale.date.toDate();
             if (saleDate >= startOfDay && saleDate <= endOfDay) {
-                totalProductSales += sale.amount;
+                if (sale.paymentType === 'cash') productSalesCash += sale.amount;
+                else if (sale.paymentType === 'card') productSalesCard += sale.amount;
+                else if (sale.paymentType === 'blik') productSalesBlik += sale.amount;
             }
         });
+
+        const totalProductSales = productSalesCash + productSalesCard + productSalesBlik;
         total += totalProductSales;
+        cash += productSalesCash;
+        card += productSalesCard;
+        blik += productSalesBlik;
+        // ### КІНЕЦЬ ЗМІН ###
 
         let totalAdvances = 0;
         state.advances.forEach(advance => {
@@ -1868,8 +1878,11 @@
         }
     }
     
+    // ### ПОЧАТОК ЗМІН: Функції для Магазину ###
     function renderShopView(container) {
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+        const paymentTypes = { cash: '💵', card: '💳', blik: '📱' };
+        
         const recentSalesHtml = state.productSales.slice(0, 10).map(sale => {
             const salon = state.salons.find(s => s.id === sale.salonId);
             return `
@@ -1880,6 +1893,7 @@
                     </div>
                     <div class="actions">
                         <strong>${sale.amount.toFixed(2)} zł</strong>
+                        <small>(${paymentTypes[sale.paymentType] || 'Н/Д'})</small>
                     </div>
                 </li>
             `;
@@ -1896,6 +1910,14 @@
                         <div class="form-group" style="flex:1;">
                             <label for="product-sale-amount">Сума продажу (zł)</label>
                             <input type="number" id="product-sale-amount" required min="0" step="0.01">
+                        </div>
+                         <div class="form-group" style="flex:1;">
+                            <label for="product-sale-payment-type">Тип оплати</label>
+                            <select id="product-sale-payment-type" required>
+                                <option value="cash">Готівка</option>
+                                <option value="card">Картка</option>
+                                <option value="blik">Blik</option>
+                            </select>
                         </div>
                         <div class="form-group" style="flex:1;">
                             <label for="product-sale-salon">Салон</label>
@@ -1923,7 +1945,9 @@
         const description = document.getElementById('product-sale-description').value.trim();
         const amount = parseFloat(document.getElementById('product-sale-amount').value);
         const salonId = document.getElementById('product-sale-salon').value;
-        if (!description || !amount || amount <= 0 || !salonId) {
+        const paymentType = document.getElementById('product-sale-payment-type').value;
+        
+        if (!description || !amount || amount <= 0 || !salonId || !paymentType) {
             return alert("Будь ласка, заповніть усі поля коректно.");
         }
 
@@ -1932,6 +1956,7 @@
                 description,
                 amount,
                 salonId,
+                paymentType,
                 date: Timestamp.now(),
                 authorEmail: state.user.email
             });
@@ -1942,6 +1967,7 @@
             alert("Не вдалося зареєструвати продаж.");
         }
     }
+    // ### КІНЕЦЬ ЗМІН ###
 
     function renderSettingsView(container) {
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
