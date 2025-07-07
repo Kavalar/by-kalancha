@@ -1299,7 +1299,9 @@
             };
 
             const newTotalPaid = currentTotalPaid + amountToPay;
-            const newStatus = newTotalPaid >= finalPrice ? 'completed' : 'partially_paid';
+            // ### ПОЧАТОК ВИПРАВЛЕННЯ: Більш точна перевірка статусу ###
+            const newStatus = (newTotalPaid >= finalPrice - 0.001) ? 'completed' : 'partially_paid';
+            // ### КІНЕЦЬ ВИПРАВЛЕННЯ ###
             await updateDoc(appointmentRef, {
                 payments: arrayUnion(newPayment),
                 totalPaid: increment(amountToPay),
