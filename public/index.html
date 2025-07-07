@@ -418,8 +418,8 @@
 
     function renderView(viewName) {
         if (!state.user) return;
-
-        const masterViews = ['calendar', 'appointments', 'notepad', 'salonExpenses'];
+        
+        const masterViews = ['calendar', 'appointments', 'notepad', 'salonExpenses', 'shop'];
         if (state.user.role === 'master' && !masterViews.includes(viewName)) {
              viewName = 'calendar';
         }
@@ -446,7 +446,6 @@
 
         const headerTitle = document.getElementById('header-title');
         if(headerTitle) {
-            // --- ЗМІНА: Додано заголовок для "Магазин" ---
             const viewTitles = { calendar: 'Календар', appointments: 'Запис', clients: 'Клієнти', services: 'Послуги та Категорії', masters: 'Майстри', shop: 'Магазин', salary: 'Зарплата', expenses: 'Загальні витрати', salonExpenses: 'Витрати в салоні', notepad: 'Блокнот', settings: 'Налаштування', clientDetail: 'Історія Клієнта', masterDetail: 'Картка Майстра' };
             headerTitle.textContent = viewTitles[viewName] || 'Dashboard';
         }
@@ -461,6 +460,8 @@
         const contentWrapper = document.getElementById('content-wrapper');
         if(!contentWrapper) return;
         
+        // --- ОСНОВНЕ ВИПРАВЛЕННЯ ТУТ ---
+        // У всіх викликах тепер використовується правильна змінна 'contentWrapper'
         switch (viewName) {
             case 'calendar': renderCalendarView(contentWrapper); break;
             case 'appointments': renderAppointmentsView(contentWrapper); break;
@@ -473,7 +474,6 @@
             case 'expenses': renderExpensesView(contentWrapper); break;
             case 'salonExpenses': renderSalonExpensesView(contentWrapper); break;
             case 'notepad': renderNotepadView(contentWrapper); break;
-            // --- ЗМІНА: Додано виклик рендеру для "Магазин" ---
             case 'shop': renderShopView(contentWrapper); break;
             case 'settings': renderSettingsView(contentWrapper); break;
             default:
