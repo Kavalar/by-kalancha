@@ -189,6 +189,23 @@
     </div>
 </div>
 
+<div class="modal-overlay" id="edit-payments-modal">
+    <div class="modal-panel" style="width: 500px;">
+        <div class="modal-header">
+            <h2>Редагувати оплати</h2>
+            <button class="close-btn">&times;</button>
+        </div>
+        <form id="edit-payments-form">
+            <input type="hidden" id="edit-payments-appointment-id">
+            <p>Ви можете змінити тип оплати або видалити платіж.</p>
+            <ul id="edit-payments-list" class="item-list"></ul>
+            <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem;">
+                <button type="button" id="cancel-edit-payments-btn" class="btn btn-edit">Скасувати</button>
+                <button type="submit" class="btn">Зберегти зміни</button>
+            </div>
+        </form>
+    </div>
+</div>
 <div class="modal-overlay" id="salary-group-modal">
     <div class="modal-panel" style="width: 550px;">
         <div class="modal-header">
@@ -411,6 +428,20 @@
                 actionModal.style.display = 'none';
             };
         }
+        
+        // ### ПОЧАТОК ЗМІН: Обробники для нового модального вікна ###
+        const editPaymentsModal = document.getElementById('edit-payments-modal');
+        if (editPaymentsModal) {
+            editPaymentsModal.querySelector('.close-btn').onclick = () => {
+                editPaymentsModal.style.display = 'none';
+            };
+            document.getElementById('cancel-edit-payments-btn').onclick = () => {
+                editPaymentsModal.style.display = 'none';
+            };
+            document.getElementById('edit-payments-form').onsubmit = handleUpdatePayments;
+        }
+        // ### КІНЕЦЬ ЗМІН ###
+
         renderView(state.currentView);
     }
 
@@ -783,12 +814,16 @@
         }
 
         let buttonsHtml = '';
-        // ### ПОЧАТОК ВИПРАВЛЕННЯ: Більш надійна перевірка, чи потрібна кнопка оплати ###
         const remainingToPay = (appointment.finalPrice || 0) - (appointment.totalPaid || 0);
         if (appointment.status !== 'completed' && remainingToPay > 0.001) {
             buttonsHtml += `<button class="btn btn-complete-payment" data-action="pay">Внести / Додати оплату</button>`;
         }
-        // ### КІНЕЦЬ ВИПРАВЛЕННЯ ###
+        
+        // ### ПОЧАТОК ЗМІН: Додано кнопку редагування оплат ###
+        if (appointment.payments && appointment.payments.length > 0) {
+             buttonsHtml += `<button class="btn btn-edit" data-action="edit-payments">✏️ Редагувати оплати</button>`;
+        }
+        // ### КІНЕЦЬ ЗМІН ###
         
         buttonsHtml += `<button class="btn btn-edit" data-action="edit">Редагувати / Перенести</button>`;
         buttonsHtml += `<button class="btn btn-delete" data-action="cancel">Скасувати запис</button>`;
@@ -797,22 +832,97 @@
         buttonsEl.onclick = function(event) {
             const button = event.target.closest('button');
             if (!button) return;
-
             const action = button.dataset.action;
 
             if (action === 'pay') {
                 openPaymentModal(appointment);
-                document.getElementById('appointment-action-modal').style.display = 'none';
             } else if (action === 'edit') {
                 handleEditAppointment(appointment.id);
             } else if (action === 'cancel') {
                 handleCancelAppointment(appointment.id);
+            } else if (action === 'edit-payments') {
+                showEditPaymentsModal(appointment);
             }
+            document.getElementById('appointment-action-modal').style.display = 'none';
         };
         
         modal.querySelector('.close-btn').onclick = () => modal.style.display = 'none';
         modal.style.display = 'flex';
     }
+
+    // ### ПОЧАТОК ЗМІН: Нові функції для редагування оплат ###
+    function showEditPaymentsModal(appointment) {
+        const modal = document.getElementById('edit-payments-modal');
+        const listEl = document.getElementById('edit-payments-list');
+        document.getElementById('edit-payments-appointment-id').value = appointment.id;
+
+        listEl.innerHTML = '';
+        if (!appointment.payments || appointment.payments.length === 0) {
+            listEl.innerHTML = '<li>Оплат ще не було.</li>';
+        } else {
+            appointment.payments.forEach((payment, index) => {
+                const li = document.createElement('li');
+                li.dataset.index = index;
+                li.innerHTML = `
+                    <div style="flex-grow: 1;"><strong>${payment.amount.toFixed(2)} zł</strong></div>
+                    <div style="flex-grow: 1.5;">
+                        <select class="payment-type-selector">
+                            <option value="cash" ${payment.type === 'cash' ? 'selected' : ''}>Готівка</option>
+                            <option value="card" ${payment.type === 'card' ? 'selected' : ''}>Картка</option>
+                            <option value="blik" ${payment.type === 'blik' ? 'selected' : ''}>Blik</option>
+                        </select>
+                    </div>
+                    <div class="actions">
+                        <button type="button" class="btn btn-delete btn-delete-single-payment">Видалити</button>
+                    </div>
+                `;
+                li.querySelector('.btn-delete-single-payment').onclick = () => {
+                    if(confirm('Ви впевнені, що хочете видалити цей платіж?')) {
+                        li.remove();
+                    }
+                };
+                listEl.appendChild(li);
+            });
+        }
+        modal.style.display = 'flex';
+    }
+
+    async function handleUpdatePayments(event) {
+        event.preventDefault();
+        const appointmentId = document.getElementById('edit-payments-appointment-id').value;
+        const appointment = state.appointments.find(a => a.id === appointmentId);
+        if (!appointment) return alert('Помилка: запис не знайдено.');
+
+        const newPayments = [];
+        let newTotalPaid = 0;
+
+        document.querySelectorAll('#edit-payments-list li').forEach(li => {
+            const originalPayment = appointment.payments[li.dataset.index];
+            const newType = li.querySelector('.payment-type-selector').value;
+            newPayments.push({
+                ...originalPayment,
+                type: newType
+            });
+            newTotalPaid += originalPayment.amount;
+        });
+
+        const finalPrice = appointment.finalPrice || 0;
+        const newStatus = (newTotalPaid >= finalPrice - 0.001) ? 'completed' : (newTotalPaid > 0 ? 'partially_paid' : 'upcoming');
+        
+        try {
+            await updateDoc(doc(db, 'appointments', appointmentId), {
+                payments: newPayments,
+                totalPaid: newTotalPaid,
+                status: newStatus
+            });
+            alert('Оплати успішно оновлено!');
+            document.getElementById('edit-payments-modal').style.display = 'none';
+        } catch (e) {
+            console.error("Помилка оновлення оплат:", e);
+            alert("Не вдалося оновити оплати.");
+        }
+    }
+    // ### КІНЕЦЬ ЗМІН ###
 
     async function handleCancelAppointment(appointmentId) {
         if (confirm('Ви впевнені, що хочете скасувати цей запис? Цю дію не можна буде скасувати.')) {
@@ -829,7 +939,6 @@
 
     function handleEditAppointment(appointmentId) {
         state.editingAppointmentId = appointmentId;
-        document.getElementById('appointment-action-modal').style.display = 'none';
         renderView('appointments');
     }
     // #endregion
