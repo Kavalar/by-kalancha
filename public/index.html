@@ -297,10 +297,17 @@
             productSales: 'productSales',
         };
         Object.entries(collections).forEach(([stateKey, colName]) => {
-            // --- ВИПРАВЛЕННЯ: Уніфіковано сортування за полем `date` ---
-            const q = (colName === 'notepadEntries' || colName === 'productSales' || colName === 'salonExpenses' || colName === 'expenses') 
-                ? query(collection(db, colName), orderBy("date", "desc")) 
-                : (colName === 'appointments' ? query(collection(db, colName), orderBy("dateTime", "desc")) : collection(db, colName));
+            const q_collections_with_date = ['notepadEntries', 'productSales', 'salonExpenses', 'expenses'];
+            const q_collections_with_dateTime = ['appointments'];
+            
+            let q;
+            if (q_collections_with_date.includes(colName)) {
+                q = query(collection(db, colName), orderBy("date", "desc"));
+            } else if (q_collections_with_dateTime.includes(colName)) {
+                q = query(collection(db, colName), orderBy("dateTime", "desc"));
+            } else {
+                q = collection(db, colName);
+            }
 
             onSnapshot(q, snapshot => {
                 state[stateKey] = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
