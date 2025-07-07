@@ -164,7 +164,7 @@
                 </div>
                 <div class="form-group" style="flex:1;">
                     <label for="payment-modal-type">Тип оплати</label>
-                     <select id="payment-modal-type">
+                    <select id="payment-modal-type">
                         <option value="cash">Готівка</option>
                         <option value="card">Картка</option>
                         <option value="blik">Blik</option>
@@ -202,7 +202,7 @@
         </div>
         <form id="salary-group-form">
             <input type="hidden" id="edit-salary-group-id">
-             <div class="form-group">
+            <div class="form-group">
                 <label for="salary-group-name">Назва групи</label>
                 <input type="text" id="salary-group-name" required>
             </div>
@@ -234,7 +234,7 @@
         salons: [],
         expenses: [],
         salonExpenses: [],
-        productSales: [], // --- ЗМІНА: Додано новий стан для продажів товарів
+        productSales: [], 
         advances: [],
         salaryGroups: [],
         notepadEntries: [],
@@ -284,7 +284,6 @@
 
     function setupRealtimeListeners() {
         if (listenersAreActive) return;
-        // --- ЗМІНА: Додано відстеження колекції productSales ---
         const collections = { 
             salons: 'salons',
             categories: 'serviceCategories', 
@@ -295,12 +294,24 @@
             expenses: 'expenses',
             salonExpenses: 'salonExpenses',
             notepadEntries: 'notepadEntries',
-            productSales: 'productSales', // Нова колекція
+            productSales: 'productSales',
         };
+
         Object.entries(collections).forEach(([stateKey, colName]) => {
-            const q = (colName === 'notepadEntries' || colName === 'productSales') 
-                ? query(collection(db, colName), orderBy("date", "desc")) 
-                : collection(db, colName);
+            // ################## ПОЧАТОК ВИПРАВЛЕННЯ ##################
+            let q;
+            if (colName === 'notepadEntries') {
+                q = query(collection(db, colName), orderBy("createdAt", "desc"));
+            } else if (colName === 'productSales') {
+                 q = query(collection(db, colName), orderBy("date", "desc"));
+            } else if (colName === 'salonExpenses') {
+                 q = query(collection(db, colName), orderBy("date", "desc"));
+            } else if (colName === 'expenses') {
+                 q = query(collection(db, colName), orderBy("date", "desc"));
+            } else {
+                q = collection(db, colName);
+            }
+            // ################## КІНЕЦЬ ВИПРАВЛЕННЯ ##################
 
             onSnapshot(q, snapshot => {
                 state[stateKey] = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
@@ -312,6 +323,7 @@
                 }
             });
         });
+
         const isAdminOrSalonAdmin = state.user.role === 'admin' || state.user.role === 'salon_admin';
         if (isAdminOrSalonAdmin) {
             onSnapshot(query(collectionGroup(db, 'advances')), snapshot => {
@@ -349,7 +361,6 @@
             `;
         }
 
-        // --- ЗМІНА: Додано вкладку "Магазин" для адмінів ---
         let shopTab = '';
         if (user.role === 'admin' || user.role === 'salon_admin') {
             shopTab = '<li data-view="shop">Магазин</li>';
@@ -359,7 +370,6 @@
             <li data-view="salonExpenses">Витрати в салоні</li>
             <li data-view="notepad">Блокнот</li>
         `;
-
         appContainer.innerHTML = `
         <div class="crm-layout">
             <nav class="crm-nav" id="main-nav">
@@ -388,7 +398,6 @@
                 </div>
             </main>
         </div>`;
-        
         document.getElementById('logout-btn').onclick = () => {
             listenersAreActive = false;
             if(masterAdvancesUnsubscribe) masterAdvancesUnsubscribe();
@@ -418,8 +427,7 @@
 
     function renderView(viewName) {
         if (!state.user) return;
-        
-        const masterViews = ['calendar', 'appointments', 'notepad', 'salonExpenses', 'shop'];
+        const masterViews = ['calendar', 'appointments', 'notepad', 'salonExpenses'];
         if (state.user.role === 'master' && !masterViews.includes(viewName)) {
              viewName = 'calendar';
         }
@@ -460,8 +468,6 @@
         const contentWrapper = document.getElementById('content-wrapper');
         if(!contentWrapper) return;
         
-        // --- ОСНОВНЕ ВИПРАВЛЕННЯ ТУТ ---
-        // У всіх викликах тепер використовується правильна змінна 'contentWrapper'
         switch (viewName) {
             case 'calendar': renderCalendarView(contentWrapper); break;
             case 'appointments': renderAppointmentsView(contentWrapper); break;
@@ -487,9 +493,7 @@
         const salonInput = document.getElementById('summary-salon-filter');
         const advancesEl = document.getElementById('summary-advances');
         const salonExpensesEl = document.getElementById('summary-salon-expenses');
-        // --- ЗМІНА: Отримання елемента для продажів товарів ---
         const productSalesEl = document.getElementById('summary-product-sales');
-
         if (!dateInput || !salonInput || !advancesEl || !salonExpensesEl || !productSalesEl) return;
 
         const selectedDate = new Date(dateInput.value);
@@ -524,8 +528,6 @@
                 });
             }
         });
-
-        // --- ЗМІНА: Розрахунок продажів товарів за день ---
         let totalProductSales = 0;
         let filteredProductSales = state.productSales;
         if (selectedSalonId !== 'all') {
@@ -537,10 +539,7 @@
                 totalProductSales += sale.amount;
             }
         });
-        
-        // Додаємо продажі товарів до загального доходу
         total += totalProductSales;
-        // --- КІНЕЦЬ ЗМІНИ ---
 
         let totalAdvances = 0;
         state.advances.forEach(advance => {
@@ -560,8 +559,6 @@
                 totalSalonExpenses += expense.amount;
             }
         });
-
-        // --- ЗМІНА: Відображення нових даних ---
         document.getElementById('summary-total').textContent = `${total.toFixed(0)} zł`;
         document.getElementById('summary-cash').textContent = `${cash.toFixed(0)} zł`;
         document.getElementById('summary-card').textContent = `${card.toFixed(0)} zł`;
@@ -796,15 +793,8 @@
             <p><strong>Сума:</strong> ${appointment.finalPrice.toFixed(0)} zł</p>
             <p><strong>Статус:</strong> ${statusText}</p>
         `;
-
-        // --- ЗМІНА: Додано блок з деталями оплат ---
         if (appointment.payments && appointment.payments.length > 0) {
-            const paymentTypes = {
-                cash: 'Готівка',
-                card: 'Картка',
-                blik: 'Blik',
-                settlement: 'Взаємозалік'
-            };
+            const paymentTypes = { cash: 'Готівка', card: 'Картка', blik: 'Blik', settlement: 'Взаємозалік' };
             let paymentsHtml = '<hr style="margin: 1rem 0;"><p><strong>Історія оплат:</strong></p><ul style="padding-left: 20px; margin: 0;">';
             appointment.payments.forEach(p => {
                 const paymentTypeStr = paymentTypes[p.type] || p.type;
@@ -813,7 +803,6 @@
             paymentsHtml += '</ul>';
             detailsEl.innerHTML += paymentsHtml;
         }
-        // --- КІНЕЦЬ ЗМІНИ ---
 
         let buttonsHtml = '';
         if (appointment.status !== 'completed') {
@@ -1398,12 +1387,12 @@
                         <input type="number" id="advance-amount" min="1" required>
                     </div>
                     <div class="form-group">
-                         <button type="submit" class="btn">Видати аванс</button>
+                        <button type="submit" class="btn">Видати аванс</button>
                     </div>
                 </form>
             </div>
             <div class="content-card">
-                 <h3>Історія авансів</h3>
+                <h3>Історія авансів</h3>
                 <ul id="master-advances-list" class="item-list"><li>Завантаження...</li></ul>
             </div>
         `;
@@ -1575,7 +1564,7 @@
                     advances: 0,
                     settlements: 0,
                     salaryGroupId: masterInfo ? masterInfo.salaryGroupId : null
-                 };
+                };
             }
 
             const salaryBaseForThisAppointment = typeof appointment.salaryBase === 'number' ? appointment.salaryBase : appointment.finalPrice;
@@ -1744,13 +1733,13 @@
                                 <option value="">Оберіть салон</option>
                                 ${salonOptions}
                             </select>
-                        </div>
+                         </div>
                     </div>
                     <button type="submit" class="btn">Додати витрату</button>
                 </form>
             </div>
             <div class="content-card" style="margin-top:2rem;">
-                 <h2>Історія витрат в салонах</h2>
+                <h2>Історія витрат в салонах</h2>
                 <ul id="salon-expenses-list" class="item-list"></ul>
             </div>
         `;
@@ -1834,7 +1823,6 @@
                 ${state.user.role === 'admin' ? `<div class="actions"><button class="btn btn-delete btn-delete-notepad">🗑️</button></div>` : ''}
             </li>
         `).join('');
-
         container.innerHTML = `
             <div class="content-card">
                 <h2>Блокнот / Журнал записів</h2>
@@ -1846,7 +1834,7 @@
                     <button type="submit" class="btn">Додати запис</button>
                 </form>
             </div>
-             <div class="content-card">
+            <div class="content-card">
                 <h3>Останні записи</h3>
                 <ul id="notepad-entries" class="item-list">${entriesHtml || '<li>Записів ще немає.</li>'}</ul>
             </div>
@@ -1908,11 +1896,10 @@
                     </div>
                     <div class="actions">
                         <strong>${sale.amount.toFixed(2)} zł</strong>
-                        </div>
+                    </div>
                 </li>
             `;
         }).join('');
-
         container.innerHTML = `
             <div class="content-card">
                 <h2>Продаж товару</h2>
@@ -1944,7 +1931,6 @@
                 </ul>
             </div>
         `;
-
         document.getElementById('add-product-sale-form').onsubmit = handleAddProductSale;
     }
 
@@ -1953,7 +1939,6 @@
         const description = document.getElementById('product-sale-description').value.trim();
         const amount = parseFloat(document.getElementById('product-sale-amount').value);
         const salonId = document.getElementById('product-sale-salon').value;
-
         if (!description || !amount || amount <= 0 || !salonId) {
             return alert("Будь ласка, заповніть усі поля коректно.");
         }
@@ -2009,16 +1994,16 @@
                 <h2>Призначення груп майстрам</h2>
                 <ul id="master-group-assignment-list" class="item-list">${masterAssignmentHtml}</ul>
             </div>
-             <div class="content-card">
+            <div class="content-card">
                 <h2>Ручна відправка звіту</h2>
                 <form id="manual-report-form"><div class="form-row"><div class="form-group" style="flex:1;"><label for="report-start-date">Дата початку</label><input type="date" id="report-start-date" required></div><div class="form-group" style="flex:1;"><label for="report-end-date">Дата кінця</label><input type="date" id="report-end-date" required></div></div><div class="form-group"><label for="report-salon-filter">Салон</label><select id="report-salon-filter"><option value="all">Всі салони (Разом)</option>${salonOptions}</select></div><button type="submit" class="btn">Відправити звіт</button></form>
             </div>
             <div class="content-card">
-                 <h2>Зміна паролю</h2>
+                <h2>Зміна паролю</h2>
                 <form id="change-password-form">
                     <div class="form-group"><label for="new-password">Новий пароль</label><input type="password" id="new-password" required minlength="6" autocomplete="new-password"></div>
                     <div class="form-group"><label for="confirm-password">Підтвердіть новий пароль</label><input type="password" id="confirm-password" required minlength="6" autocomplete="new-password"></div>
-                     <button type="submit" class="btn">Змінити пароль</button>
+                    <button type="submit" class="btn">Змінити пароль</button>
                     <p id="password-change-status" style="margin-top: 1rem; color: var(--gray-text);"></p>
                 </form>
             </div>`;
@@ -2037,7 +2022,7 @@
             const masterId = select.closest('li').dataset.masterId;
             const master = state.masters.find(m => m.id === masterId);
             if (master && master.salaryGroupId) {
-                 select.value = master.salaryGroupId;
+                select.value = master.salaryGroupId;
             }
             select.onchange = (e) => handleAssignGroupToMaster(masterId, e.target.value);
         });
@@ -2073,7 +2058,7 @@
             tierRow.innerHTML = `
                 <div class="form-group" style="flex:1;">
                     <label>Сума від (zł)</label>
-                     <input type="number" class="tier-threshold" value="${tier.threshold}" min="0" required>
+                    <input type="number" class="tier-threshold" value="${tier.threshold}" min="0" required>
                 </div>
                 <div class="form-group" style="flex:1;">
                     <label>Відсоток (%)</label>
