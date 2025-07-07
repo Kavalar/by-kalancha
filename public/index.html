@@ -168,13 +168,8 @@
                         <option value="cash">Готівка</option>
                         <option value="card">Картка</option>
                         <option value="blik">Blik</option>
-                        <option value="settlement">Взаємозалік (з ЗП)</option>
                     </select>
                 </div>
-            </div>
-            <div class="form-group" id="settlement-master-selector" style="display: none;">
-                <label for="settlement-master-id">Списати з зарплати майстра:</label>
-                <select id="settlement-master-id"></select>
             </div>
             <button type="submit">Підтвердити оплату</button>
         </form>
@@ -298,7 +293,6 @@
         };
 
         Object.entries(collections).forEach(([stateKey, colName]) => {
-            // ################## ПОЧАТОК ВИПРАВЛЕННЯ ##################
             let q;
             if (colName === 'notepadEntries') {
                 q = query(collection(db, colName), orderBy("createdAt", "desc"));
@@ -311,7 +305,6 @@
             } else {
                 q = collection(db, colName);
             }
-            // ################## КІНЕЦЬ ВИПРАВЛЕННЯ ##################
 
             onSnapshot(q, snapshot => {
                 state[stateKey] = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
@@ -439,6 +432,7 @@
 
         if (state.currentView === 'appointments' && viewName !== 'appointments') {
             state.editingAppointmentId = null;
+            state.selectedClientForAppointment = null;
         }
         state.currentView = viewName;
         
@@ -519,12 +513,10 @@
             if (app.payments && app.payments.length > 0) {
                 servicesWithPayment++;
                 app.payments.forEach(p => {
-                    if (p.type !== 'settlement') { 
-                        total += p.amount;
-                        if(p.type === 'cash') cash += p.amount;
-                        else if(p.type === 'card') card += p.amount;
-                        else if(p.type === 'blik') blik += p.amount;
-                    }
+                    total += p.amount;
+                    if(p.type === 'cash') cash += p.amount;
+                    else if(p.type === 'card') card += p.amount;
+                    else if(p.type === 'blik') blik += p.amount;
                 });
             }
         });
@@ -745,24 +737,6 @@
         amountInput.value = remaining > 0 ? remaining.toFixed(2) : '0.00';
         amountInput.max = remaining.toFixed(2);
         
-        const paymentTypeSelect = document.getElementById('payment-modal-type');
-        const settlementSelector = document.getElementById('settlement-master-selector');
-        const settlementMasterSelect = document.getElementById('settlement-master-id');
-        paymentTypeSelect.onchange = () => {
-            if (paymentTypeSelect.value === 'settlement') {
-                settlementSelector.style.display = 'block';
-                settlementMasterSelect.required = true;
-            } else {
-                settlementSelector.style.display = 'none';
-                settlementMasterSelect.required = false;
-            }
-        };
-        paymentTypeSelect.dispatchEvent(new Event('change'));
-
-        const currentMasterId = appointment.masterId;
-        settlementMasterSelect.innerHTML = state.masters
-            .filter(m => m.id !== currentMasterId && !m.isFrozen)
-            .map(m => `<option value="${m.id}">${m.name}</option>`).join('');
         document.getElementById('payment-modal').style.display = 'flex';
     }
 
@@ -794,7 +768,7 @@
             <p><strong>Статус:</strong> ${statusText}</p>
         `;
         if (appointment.payments && appointment.payments.length > 0) {
-            const paymentTypes = { cash: 'Готівка', card: 'Картка', blik: 'Blik', settlement: 'Взаємозалік' };
+            const paymentTypes = { cash: 'Готівка', card: 'Картка', blik: 'Blik' };
             let paymentsHtml = '<hr style="margin: 1rem 0;"><p><strong>Історія оплат:</strong></p><ul style="padding-left: 20px; margin: 0;">';
             appointment.payments.forEach(p => {
                 const paymentTypeStr = paymentTypes[p.type] || p.type;
@@ -868,13 +842,27 @@
         listEl.innerHTML = filteredClients.length > 0 ? '' : '<li>Клієнтів не знайдено.</li>';
         filteredClients.sort((a,b) => a.name.localeCompare(b.name)).forEach(client => {
             const li = document.createElement('li');
-            li.innerHTML = `<div><strong>${client.name}</strong><br><small>${client.phone || 'Телефон не вказано'}</small></div><div><button class="btn-edit btn-view-history" data-id="${client.id}">Історія</button></div>`;
+            li.innerHTML = `
+                <div><strong>${client.name}</strong><br><small>${client.phone || 'Телефон не вказано'}</small></div>
+                <div class="actions">
+                    <button class="btn btn-complete-payment btn-book-appointment" data-id="${client.id}" data-name="${client.name}" data-phone="${client.phone || ''}">Записати</button>
+                    <button class="btn-edit btn-view-history" data-id="${client.id}">Історія</button>
+                </div>`;
             listEl.appendChild(li);
         });
         listEl.onclick = (e) => {
             if(e.target.classList.contains('btn-view-history')) {
                 state.viewingClientId = e.target.dataset.id;
                 renderView('clientDetail');
+            }
+            if(e.target.classList.contains('btn-book-appointment')) {
+                const clientData = e.target.dataset;
+                state.selectedClientForAppointment = {
+                    id: clientData.id,
+                    name: clientData.name,
+                    phone: clientData.phone
+                };
+                renderView('appointments');
             }
         };
     }
@@ -1015,6 +1003,15 @@
                     updateFinalPrice();
                 }, 100);
             }
+        } else if (!isEditMode && state.selectedClientForAppointment) {
+            const clientSearchInput = document.getElementById('client-search-input');
+            const clientPhoneInput = document.getElementById('client-phone-input');
+            const clientPhoneGroup = document.getElementById('client-phone-group');
+            
+            clientSearchInput.value = state.selectedClientForAppointment.name;
+            clientSearchInput.disabled = true;
+            clientPhoneInput.value = state.selectedClientForAppointment.phone || '';
+            clientPhoneGroup.style.display = 'block';
         } else if (state.preselectedAppointment) {
             const { dateTime, masterId } = state.preselectedAppointment;
             const d = new Date(dateTime.getTime() - (dateTime.getTimezoneOffset() * 60000));
@@ -1252,6 +1249,9 @@
                 await addDoc(collection(db, 'appointments'), fullAppointmentData);
                 alert('Запис успішно створено!');
                 event.target.reset();
+                state.selectedClientForAppointment = null;
+                const clientSearchInput = document.getElementById('client-search-input');
+                if(clientSearchInput) clientSearchInput.disabled = false;
                 document.getElementById('client-phone-group').style.display = 'none';
                 updateFinalPrice();
             }
@@ -1266,18 +1266,12 @@
         const appointmentId = document.getElementById('payment-appointment-id').value;
         const paymentType = document.getElementById('payment-modal-type').value;
         const amountToPay = parseFloat(document.getElementById('payment-amount').value);
-        const receivingMasterId = paymentType === 'settlement' ? document.getElementById('settlement-master-id').value : null;
-
 
         if (!appointmentId || !amountToPay || amountToPay <= 0) {
             alert('Будь ласка, введіть коректну суму.');
             return;
         }
-        if (paymentType === 'settlement' && !receivingMasterId) {
-            alert('Будь ласка, оберіть майстра для взаємозаліку.');
-            return;
-        }
-
+        
         const appointmentRef = doc(db, 'appointments', appointmentId);
         try {
             const appointmentSnap = await getDoc(appointmentRef);
@@ -1297,8 +1291,7 @@
             const newPayment = {
                 amount: amountToPay,
                 type: paymentType,
-                date: Timestamp.now(),
-                ...(paymentType === 'settlement' && { receivingMasterId })
+                date: Timestamp.now()
             };
 
             const newTotalPaid = currentTotalPaid + amountToPay;
@@ -1562,19 +1555,12 @@
                     name: masterInfo ? masterInfo.name : 'Невідомий',
                     totalSalaryBase: 0,
                     advances: 0,
-                    settlements: 0,
                     salaryGroupId: masterInfo ? masterInfo.salaryGroupId : null
                 };
             }
 
             const salaryBaseForThisAppointment = typeof appointment.salaryBase === 'number' ? appointment.salaryBase : appointment.finalPrice;
             masterTotals[masterId].totalSalaryBase += salaryBaseForThisAppointment;
-
-            (appointment.payments || []).forEach(p => {
-                if (p.type === 'settlement' && p.receivingMasterId === masterId) {
-                    masterTotals[masterId].settlements += p.amount;
-                }
-            });
         });
 
         const masterIds = Object.keys(masterTotals);
@@ -1599,7 +1585,7 @@
             const tiers = group?.tiers?.sort((a,b) => b.threshold - a.threshold) || [];
             const applicableTier = tiers.find(tier => data.totalSalaryBase >= tier.threshold) || { rate: 0 };
             const salary = data.totalSalaryBase * (applicableTier.rate / 100);
-            const finalPayout = salary - data.advances - data.settlements;
+            const finalPayout = salary - data.advances;
             const cardHTML = `
                 <div class="salary-report-card">
                     <h3>${data.name}</h3>
@@ -1608,7 +1594,6 @@
                     <p><span>Ставка:</span> <strong>${applicableTier.rate}%</strong></p>
                     <p><span>Нарахована ЗП:</span> <span>${salary.toFixed(0)} zł</span></p>
                     <p><span>Видано авансів:</span> <span>-${data.advances.toFixed(0)} zł</span></p>
-                    <p><span>Внутрішні послуги:</span> <span>-${data.settlements.toFixed(0)} zł</span></p>
                     <p class="total-salary"><span>До виплати:</span> <strong>${finalPayout.toFixed(0)} zł</strong></p>
                 </div>`;
             reportContainer.innerHTML += cardHTML;
@@ -1883,7 +1868,6 @@
         }
     }
     
-    // --- ПОЧАТОК НОВОГО КОДУ ДЛЯ МАГАЗИНУ ---
     function renderShopView(container) {
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
         const recentSalesHtml = state.productSales.slice(0, 10).map(sale => {
@@ -1958,7 +1942,6 @@
             alert("Не вдалося зареєструвати продаж.");
         }
     }
-    // --- КІНЕЦЬ НОВОГО КОДУ ДЛЯ МАГАЗИНУ ---
 
     function renderSettingsView(container) {
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
