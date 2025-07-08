@@ -38,11 +38,11 @@
         .crm-layout { display: flex; height: 100vh; }
         .crm-nav { background: var(--primary-color); color: #ecf0f1; width: 240px; flex-shrink: 0; display: flex; flex-direction: column; padding: 1.5rem 0; box-shadow: 5px 0px 15px rgba(0,0,0,0.05); z-index: 10; }
         .crm-nav h1 { font-size: 1.5rem; text-align: center; margin: 0 0 2rem 0; color: #fff; letter-spacing: 1px; }
-        .crm-nav ul { list-style: none; padding: 0; margin: 0; flex-grow: 1; overflow-y: auto; } /* <-- ВИПРАВЛЕННЯ: Додано скрол */
+        .crm-nav ul { list-style: none; padding: 0; margin: 0; flex-grow: 1; overflow-y: auto; }
         .crm-nav li { padding: 1rem 1.5rem; cursor: pointer; border-left: 4px solid transparent; transition: all .2s; }
         .crm-nav li:hover { background-color: rgba(255,255,255,0.05); }
         .crm-nav li.active { background-color: rgba(255,255,255,0.1); border-left-color: var(--success-color); font-weight: 600; }
-        .crm-nav .user-info { padding: 1.5rem; border-top: 1px solid rgba(255,255,255,0.1); text-align: center; flex-shrink: 0; } /* <-- ВИПРАВЛЕННЯ: Додано, щоб блок не стискався */
+        .crm-nav .user-info { padding: 1.5rem; border-top: 1px solid rgba(255,255,255,0.1); text-align: center; flex-shrink: 0; }
         .crm-nav .user-info span { display: block; word-wrap: break-word; font-size: 0.9rem; margin-bottom: 1rem; }
         .crm-nav .user-info button { width: 100%; background: rgba(255,255,255,0.1); border: 1px solid #fff; color: #fff; padding: 0.75rem; border-radius: 6px; cursor: pointer; }
         .crm-nav .user-info button:hover { background: var(--danger-color); border-color: var(--danger-color); }
@@ -271,7 +271,6 @@
     let listenersAreActive = false;
     let masterAdvancesUnsubscribe = null;
     
-    // ### FIX: Moved handleLogin function before it is referenced ###
     async function handleLogin(e) { 
         e.preventDefault();
         const email = document.getElementById('email').value.trim(); 
@@ -376,6 +375,8 @@
                 <li data-view="salary">Зарплата</li>
                 <li data-view="expenses">Загальні витрати</li>
                 <li data-view="settings">Налаштування</li>
+                <li data-view="staff">Персонал</li>
+                <li data-view="auditLog">Журнал дій</li>
             `;
         }
 
@@ -462,7 +463,7 @@
              viewName = 'calendar';
         }
         
-        const salonAdminForbiddenViews = ['settings', 'salary', 'expenses'];
+        const salonAdminForbiddenViews = ['settings', 'salary', 'expenses', 'staff', 'auditLog'];
         if (state.user.role === 'salon_admin' && salonAdminForbiddenViews.includes(viewName)) {
              viewName = 'calendar';
         }
@@ -485,7 +486,7 @@
 
         const headerTitle = document.getElementById('header-title');
         if(headerTitle) {
-            const viewTitles = { calendar: 'Календар', appointments: 'Запис', clients: 'Клієнти', services: 'Послуги та Категорії', masters: 'Майстри', shop: 'Магазин', salary: 'Зарплата', expenses: 'Загальні витрати', salonExpenses: 'Витрати в салоні', notepad: 'Блокнот', settings: 'Налаштування', clientDetail: 'Історія Клієнта', masterDetail: 'Картка Майстра' };
+            const viewTitles = { calendar: 'Календар', appointments: 'Запис', clients: 'Клієнти', services: 'Послуги та Категорії', masters: 'Майстри', shop: 'Магазин', salary: 'Зарплата', expenses: 'Загальні витрати', salonExpenses: 'Витрати в салоні', notepad: 'Блокнот', settings: 'Налаштування', clientDetail: 'Історія Клієнта', masterDetail: 'Картка Майстра', staff: 'Персонал', auditLog: 'Журнал дій' };
             headerTitle.textContent = viewTitles[viewName] || 'Dashboard';
         }
 
@@ -513,11 +514,21 @@
             case 'notepad': renderNotepadView(contentWrapper); break;
             case 'shop': renderShopView(contentWrapper); break;
             case 'settings': renderSettingsView(contentWrapper); break;
+            case 'staff': renderStaffView(contentWrapper); break;
+            case 'auditLog': renderAuditLogView(contentWrapper); break;
             default:
                 contentWrapper.innerHTML = `<h2>Невідомий розділ</h2>`;
         }
     }
     // #endregion
+
+    function renderStaffView(container) {
+        container.innerHTML = `<div class="content-card"><h2>Персонал</h2><p>Цей розділ у розробці.</p></div>`;
+    }
+
+    function renderAuditLogView(container) {
+        container.innerHTML = `<div class="content-card"><h2>Журнал дій</h2><p>Цей розділ у розробці.</p></div>`;
+    }
 
     function renderDailySummary() {
         const dateInput = document.getElementById('summary-date-picker');
@@ -1943,7 +1954,7 @@
             </div>
             <div class="content-card">
                 <h3>Останні записи</h3>
-                <ul id="notepad-entries" class="item-list">${entriesHtml || '<li>Записів ще немає.</li>'}</ul>
+                <ul id="notepad-entries" class="item-list">${entriesHtml || '<li>Записів ще не немає.</li>'}</ul>
             </div>
         `;
         document.getElementById('add-notepad-entry-form').onsubmit = handleAddNotepadEntry;
