@@ -242,6 +242,23 @@
     </div>
 </div>
 
+<div class="modal-overlay" id="confirm-reason-modal">
+    <div class="modal-panel" style="width: 450px; text-align: center;">
+        <div class="modal-header" style="justify-content: center;">
+            <h2 id="confirm-reason-modal-title">Підтвердження дії</h2>
+        </div>
+        <p id="confirm-reason-modal-message" style="margin-bottom: 1rem; font-size: 1.1rem;"></p>
+        <div class="form-group" style="text-align: left;">
+            <label for="confirm-reason-input">Причина (необов'язково)</label>
+            <textarea id="confirm-reason-input" rows="3" placeholder="Вкажіть причину видалення..."></textarea>
+        </div>
+        <div style="display: flex; justify-content: center; gap: 1rem;">
+            <button id="confirm-reason-modal-cancel-btn" class="btn btn-edit">Скасувати</button>
+            <button id="confirm-reason-modal-confirm-btn" class="btn btn-delete">Підтвердити</button>
+        </div>
+    </div>
+</div>
+
 <!-- Notification Toast -->
 <div id="notification-toast" style="position: fixed; bottom: 20px; right: 20px; background-color: var(--success-color); color: white; padding: 1rem 1.5rem; border-radius: 8px; box-shadow: var(--shadow); z-index: 2000; opacity: 0; display: none; transition: opacity 0.5s ease-in-out;">
     <span id="notification-message"></span>
@@ -327,7 +344,6 @@
         
         messageEl.textContent = message;
         
-        // Clone and replace the button to remove old event listeners, preventing multiple fires
         const newConfirmBtn = confirmBtn.cloneNode(true);
         confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
         
@@ -343,6 +359,36 @@
         cancelBtn.onclick = hideModal;
         
         confirmModal.style.display = 'flex';
+    }
+
+    function showConfirmWithReasonModal(message, onConfirm) {
+        const modal = document.getElementById('confirm-reason-modal');
+        if (!modal) return;
+        
+        const messageEl = document.getElementById('confirm-reason-modal-message');
+        const confirmBtn = document.getElementById('confirm-reason-modal-confirm-btn');
+        const cancelBtn = document.getElementById('confirm-reason-modal-cancel-btn');
+        const reasonInput = document.getElementById('confirm-reason-input');
+        
+        messageEl.textContent = message;
+        reasonInput.value = ''; 
+        
+        const newConfirmBtn = confirmBtn.cloneNode(true);
+        confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+        
+        const hideModal = () => {
+            modal.style.display = 'none';
+        };
+
+        newConfirmBtn.onclick = () => {
+            hideModal();
+            const reason = reasonInput.value.trim();
+            onConfirm(reason); 
+        };
+        
+        cancelBtn.onclick = hideModal;
+        
+        modal.style.display = 'flex';
     }
     // #endregion
 
@@ -859,10 +905,12 @@
     }
 
     async function handleDeleteStaff(staffId, name) {
-        showConfirmModal(`Ви впевнені, що хочете видалити співробітника ${name}? Цю дію не можна скасувати.`, async () => {
+        showConfirmWithReasonModal(`Ви впевнені, що хочете видалити співробітника ${name}?`, async (reason) => {
             const action = () => deleteDoc(doc(db, 'staff', staffId));
+            const logDetails = { staffId, name };
+            if (reason) logDetails.reason = reason;
             try {
-                await logAndExecute('Видалено співробітника', { staffId, name }, action);
+                await logAndExecute('Видалено співробітника', logDetails, action);
                 showNotification('Співробітника видалено.');
                 renderView('staff');
             } catch (e) {
@@ -904,10 +952,11 @@
     async function handleDeleteStaffHistory(itemId, type, amount) {
         const staffId = state.viewingStaffId;
         const person = state.staff.find(p => p.id === staffId);
-        showConfirmModal('Ви впевнені, що хочете видалити цей запис?', async () => {
+        showConfirmWithReasonModal('Ви впевнені, що хочете видалити цей запис?', async (reason) => {
             const action = () => deleteDoc(doc(db, 'staff', staffId, type, itemId));
             const logAction = type === 'advances' ? 'Видалено аванс' : 'Видалено премію';
             const logDetails = { staffId, name: person.name, amount: parseFloat(amount) };
+            if (reason) logDetails.reason = reason;
             try {
                 await logAndExecute(logAction, logDetails, action);
             } catch (e) {
@@ -932,6 +981,7 @@
                     case 'appointmentId': displayKey = 'ID Запису'; break;
                     case 'description': displayKey = 'Опис'; break;
                     case 'clientName': displayKey = 'Ім\'я клієнта'; break;
+                    case 'reason': displayKey = 'Причина'; break;
                 }
                 return `${displayKey}: ${value}`;
             });
@@ -1372,10 +1422,12 @@
     }
 
     async function handleCancelAppointment(appointmentId, clientName) {
-        showConfirmModal('Ви впевнені, що хочете скасувати цей запис? Цю дію не можна буде скасувати.', async () => {
+        showConfirmWithReasonModal('Ви впевнені, що хочете скасувати цей запис?', async (reason) => {
             const action = () => deleteDoc(doc(db, 'appointments', appointmentId));
+            const logDetails = { appointmentId, clientName };
+            if (reason) logDetails.reason = reason;
             try {
-                await logAndExecute('Скасовано запис', { appointmentId, clientName }, action);
+                await logAndExecute('Скасовано запис', logDetails, action);
                 document.getElementById('appointment-action-modal').style.display = 'none';
                 showNotification('Запис успішно скасовано.');
             } catch (e) {
@@ -1948,15 +2000,13 @@
             <div class="content-card">
                 <h3>Видача авансу</h3>
                 <form id="add-advance-form">
-                    <div class="form-row">
-                        <div class="form-group" style="flex:1;">
-                            <label for="advance-amount">Сума авансу (zł)</label>
-                            <input type="number" id="advance-amount" min="1" required>
-                        </div>
-                        <div class="form-group" style="flex:2;">
-                            <label for="advance-description">Опис (необов'язково)</label>
-                            <input type="text" id="advance-description">
-                        </div>
+                    <div class="form-group">
+                        <label for="advance-amount">Сума авансу (zł)</label>
+                        <input type="number" id="advance-amount" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="advance-description">Опис (необов'язково)</label>
+                        <textarea id="advance-description" rows="2"></textarea>
                     </div>
                     <button type="submit" class="btn">Видати аванс</button>
                 </form>
@@ -2036,10 +2086,12 @@
     async function handleDeleteAdvance(advanceId, masterName, amount, description) {
         const masterId = state.viewingMasterId;
         if (!masterId || !advanceId) return;
-        showConfirmModal('Ви впевнені, що хочете видалити цей аванс? Цю дію не можна скасувати.', async () => {
+        showConfirmWithReasonModal('Ви впевнені, що хочете видалити цей аванс?', async (reason) => {
             const action = () => deleteDoc(doc(db, 'masters', masterId, 'advances', advanceId));
+            const logDetails = { masterId, name: masterName, amount: parseFloat(amount), description };
+            if (reason) logDetails.reason = reason;
             try {
-                await logAndExecute('Видалено аванс майстра', { masterId, name: masterName, amount: parseFloat(amount), description }, action);
+                await logAndExecute('Видалено аванс майстра', logDetails, action);
             } catch (e) {
                 showNotification("Помилка при видаленні авансу.", "error");
             }
@@ -2092,13 +2144,13 @@
     function setupCategoriesLogic() { document.getElementById('add-category-form').onsubmit = handleAddCategory; document.getElementById('edit-category-modal').querySelector('.close-btn').onclick = () => document.getElementById('edit-category-modal').style.display = 'none'; document.getElementById('edit-category-form').onsubmit = handleUpdateCategory; const categoriesListEl = document.getElementById('categories-list'); categoriesListEl.innerHTML = state.categories.length > 0 ? '' : '<li>Немає категорій.</li>'; state.categories.forEach(category => { const li = document.createElement('li'); li.className = 'category-list-item'; li.dataset.id = category.id; if (category.id === state.selectedCategoryId) li.classList.add('selected'); li.innerHTML = `<span>${category.name} ${category.discount ? `<strong style="color:var(--danger-color);">-`+category.discount+'%</strong>' : ''}</span><div class="actions"><button class="btn btn-edit" data-id="${category.id}" data-name="${category.name}" data-discount="${category.discount || 0}">✏️</button><button class="btn btn-delete" data-id="${category.id}" data-name="${category.name}">🗑️</button></div>`; categoriesListEl.appendChild(li); }); categoriesListEl.onclick = (event) => { const target = event.target; const deleteBtn = target.closest('.btn-delete'); if (deleteBtn) { handleDeleteCategory(deleteBtn.dataset.id, deleteBtn.dataset.name); } else if (target.closest('.btn-edit')) { const btn = target.closest('.btn-edit'); showEditCategoryModal(btn.dataset.id, btn.dataset.name, btn.dataset.discount); } else if (target.closest('.category-list-item')) { state.selectedCategoryId = target.closest('.category-list-item').dataset.id; renderView('services'); } }; }
     function renderServicesForCategory() { const categoryId = state.selectedCategoryId; const servicesContainer = document.getElementById('services-container'); const category = state.categories.find(c => c.id === categoryId); const categoryName = category ? category.name : ''; servicesContainer.innerHTML = `<div class="content-card"><div style="display:flex; justify-content:space-between; align-items:center;"><h2>Послуги: ${categoryName}</h2><button id="add-service-btn" class="btn">Додати послугу</button></div><ul id="services-list" class="item-list"></ul></div>`; document.getElementById('add-service-btn').onclick = () => showServiceModal(); const servicesListEl = document.getElementById('services-list'); const filteredServices = state.services.filter(s => s.categoryId === categoryId).sort((a,b)=>a.name.localeCompare(b.name)); servicesListEl.innerHTML = filteredServices.length > 0 ? '' : '<li>Немає послуг в цій категорії.</li>'; filteredServices.forEach(service => { const finalDiscount = (service.discount > 0) ? service.discount : (category?.discount || 0); const discountedPrice = service.price * (1 - finalDiscount / 100); const li = document.createElement('li'); li.innerHTML = `<div><strong>${service.name}</strong><br><small>${service.duration || 'N/A'} хв. ${service.discount > 0 ? `(Знижка ${service.discount}%)` : ''}</small></div><div class="price-display">${finalDiscount > 0 ? `<span class="old-price">${service.price} zł</span>` : ''}<span class="new-price">${discountedPrice.toFixed(0)} zł</span></div><div class="actions"><button class="btn-edit btn-edit-service" data-id="${service.id}" data-name="${service.name}" data-duration="${service.duration}" data-price="${service.price}" data-discount="${service.discount || 0}">✏️</button><button class="btn-delete btn-delete-service" data-id="${service.id}" data-name="${service.name}">🗑️</button></div>`; servicesListEl.appendChild(li); }); servicesListEl.onclick = (event) => { const target = event.target.closest('button'); if (!target) return; const deleteBtn = target.closest('.btn-delete-service'); if (deleteBtn) handleDeleteService(deleteBtn.dataset.id, deleteBtn.dataset.name); if (target.classList.contains('btn-edit-service')) { showServiceModal(target.dataset.id, target.dataset); }}; }
     async function handleAddCategory(event) { event.preventDefault(); const nameInput = document.getElementById('new-category-name'); const name = nameInput.value.trim(); if (!name) return; const action = () => addDoc(collection(db, 'serviceCategories'), { name, discount: 0 }); try { await logAndExecute('Створено категорію', { name }, action); nameInput.value = ''; } catch (e) { showNotification('Не вдалося додати.', "error"); } }
-    async function handleDeleteCategory(id, name) { showConfirmModal(`Видалити категорію "${name}" та всі послуги в ній?`, async () => { try { const q = query(collection(db, 'services'), where('categoryId', '==', id)); const snapshot = await getDocs(q); const deletePromises = []; snapshot.forEach(doc => deletePromises.push(deleteDoc(doc.ref))); await Promise.all(deletePromises); await logAndExecute('Видалено категорію', { categoryId: id, name }, () => deleteDoc(doc(db, 'serviceCategories', id))); if (state.selectedCategoryId === id) { state.selectedCategoryId = null; } } catch (e) { showNotification('Не вдалося видалити.', "error"); } }); }
+    async function handleDeleteCategory(id, name) { showConfirmWithReasonModal(`Видалити категорію "${name}" та всі послуги в ній?`, async (reason) => { try { const q = query(collection(db, 'services'), where('categoryId', '==', id)); const snapshot = await getDocs(q); const deletePromises = []; snapshot.forEach(doc => deletePromises.push(deleteDoc(doc.ref))); await Promise.all(deletePromises); const logDetails = { categoryId: id, name }; if (reason) logDetails.reason = reason; await logAndExecute('Видалено категорію', logDetails, () => deleteDoc(doc(db, 'serviceCategories', id))); if (state.selectedCategoryId === id) { state.selectedCategoryId = null; } } catch (e) { showNotification('Не вдалося видалити.', "error"); } }); }
     function showEditCategoryModal(id, name, discount) { const modal = document.getElementById('edit-category-modal'); modal.style.display = 'flex'; document.getElementById('edit-category-id').value = id; document.getElementById('edit-category-name').value = name; document.getElementById('edit-category-discount').value = discount || 0; }
     async function handleUpdateCategory(event) { event.preventDefault(); const id = document.getElementById('edit-category-id').value; const name = document.getElementById('edit-category-name').value.trim(); const discount = parseFloat(document.getElementById('edit-category-discount').value) || 0; if (!name) return showNotification('Назва не може бути порожньою.', "error"); const action = () => updateDoc(doc(db, 'serviceCategories', id), { name, discount }); try { await logAndExecute('Оновлено категорію', { categoryId: id, name }, action); document.getElementById('edit-category-modal').style.display = 'none'; } catch(e) { showNotification('Не вдалося оновити.', "error"); } }
     function showServiceModal(id = null, data = {}) { const modal = document.getElementById('edit-service-modal'); modal.style.display = 'flex'; modal.querySelector('h2').textContent = id ? 'Редагувати послугу' : 'Додати нову послугу'; document.getElementById('edit-service-id').value = id || ''; document.getElementById('edit-service-name').value = data.name || ''; document.getElementById('edit-service-duration').value = data.duration || ''; document.getElementById('edit-service-price').value = data.price || ''; document.getElementById('edit-service-discount').value = data.discount || 0; document.getElementById('edit-service-form').onsubmit = id ? handleUpdateService : handleAddService; document.querySelector('#edit-service-modal .close-btn').onclick = () => modal.style.display = 'none'; }
     async function handleAddService(event) { event.preventDefault(); if (!state.selectedCategoryId) return showNotification('Спочатку оберіть категорію!', "error"); const name = document.getElementById('edit-service-name').value.trim(); const duration = parseInt(document.getElementById('edit-service-duration').value); const price = parseFloat(document.getElementById('edit-service-price').value); const discount = parseFloat(document.getElementById('edit-service-discount').value) || 0; if (!name || !(duration>=0) || !(price>=0)) return showNotification('Заповніть усі поля коректно.', "error"); const action = () => addDoc(collection(db, 'services'), { name, duration, price, discount, categoryId: state.selectedCategoryId }); try { await logAndExecute('Створено послугу', { name, categoryId: state.selectedCategoryId }, action); document.getElementById('edit-service-modal').style.display = 'none'; } catch (e) { showNotification('Не вдалося додати.', "error"); } }
     async function handleUpdateService(event) { event.preventDefault(); const id = document.getElementById('edit-service-id').value; const name = document.getElementById('edit-service-name').value.trim(); const duration = parseInt(document.getElementById('edit-service-duration').value); const price = parseFloat(document.getElementById('edit-service-price').value); const discount = parseFloat(document.getElementById('edit-service-discount').value) || 0; if (!name || !(duration>=0) || !(price>=0)) return showNotification('Заповніть усі поля коректно.', "error"); const action = () => updateDoc(doc(db, 'services', id), { name, duration, price, discount }); try { await logAndExecute('Оновлено послугу', { serviceId: id, name }, action); document.getElementById('edit-service-modal').style.display = 'none'; } catch(e) { showNotification('Не вдалося оновити.', "error"); } }
-    async function handleDeleteService(id, name) { showConfirmModal(`Видалити послугу "${name}"?`, async () => { const action = () => deleteDoc(doc(db, 'services', id)); try { await logAndExecute('Видалено послугу', { serviceId: id, name }, action); } catch (e) { showNotification('Не вдалося видалити.', "error"); } }); }
+    async function handleDeleteService(id, name) { showConfirmWithReasonModal(`Видалити послугу "${name}"?`, async (reason) => { const action = () => deleteDoc(doc(db, 'services', id)); const logDetails = { serviceId: id, name }; if (reason) logDetails.reason = reason; try { await logAndExecute('Видалено послугу', logDetails, action); } catch (e) { showNotification('Не вдалося видалити.', "error"); } }); }
     // #endregion
 
     // #region Salary, Expenses, Notepad & Settings
@@ -2324,10 +2376,12 @@
     }
 
     async function handleDeleteExpense(id, description) {
-        showConfirmModal('Ви впевнені, що хочете видалити цю витрату?', async () => {
+        showConfirmWithReasonModal('Ви впевнені, що хочете видалити цю витрату?', async (reason) => {
             const action = () => deleteDoc(doc(db, 'expenses', id));
+            const logDetails = { expenseId: id, description };
+            if (reason) logDetails.reason = reason;
             try {
-                await logAndExecute('Видалено загальну витрату', { expenseId: id, description }, action);
+                await logAndExecute('Видалено загальну витрату', logDetails, action);
             } catch(e) {
                 showNotification("Не вдалося видалити витрату.", "error");
             }
@@ -2431,10 +2485,12 @@
     }
     
     async function handleDeleteSalonExpense(id, description) {
-        showConfirmModal('Ви впевнені, що хочете видалити цю витрату?', async () => {
+        showConfirmWithReasonModal('Ви впевнені, що хочете видалити цю витрату?', async (reason) => {
             const action = () => deleteDoc(doc(db, 'salonExpenses', id));
+            const logDetails = { expenseId: id, description };
+            if (reason) logDetails.reason = reason;
             try {
-                await logAndExecute('Видалено витрату салону', { expenseId: id, description }, action);
+                await logAndExecute('Видалено витрату салону', logDetails, action);
             } catch(e) {
                 showNotification("Не вдалося видалити витрату.", "error");
             }
@@ -2501,10 +2557,12 @@
 
     async function handleDeleteNotepadEntry(entryId) {
         if (!entryId) return;
-        showConfirmModal('Ви впевнені, що хочете видалити цей запис?', async () => {
+        showConfirmWithReasonModal('Ви впевнені, що хочете видалити цей запис?', async (reason) => {
             const action = () => deleteDoc(doc(db, 'notepadEntries', entryId));
+            const logDetails = { entryId };
+            if (reason) logDetails.reason = reason;
             try {
-                await logAndExecute('Видалено запис з блокноту', { entryId }, action);
+                await logAndExecute('Видалено запис з блокноту', logDetails, action);
             } catch (e) {
                 showNotification("Не вдалося видалити запис.", "error");
             }
@@ -2615,10 +2673,12 @@
 
     async function handleDeleteProductSale(saleId, description) {
         if(!saleId) return;
-        showConfirmModal('Ви впевнені, що хочете видалити цей продаж? Цю дію не можна скасувати.', async () => {
+        showConfirmWithReasonModal('Ви впевнені, що хочете видалити цей продаж? Цю дію не можна скасувати.', async (reason) => {
             const action = () => deleteDoc(doc(db, "productSales", saleId));
+            const logDetails = { saleId, description };
+            if (reason) logDetails.reason = reason;
             try {
-                await logAndExecute('Видалено продаж товару', { saleId, description }, action);
+                await logAndExecute('Видалено продаж товару', logDetails, action);
             } catch (e) {
                 showNotification('Не вдалося видалити продаж.', "error");
             }
@@ -2790,10 +2850,12 @@
     }
 
     async function handleDeleteSalaryGroup(groupId, name) {
-        showConfirmModal(`Ви впевнені, що хочете видалити групу "${name}"? Майстри, призначені до неї, залишаться без групи.`, async () => {
+        showConfirmWithReasonModal(`Ви впевнені, що хочете видалити групу "${name}"? Майстри, призначені до неї, залишаться без групи.`, async (reason) => {
             const action = () => deleteDoc(doc(db, 'salaryGroups', groupId));
+            const logDetails = { groupId, name };
+            if (reason) logDetails.reason = reason;
             try {
-                await logAndExecute('Видалено групу зарплат', { groupId, name }, action);
+                await logAndExecute('Видалено групу зарплат', logDetails, action);
             } catch(e) {
                 showNotification('Не вдалося видалити групу.', "error");
             }
