@@ -39,12 +39,12 @@
         .crm-layout { display: flex; height: 100vh; }
         .crm-nav { background: var(--primary-color); color: #ecf0f1; width: 240px; flex-shrink: 0; display: flex; flex-direction: column; padding: 1.5rem 0; box-shadow: 5px 0px 15px rgba(0,0,0,0.05); z-index: 10; }
         .crm-nav h1 { font-size: 1.5rem; text-align: center; margin: 0 0 2rem 0; color: #fff; letter-spacing: 1px; }
-        .crm-nav ul { list-style: none; padding: 0; margin: 0; flex-grow: 1; }
+        .crm-nav ul { list-style: none; padding: 0; margin: 0; flex-grow: 1; overflow-y: auto; } /* <-- FIX: Added overflow-y */
         .crm-nav li { padding: 1rem 1.5rem; cursor: pointer; border-left: 4px solid transparent; transition: all .2s; }
         .crm-nav li.admin-only { display: none; }
         .crm-nav li:hover { background-color: rgba(255,255,255,0.05); }
         .crm-nav li.active { background-color: rgba(255,255,255,0.1); border-left-color: var(--success-color); font-weight: 600; }
-        .crm-nav .user-info { padding: 1.5rem; border-top: 1px solid rgba(255,255,255,0.1); text-align: center; }
+        .crm-nav .user-info { padding: 1.5rem; border-top: 1px solid rgba(255,255,255,0.1); text-align: center; flex-shrink: 0; }
         .crm-nav .user-info span { display: block; word-wrap: break-word; font-size: 0.9rem; margin-bottom: 1rem; }
         .crm-nav .user-info button { width: 100%; background: rgba(255,255,255,0.1); border: 1px solid #fff; color: #fff; padding: 0.75rem; border-radius: 6px; cursor: pointer; }
         .crm-nav .user-info button:hover { background: var(--danger-color); border-color: var(--danger-color); }
@@ -379,6 +379,8 @@
 
     function setupRealtimeListeners() {
         if (listenersAreActive) return;
+
+        // General collections accessible by most users
         const collections = { 
             salons: 'salons',
             categories: 'serviceCategories', 
@@ -386,7 +388,6 @@
             masters: 'masters',
             appointments: 'appointments', 
             clients: 'clients',
-            expenses: 'expenses',
             salonExpenses: 'salonExpenses',
             notepadEntries: 'notepadEntries',
             productSales: 'productSales',
@@ -396,7 +397,7 @@
             let q;
             if (['notepadEntries', 'auditLog'].includes(colName)) {
                 q = query(collection(db, colName), orderBy("timestamp", "desc"));
-            } else if (['productSales', 'salonExpenses', 'expenses'].includes(colName)) {
+            } else if (['productSales', 'salonExpenses'].includes(colName)) {
                  q = query(collection(db, colName), orderBy("date", "desc"));
             } else {
                 q = collection(db, colName);
@@ -410,9 +411,12 @@
                 if (state.user) {
                     renderView(state.currentView);
                 }
+            }, (error) => {
+                console.error(`Error listening to ${colName}:`, error);
             });
         });
 
+        // Listeners for data accessible only by specific roles
         const isAdminOrSalonAdmin = state.user.role === 'admin' || state.user.role === 'salon_admin';
         if (isAdminOrSalonAdmin) {
             onSnapshot(query(collectionGroup(db, 'advances')), snapshot => {
@@ -420,21 +424,37 @@
                 if (state.user && state.currentView === 'calendar') {
                     renderDailySummary();
                 }
+            }, (error) => {
+                console.error(`Error listening to advances:`, error);
             });
         }
         
         if (state.user.role === 'admin') {
-            onSnapshot(collection(db, 'salaryGroups'), snapshot => {
-                state.salaryGroups = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
-                if (['settings', 'salary'].includes(state.currentView)) renderView(state.currentView);
-            });
-            onSnapshot(collection(db, 'staff'), snapshot => {
-                state.staff = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
-                if (['staff', 'staffDetail'].includes(state.currentView)) renderView(state.currentView);
-            });
-            onSnapshot(query(collection(db, 'auditLog'), orderBy("timestamp", "desc")), snapshot => {
-                state.auditLog = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
-                if (state.currentView === 'auditLog') renderView(state.currentView);
+            // Admin-only collections
+            const adminCollections = {
+                salaryGroups: 'salaryGroups',
+                staff: 'staff',
+                auditLog: 'auditLog',
+                expenses: 'expenses' // <-- FIX: Moved here from general collections
+            };
+
+            Object.entries(adminCollections).forEach(([stateKey, colName]) => {
+                let q;
+                if (colName === 'auditLog') {
+                    q = query(collection(db, colName), orderBy("timestamp", "desc"));
+                } else if (colName === 'expenses') {
+                    q = query(collection(db, colName), orderBy("date", "desc"));
+                } else {
+                    q = collection(db, colName);
+                }
+                onSnapshot(q, snapshot => {
+                    state[stateKey] = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
+                    if (['settings', 'salary', 'staff', 'auditLog', 'expenses'].includes(state.currentView)) {
+                         renderView(state.currentView);
+                    }
+                }, (error) => {
+                    console.error(`Error listening to admin collection ${colName}:`, error);
+                });
             });
         }
         listenersAreActive = true;
@@ -1093,7 +1113,7 @@
             alert('Не вдалося зберегти запис.');
         }
     }
-    // Other appointment functions (render, setup logic, etc.) are mostly unchanged
+    // Other appointment functions (render, setup logic, etc.) are mostly unchanged.
     function renderAppointmentsView(container) {
         const isEditMode = !!state.editingAppointmentId;
         let appointmentToEdit = null;
@@ -1729,9 +1749,7 @@
     }
     // #endregion
 
-    // All other functions (clients, masters, services, settings, etc.) remain largely the same.
-    // Small adjustments might be needed for consistency, but the core logic is sound.
-    // I will include them for completeness.
+    // All other functions (clients, masters, services, settings, etc.) are included for completeness.
     // #region Clients Views
     function renderClientsView(container) {
         container.innerHTML = `<div class="content-card"><h2>База клієнтів</h2><div class="form-group"><input type="text" id="client-search" placeholder="Пошук за іменем або телефоном..."></div><ul id="clients-list" class="item-list"></ul></div>`;
