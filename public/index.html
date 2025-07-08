@@ -38,11 +38,11 @@
         .crm-layout { display: flex; height: 100vh; }
         .crm-nav { background: var(--primary-color); color: #ecf0f1; width: 240px; flex-shrink: 0; display: flex; flex-direction: column; padding: 1.5rem 0; box-shadow: 5px 0px 15px rgba(0,0,0,0.05); z-index: 10; }
         .crm-nav h1 { font-size: 1.5rem; text-align: center; margin: 0 0 2rem 0; color: #fff; letter-spacing: 1px; }
-        .crm-nav ul { list-style: none; padding: 0; margin: 0; flex-grow: 1; overflow-y: auto; } /* <-- ВИПРАВЛЕННЯ: Додано скрол */
+        .crm-nav ul { list-style: none; padding: 0; margin: 0; flex-grow: 1; }
         .crm-nav li { padding: 1rem 1.5rem; cursor: pointer; border-left: 4px solid transparent; transition: all .2s; }
         .crm-nav li:hover { background-color: rgba(255,255,255,0.05); }
         .crm-nav li.active { background-color: rgba(255,255,255,0.1); border-left-color: var(--success-color); font-weight: 600; }
-        .crm-nav .user-info { padding: 1.5rem; border-top: 1px solid rgba(255,255,255,0.1); text-align: center; flex-shrink: 0; } /* <-- ВИПРАВЛЕННЯ: Додано, щоб блок не стискався */
+        .crm-nav .user-info { padding: 1.5rem; border-top: 1px solid rgba(255,255,255,0.1); text-align: center; }
         .crm-nav .user-info span { display: block; word-wrap: break-word; font-size: 0.9rem; margin-bottom: 1rem; }
         .crm-nav .user-info button { width: 100%; background: rgba(255,255,255,0.1); border: 1px solid #fff; color: #fff; padding: 0.75rem; border-radius: 6px; cursor: pointer; }
         .crm-nav .user-info button:hover { background: var(--danger-color); border-color: var(--danger-color); }
@@ -271,18 +271,6 @@
     let listenersAreActive = false;
     let masterAdvancesUnsubscribe = null;
     
-    // ### FIX: Moved handleLogin function before it is referenced ###
-    async function handleLogin(e) { 
-        e.preventDefault();
-        const email = document.getElementById('email').value.trim(); 
-        const password = document.getElementById('password').value; 
-        try { 
-            await signInWithEmailAndPassword(auth, email, password);
-        } catch (err) { 
-            document.getElementById('login-error').innerText = "Неправильний email або пароль.";
-        } 
-    }
-
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             if (listenersAreActive) return;
@@ -441,6 +429,7 @@
             };
         }
         
+        // ### ПОЧАТОК ЗМІН: Обробники для нового модального вікна ###
         const editPaymentsModal = document.getElementById('edit-payments-modal');
         if (editPaymentsModal) {
             editPaymentsModal.querySelector('.close-btn').onclick = () => {
@@ -451,6 +440,7 @@
             };
             document.getElementById('edit-payments-form').onsubmit = handleUpdatePayments;
         }
+        // ### КІНЕЦЬ ЗМІН ###
 
         renderView(state.currentView);
     }
@@ -829,9 +819,11 @@
             buttonsHtml += `<button class="btn btn-complete-payment" data-action="pay">Внести / Додати оплату</button>`;
         }
         
+        // ### ПОЧАТОК ЗМІН: Додано кнопку редагування оплат ###
         if (appointment.payments && appointment.payments.length > 0) {
              buttonsHtml += `<button class="btn btn-edit" data-action="edit-payments">✏️ Редагувати оплати</button>`;
         }
+        // ### КІНЕЦЬ ЗМІН ###
         
         buttonsHtml += `<button class="btn btn-edit" data-action="edit">Редагувати / Перенести</button>`;
         buttonsHtml += `<button class="btn btn-delete" data-action="cancel">Скасувати запис</button>`;
@@ -858,6 +850,7 @@
         modal.style.display = 'flex';
     }
 
+    // ### ПОЧАТОК ЗМІН: Нові функції для редагування оплат ###
     function showEditPaymentsModal(appointment) {
         const modal = document.getElementById('edit-payments-modal');
         const listEl = document.getElementById('edit-payments-list');
@@ -929,6 +922,7 @@
             alert("Не вдалося оновити оплати.");
         }
     }
+    // ### КІНЕЦЬ ЗМІН ###
 
     async function handleCancelAppointment(appointmentId) {
         if (confirm('Ви впевнені, що хочете скасувати цей запис? Цю дію не можна буде скасувати.')) {
@@ -2204,4 +2198,169 @@
                 </div>
                 <div class="form-group" style="flex:1;">
                     <label>Відсоток (%)</label>
-                    <input type="number" class="tier-rate" value="${t
+                    <input type="number" class="tier-rate" value="${tier.rate}" min="0" max="100" required>
+                </div>
+                <button type="button" class="btn btn-delete remove-tier-btn">&times;</button>
+            `;
+            container.appendChild(tierRow);
+        });
+        document.querySelectorAll('.remove-tier-btn').forEach(btn => {
+            btn.onclick = () => btn.closest('.form-row').remove();
+        });
+    }
+
+    function handleAddTierRowToModal() {
+        const container = document.getElementById('salary-group-tiers-table');
+        const tierRow = document.createElement('div');
+        tierRow.className = 'form-row';
+        tierRow.innerHTML = `
+            <div class="form-group" style="flex:1;">
+                <label>Сума від (zł)</label>
+                <input type="number" class="tier-threshold" value="0" min="0" required>
+            </div>
+            <div class="form-group" style="flex:1;">
+                <label>Відсоток (%)</label>
+                <input type="number" class="tier-rate" value="0" min="0" max="100" required>
+            </div>
+            <button type="button" class="btn btn-delete remove-tier-btn">&times;</button>
+        `;
+        tierRow.querySelector('.remove-tier-btn').onclick = () => tierRow.remove();
+        container.appendChild(tierRow);
+    }
+
+    async function handleSaveSalaryGroup(event) {
+        event.preventDefault();
+        const groupId = document.getElementById('edit-salary-group-id').value;
+        const name = document.getElementById('salary-group-name').value.trim();
+        if (!name) {
+            alert('Назва групи не може бути порожньою.');
+            return;
+        }
+
+        const tiers = [];
+        document.querySelectorAll('#salary-group-tiers-table .form-row').forEach(row => {
+            const threshold = parseFloat(row.querySelector('.tier-threshold').value);
+            const rate = parseFloat(row.querySelector('.tier-rate').value);
+            if (!isNaN(threshold) && !isNaN(rate)) {
+                tiers.push({ threshold, rate });
+            }
+        });
+        const data = { name, tiers: tiers.sort((a,b) => a.threshold - b.threshold) };
+        try {
+            if (groupId) {
+                await updateDoc(doc(db, 'salaryGroups', groupId), data);
+            } else {
+                await addDoc(collection(db, 'salaryGroups'), data);
+            }
+            document.getElementById('salary-group-modal').style.display = 'none';
+        } catch (e) {
+            console.error("Помилка збереження групи зарплат:", e);
+            alert('Не вдалося зберегти групу.');
+        }
+    }
+
+    async function handleDeleteSalaryGroup(groupId) {
+        if (!confirm('Ви впевнені, що хочете видалити цю групу? Майстри, призначені до неї, залишаться без групи.')) return;
+        try {
+            await deleteDoc(doc(db, 'salaryGroups', groupId));
+        } catch(e) {
+            console.error("Помилка видалення групи:", e);
+            alert('Не вдалося видалити групу.');
+        }
+    }
+    
+    async function handleAssignGroupToMaster(masterId, groupId) {
+        try {
+            await updateDoc(doc(db, 'masters', masterId), { salaryGroupId: groupId || null });
+        } catch(e) {
+            console.error("Помилка призначення групи:", e);
+            alert('Не вдалося призначити групу.');
+        }
+    }
+    
+    async function handleManualReport(event) {
+        event.preventDefault();
+        const btn = event.target.querySelector('button[type="submit"]');
+        btn.disabled = true; btn.textContent = 'Відправка...';
+        const startDate = document.getElementById('report-start-date').value;
+        const endDate = document.getElementById('report-end-date').value;
+        const salonId = document.getElementById('report-salon-filter').value;
+
+        if (!startDate || !endDate) {
+            alert('Будь ласка, оберіть обидві дати.');
+            btn.disabled = false; btn.textContent = 'Відправити звіт';
+            return;
+        }
+        try {
+            const generateReport = httpsCallable(functions, 'generateAndSendReport');
+            const result = await generateReport({ startDate, endDate, salonId });
+            alert(result.data.message);
+        } catch (error) {
+            console.error("Помилка виклику хмарної функції:", error);
+            alert(`Помилка: ${error.message}`);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Відправити звіт';
+        }
+    }
+    
+    async function handleChangePassword(event) {
+        event.preventDefault();
+        const newPasswordInput = document.getElementById('new-password');
+        const confirmPasswordInput = document.getElementById('confirm-password');
+        const statusEl = document.getElementById('password-change-status');
+        
+        const newPassword = newPasswordInput.value;
+        const confirmPassword = confirmPasswordInput.value;
+        if (newPassword.length < 6) {
+            statusEl.textContent = 'Пароль має бути не менше 6 символів.';
+            statusEl.style.color = 'var(--danger-color)';
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            statusEl.textContent = 'Паролі не співпадають.';
+            statusEl.style.color = 'var(--danger-color)';
+            return;
+        }
+
+        const user = auth.currentUser;
+        if (!user) {
+            statusEl.textContent = 'Помилка: користувач не автентифікований.';
+            statusEl.style.color = 'var(--danger-color)';
+            return;
+        }
+
+        statusEl.textContent = 'Зміна паролю...';
+        statusEl.style.color = 'var(--gray-text)';
+        try {
+            await updatePassword(user, newPassword);
+            statusEl.textContent = 'Пароль успішно змінено!';
+            statusEl.style.color = 'var(--success-color)';
+            newPasswordInput.value = '';
+            confirmPasswordInput.value = '';
+        } catch (error) {
+            console.error("Помилка зміни пароля:", error);
+            if (error.code === 'auth/requires-recent-login') {
+                statusEl.textContent = 'Ця операція вимагає нещодавнього входу. Будь ласка, вийдіть і увійдіть знову.';
+            } else {
+                statusEl.textContent = `Помилка: ${error.message}`;
+            }
+            statusEl.style.color = 'var(--danger-color)';
+        }
+    }
+    // #endregion
+
+    async function handleLogin(e) { 
+        e.preventDefault();
+        const email = document.getElementById('email').value.trim(); 
+        const password = document.getElementById('password').value; 
+        try { 
+            await signInWithEmailAndPassword(auth, email, password);
+        } catch (err) { 
+            document.getElementById('login-error').innerText = "Неправильний email або пароль.";
+        } 
+    }
+</script>
+</body>
+</html>
