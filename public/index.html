@@ -143,6 +143,7 @@
 <body>
 <div id="app"></div>
 
+<!-- Modals -->
 <div class="modal-overlay" id="payment-modal">
     <div class="modal-panel" style="width: 450px;">
         <div class="modal-header">
@@ -206,6 +207,7 @@
         </form>
     </div>
 </div>
+
 <div class="modal-overlay" id="salary-group-modal">
     <div class="modal-panel" style="width: 550px;">
         <div class="modal-header">
@@ -225,6 +227,24 @@
             <button type="submit" class="btn" style="margin-top: 1.5rem;">Зберегти групу</button>
         </form>
     </div>
+</div>
+
+<div class="modal-overlay" id="confirm-modal">
+    <div class="modal-panel" style="width: 400px; text-align: center;">
+        <div class="modal-header" style="justify-content: center;">
+            <h2 id="confirm-modal-title">Підтвердження дії</h2>
+        </div>
+        <p id="confirm-modal-message" style="margin-bottom: 2rem; font-size: 1.1rem;"></p>
+        <div style="display: flex; justify-content: center; gap: 1rem;">
+            <button id="confirm-modal-cancel-btn" class="btn btn-edit">Скасувати</button>
+            <button id="confirm-modal-confirm-btn" class="btn btn-delete">Підтвердити</button>
+        </div>
+    </div>
+</div>
+
+<!-- Notification Toast -->
+<div id="notification-toast" style="position: fixed; bottom: 20px; right: 20px; background-color: var(--success-color); color: white; padding: 1rem 1.5rem; border-radius: 8px; box-shadow: var(--shadow); z-index: 2000; opacity: 0; display: none; transition: opacity 0.5s ease-in-out;">
+    <span id="notification-message"></span>
 </div>
 
 
@@ -277,6 +297,55 @@
     let masterAdvancesUnsubscribe = null;
     let staffSubcollectionUnsubscribers = [];
     
+    // #region UI Helper Functions (Notifications & Confirmations)
+    function showNotification(message, type = 'success') {
+        const toast = document.getElementById('notification-toast');
+        if (!toast) return;
+        const messageEl = document.getElementById('notification-message');
+        
+        messageEl.textContent = message;
+        toast.style.backgroundColor = type === 'success' ? 'var(--success-color)' : 'var(--danger-color)';
+        
+        toast.style.display = 'block';
+        setTimeout(() => toast.style.opacity = 1, 10); // Allow display property to apply before starting transition
+        
+        setTimeout(() => {
+            toast.style.opacity = 0;
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 500); // Wait for transition to finish
+        }, 3000);
+    }
+
+    function showConfirmModal(message, onConfirm) {
+        const confirmModal = document.getElementById('confirm-modal');
+        if (!confirmModal) return;
+        
+        const messageEl = document.getElementById('confirm-modal-message');
+        const confirmBtn = document.getElementById('confirm-modal-confirm-btn');
+        const cancelBtn = document.getElementById('confirm-modal-cancel-btn');
+        
+        messageEl.textContent = message;
+        
+        // Clone and replace the button to remove old event listeners, preventing multiple fires
+        const newConfirmBtn = confirmBtn.cloneNode(true);
+        confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+        
+        const hideModal = () => {
+            confirmModal.style.display = 'none';
+        };
+
+        newConfirmBtn.onclick = () => {
+            hideModal();
+            onConfirm();
+        };
+        
+        cancelBtn.onclick = hideModal;
+        
+        confirmModal.style.display = 'flex';
+    }
+    // #endregion
+
     async function handleLogin(e) { 
         e.preventDefault();
         const email = document.getElementById('email').value.trim(); 
@@ -625,7 +694,7 @@
         const salonId = document.getElementById('staff-salon').value;
 
         if (!name || !salonId || isNaN(fixedSalary)) {
-            return alert("Будь ласка, заповніть усі поля коректно.");
+            return showNotification("Будь ласка, заповніть усі поля коректно.", "error");
         }
 
         const action = () => addDoc(collection(db, 'staff'), {
@@ -639,7 +708,7 @@
             await logAndExecute('Створено співробітника', { name, salary: fixedSalary }, action);
             event.target.reset();
         } catch (e) {
-            alert("Не вдалося додати співробітника.");
+            showNotification("Не вдалося додати співробітника.", "error");
         }
     }
 
@@ -777,29 +846,29 @@
         const isFrozen = document.getElementById('edit-staff-frozen').checked;
 
         if (!name || !salonId || isNaN(fixedSalary)) {
-            return alert("Будь ласка, заповніть усі поля коректно.");
+            return showNotification("Будь ласка, заповніть усі поля коректно.", "error");
         }
         
         const action = () => updateDoc(doc(db, 'staff', staffId), { name, fixedSalary, salonId, isFrozen });
         try {
             await logAndExecute('Оновлено дані співробітника', { staffId, name }, action);
-            alert('Дані оновлено!');
+            showNotification('Дані оновлено!');
         } catch (e) {
-            alert('Не вдалося оновити дані.');
+            showNotification('Не вдалося оновити дані.', "error");
         }
     }
 
     async function handleDeleteStaff(staffId, name) {
-        if (confirm(`Ви впевнені, що хочете видалити співробітника ${name}? Цю дію не можна скасувати.`)) {
+        showConfirmModal(`Ви впевнені, що хочете видалити співробітника ${name}? Цю дію не можна скасувати.`, async () => {
             const action = () => deleteDoc(doc(db, 'staff', staffId));
             try {
                 await logAndExecute('Видалено співробітника', { staffId, name }, action);
-                alert('Співробітника видалено.');
+                showNotification('Співробітника видалено.');
                 renderView('staff');
             } catch (e) {
-                alert('Не вдалося видалити співробітника.');
+                showNotification('Не вдалося видалити співробітника.', "error");
             }
-        }
+        });
     }
 
     async function handleAddStaffPayment(event) {
@@ -810,8 +879,8 @@
         const amount = parseFloat(document.getElementById('payment-amount').value);
         const description = document.getElementById('bonus-description').value.trim();
 
-        if (isNaN(amount) || amount <= 0) return alert('Введіть коректну суму.');
-        if (type === 'bonus' && !description) return alert('Будь ласка, додайте опис для премії.');
+        if (isNaN(amount) || amount <= 0) return showNotification('Введіть коректну суму.', "error");
+        if (type === 'bonus' && !description) return showNotification('Будь ласка, додайте опис для премії.', "error");
 
         const data = {
             amount,
@@ -828,23 +897,23 @@
             event.target.reset();
             document.getElementById('bonus-description-group').style.display = 'none';
         } catch (e) {
-            alert(`Не вдалося додати ${type}.`);
+            showNotification(`Не вдалося додати ${type}.`, "error");
         }
     }
 
     async function handleDeleteStaffHistory(itemId, type, amount) {
         const staffId = state.viewingStaffId;
         const person = state.staff.find(p => p.id === staffId);
-        if (confirm('Ви впевнені, що хочете видалити цей запис?')) {
+        showConfirmModal('Ви впевнені, що хочете видалити цей запис?', async () => {
             const action = () => deleteDoc(doc(db, 'staff', staffId, type, itemId));
             const logAction = type === 'advances' ? 'Видалено аванс' : 'Видалено премію';
             const logDetails = { staffId, name: person.name, amount: parseFloat(amount) };
             try {
                 await logAndExecute(logAction, logDetails, action);
             } catch (e) {
-                alert('Не вдалося видалити запис.');
+                showNotification('Не вдалося видалити запис.', "error");
             }
-        }
+        });
     }
     // #endregion
 
@@ -855,13 +924,14 @@
                 let displayKey = key;
                 // Simple localization for keys
                 switch(key) {
-                    case 'name': displayKey = 'Ім\'я'; break;
+                    case 'name': displayKey = "Ім'я"; break;
                     case 'amount': displayKey = 'Сума'; break;
                     case 'serviceId': displayKey = 'ID Послуги'; break;
                     case 'masterId': displayKey = 'ID Майстра'; break;
                     case 'staffId': displayKey = 'ID Співробітника'; break;
                     case 'appointmentId': displayKey = 'ID Запису'; break;
                     case 'description': displayKey = 'Опис'; break;
+                    case 'clientName': displayKey = 'Ім\'я клієнта'; break;
                 }
                 return `${displayKey}: ${value}`;
             });
@@ -1254,9 +1324,9 @@
                     </div>
                 `;
                 li.querySelector('.btn-delete-single-payment').onclick = () => {
-                    if(confirm('Ви впевнені, що хочете видалити цей платіж?')) {
+                    showConfirmModal('Ви впевнені, що хочете видалити цей платіж?', () => {
                         li.remove();
-                    }
+                    });
                 };
                 listEl.appendChild(li);
             });
@@ -1268,7 +1338,7 @@
         event.preventDefault();
         const appointmentId = document.getElementById('edit-payments-appointment-id').value;
         const appointment = state.appointments.find(a => a.id === appointmentId);
-        if (!appointment) return alert('Помилка: запис не знайдено.');
+        if (!appointment) return showNotification('Помилка: запис не знайдено.', 'error');
 
         const newPayments = [];
         let newTotalPaid = 0;
@@ -1294,24 +1364,24 @@
         
         try {
             await logAndExecute('Оновлено оплати запису', { appointmentId, clientName: appointment.clientName }, action);
-            alert('Оплати успішно оновлено!');
+            showNotification('Оплати успішно оновлено!');
             document.getElementById('edit-payments-modal').style.display = 'none';
         } catch (e) {
-            alert("Не вдалося оновити оплати.");
+            showNotification("Не вдалося оновити оплати.", "error");
         }
     }
 
     async function handleCancelAppointment(appointmentId, clientName) {
-        if (confirm('Ви впевнені, що хочете скасувати цей запис? Цю дію не можна буде скасувати.')) {
+        showConfirmModal('Ви впевнені, що хочете скасувати цей запис? Цю дію не можна буде скасувати.', async () => {
             const action = () => deleteDoc(doc(db, 'appointments', appointmentId));
             try {
                 await logAndExecute('Скасовано запис', { appointmentId, clientName }, action);
                 document.getElementById('appointment-action-modal').style.display = 'none';
-                alert('Запис успішно скасовано.');
+                showNotification('Запис успішно скасовано.');
             } catch (e) {
-                alert('Не вдалося скасувати запис.');
+                showNotification('Не вдалося скасувати запис.', "error");
             }
-        }
+        });
     }
 
     function handleEditAppointment(appointmentId) {
@@ -1679,13 +1749,13 @@
         const dateTimeString = document.getElementById('appointment-datetime').value;
         const salonId = document.getElementById('appointment-salon').value;
         if (!serviceId || !masterId || !dateTimeString || !salonId) {
-            return alert("Будь ласка, заповніть усі поля, включно з салоном.");
+            return showNotification("Будь ласка, заповніть усі поля, включно з салоном.", "error");
         }
 
         const service = state.services.find(s => s.id === serviceId);
         const master = state.masters.find(m => m.id === masterId);
         if (!service || !master) {
-            return alert("Помилка: не знайдено послугу або майстра!");
+            return showNotification("Помилка: не знайдено послугу або майстра!", "error");
         }
 
         const priceModifier = master.priceModifier || 0;
@@ -1712,7 +1782,7 @@
             if (isEditMode) {
                 const action = () => updateDoc(doc(db, 'appointments', state.editingAppointmentId), appointmentData);
                 await logAndExecute('Оновлено запис', { ...logDetails, appointmentId: state.editingAppointmentId }, action);
-                alert('Запис успішно оновлено!');
+                showNotification('Запис успішно оновлено!');
                 state.editingAppointmentId = null;
                 renderView('calendar');
             } else {
@@ -1721,7 +1791,7 @@
                 if (state.selectedClientForAppointment) {
                     clientId = state.selectedClientForAppointment.id;
                 } else {
-                    if (!clientPhone) return alert("Для нового клієнта необхідно вказати номер телефону.");
+                    if (!clientPhone) return showNotification("Для нового клієнта необхідно вказати номер телефону.", "error");
                     const normalizedPhone = clientPhone.replace(/[\s-()]/g, '');
                     const existingClient = state.clients.find(c => c.name.toLowerCase() === clientName.toLowerCase() && c.phone.replace(/[\s-()]/g, '') === normalizedPhone);
                     if (existingClient) {
@@ -1746,7 +1816,7 @@
                 const createAppAction = () => addDoc(collection(db, 'appointments'), fullAppointmentData);
                 await logAndExecute('Створено запис', logDetails, createAppAction);
 
-                alert('Запис успішно створено!');
+                showNotification('Запис успішно створено!');
                 event.target.reset();
                 state.selectedClientForAppointment = null;
                 const clientSearchInput = document.getElementById('client-search-input');
@@ -1755,7 +1825,7 @@
                 updateFinalPrice();
             }
         } catch (e) {
-            alert('Не вдалося зберегти запис.');
+            showNotification('Не вдалося зберегти запис.', "error");
         }
     }
      
@@ -1766,7 +1836,7 @@
         const amountToPay = parseFloat(document.getElementById('payment-amount').value);
 
         if (!appointmentId || !amountToPay || amountToPay <= 0) {
-            return alert('Будь ласка, введіть коректну суму.');
+            return showNotification('Будь ласка, введіть коректну суму.', "error");
         }
         
         const appointmentRef = doc(db, 'appointments', appointmentId);
@@ -1779,33 +1849,36 @@
             const appointmentData = appointmentSnap.data();
             const currentTotalPaid = appointmentData.totalPaid || 0;
             const finalPrice = appointmentData.finalPrice;
-            if (amountToPay > (finalPrice - currentTotalPaid) + 0.01) { 
-                if(!confirm(`Сума оплати (${amountToPay.toFixed(2)} zł) більша за залишок (${(finalPrice - currentTotalPaid).toFixed(2)} zł). Продовжити?`)){
-                    return;
-                }
-            }
+            
+            const processPayment = async () => {
+                const newPayment = {
+                    amount: amountToPay,
+                    type: paymentType,
+                    date: Timestamp.now()
+                };
 
-            const newPayment = {
-                amount: amountToPay,
-                type: paymentType,
-                date: Timestamp.now()
+                const newTotalPaid = currentTotalPaid + amountToPay;
+                const newStatus = (newTotalPaid >= finalPrice - 0.001) ? 'completed' : 'partially_paid';
+                
+                const action = () => updateDoc(appointmentRef, {
+                    payments: arrayUnion(newPayment),
+                    totalPaid: increment(amountToPay),
+                    status: newStatus,
+                    ...(newStatus === 'completed' && !appointmentData.completedAt && { completedAt: Timestamp.now() })
+                });
+
+                await logAndExecute('Проведено оплату', { appointmentId, clientName: appointmentData.clientName, amount: amountToPay, type: paymentType }, action);
+                
+                document.getElementById('payment-modal').style.display = 'none';
             };
 
-            const newTotalPaid = currentTotalPaid + amountToPay;
-            const newStatus = (newTotalPaid >= finalPrice - 0.001) ? 'completed' : 'partially_paid';
-            
-            const action = () => updateDoc(appointmentRef, {
-                payments: arrayUnion(newPayment),
-                totalPaid: increment(amountToPay),
-                status: newStatus,
-                ...(newStatus === 'completed' && !appointmentData.completedAt && { completedAt: Timestamp.now() })
-            });
-
-            await logAndExecute('Проведено оплату', { appointmentId, clientName: appointmentData.clientName, amount: amountToPay, type: paymentType }, action);
-            
-            document.getElementById('payment-modal').style.display = 'none';
+            if (amountToPay > (finalPrice - currentTotalPaid) + 0.01) { 
+                showConfirmModal(`Сума оплати (${amountToPay.toFixed(2)} zł) більша за залишок (${(finalPrice - currentTotalPaid).toFixed(2)} zł). Продовжити?`, processPayment);
+            } else {
+                await processPayment();
+            }
         } catch (e) {
-            alert('Не вдалося провести оплату. Помилка: ' + e.message);
+            showNotification('Не вдалося провести оплату. Помилка: ' + e.message, "error");
         }
     }
     // #endregion
@@ -1938,7 +2011,7 @@
         const description = descriptionInput.value.trim();
 
         if (!masterId || !amount || amount <= 0) {
-            return alert('Будь ласка, введіть коректну суму.');
+            return showNotification('Будь ласка, введіть коректну суму.', "error");
         }
         
         const data = {
@@ -1956,21 +2029,21 @@
             amountInput.value = '';
             descriptionInput.value = '';
         } catch (e) {
-            alert("Помилка при видачі авансу.");
+            showNotification("Помилка при видачі авансу.", "error");
         }
     }
 
     async function handleDeleteAdvance(advanceId, masterName, amount, description) {
         const masterId = state.viewingMasterId;
         if (!masterId || !advanceId) return;
-        if (confirm('Ви впевнені, що хочете видалити цей аванс? Цю дію не можна скасувати.')) {
+        showConfirmModal('Ви впевнені, що хочете видалити цей аванс? Цю дію не можна скасувати.', async () => {
             const action = () => deleteDoc(doc(db, 'masters', masterId, 'advances', advanceId));
             try {
                 await logAndExecute('Видалено аванс майстра', { masterId, name: masterName, amount: parseFloat(amount), description }, action);
             } catch (e) {
-                alert("Помилка при видаленні авансу.");
+                showNotification("Помилка при видаленні авансу.", "error");
             }
-        }
+        });
     }
 
     function populateCategoryCheckboxes(elementId, checkedIds = []) { const container = document.getElementById(elementId); if (!container) return; container.innerHTML = state.categories.length ? '' : 'Спочатку додайте категорії'; state.categories.forEach(category => { const isChecked = checkedIds.includes(category.id); container.innerHTML += `<label><input type="checkbox" value="${category.id}" ${isChecked ? 'checked' : ''}> ${category.name}</label>`; }); }
@@ -1981,18 +2054,18 @@
         const tier = document.getElementById('new-master-tier').value.trim(); 
         const priceModifier = parseFloat(document.getElementById('new-master-modifier').value) || 0; 
         const categoryIds = Array.from(document.querySelectorAll('#new-master-categories input:checked')).map(el => el.value); 
-        if (!name) return alert("Введіть ім'я майстра."); 
+        if (!name) return showNotification("Введіть ім'я майстра.", "error"); 
 
         const action = () => addDoc(collection(db, 'masters'), { name, tier, priceModifier, categoryIds, isFrozen: false });
         try { 
             await logAndExecute('Створено майстра', { name }, action);
             event.target.reset(); 
         } catch (e) { 
-            alert('Не вдалося додати майстра.'); 
+            showNotification('Не вдалося додати майстра.', "error"); 
         } 
     }
 
-    function showEditMasterModal(id) { const master = state.masters.find(m => m.id === id); if (!master) return alert('Майстра не знайдено!'); const modal = document.getElementById('edit-master-modal'); modal.style.display = 'flex'; document.getElementById('edit-master-id').value = id; document.getElementById('edit-master-name').value = master.name; document.getElementById('edit-master-tier').value = master.tier || ''; document.getElementById('edit-master-modifier').value = master.priceModifier || 0; document.getElementById('edit-master-frozen').checked = master.isFrozen || false; populateCategoryCheckboxes('edit-master-categories', master.categoryIds || []); }
+    function showEditMasterModal(id) { const master = state.masters.find(m => m.id === id); if (!master) return showNotification('Майстра не знайдено!', "error"); const modal = document.getElementById('edit-master-modal'); modal.style.display = 'flex'; document.getElementById('edit-master-id').value = id; document.getElementById('edit-master-name').value = master.name; document.getElementById('edit-master-tier').value = master.tier || ''; document.getElementById('edit-master-modifier').value = master.priceModifier || 0; document.getElementById('edit-master-frozen').checked = master.isFrozen || false; populateCategoryCheckboxes('edit-master-categories', master.categoryIds || []); }
     
     async function handleUpdateMaster(event) { 
         event.preventDefault(); 
@@ -2002,14 +2075,14 @@
         const priceModifier = parseFloat(document.getElementById('edit-master-modifier').value) || 0; 
         const categoryIds = Array.from(document.querySelectorAll('#edit-master-categories input:checked')).map(el => el.value); 
         const isFrozen = document.getElementById('edit-master-frozen').checked; 
-        if (!name) return alert("Ім'я не може бути порожнім."); 
+        if (!name) return showNotification("Ім'я не може бути порожнім.", "error"); 
 
         const action = () => updateDoc(doc(db, 'masters', id), { name, tier, priceModifier, categoryIds, isFrozen });
         try { 
             await logAndExecute('Оновлено дані майстра', { masterId: id, name }, action);
             document.getElementById('edit-master-modal').style.display = 'none'; 
         } catch(e) { 
-            alert('Не вдалося оновити.'); 
+            showNotification('Не вдалося оновити.', "error"); 
         } 
     }
     // #endregion
@@ -2018,14 +2091,14 @@
     function renderServicesView(container) { container.innerHTML = `<div class="services-layout"><div class="content-card"><h2>Категорії</h2><form id="add-category-form" class="form-group"><input type="text" id="new-category-name" placeholder="Нова категорія..." required><button class="btn" type="submit" style="width:100%; margin-top:0.5rem;">Додати</button></form><ul id="categories-list" class="item-list"></ul></div><div id="services-container"><div class="content-card"><p>Оберіть категорію зліва.</p></div></div></div><div class="modal-overlay" id="edit-category-modal"><div class="modal-panel"><div class="modal-header"><h2>Редагувати категорію</h2><button class="close-btn">&times;</button></div><form id="edit-category-form"><input type="hidden" id="edit-category-id"><div class="form-group"><label for="edit-category-name">Назва категорії</label><input type="text" id="edit-category-name" required></div><div class="form-group"><label for="edit-category-discount">Акційна знижка (%)</label><input type="number" id="edit-category-discount" min="0" max="100" value="0"></div><button type="submit">Зберегти зміни</button></form></div></div><div class="modal-overlay" id="edit-service-modal"><div class="modal-panel"><div class="modal-header"><h2 id="service-modal-title">Послуга</h2><button class="close-btn">&times;</button></div><form id="edit-service-form"><input type="hidden" id="edit-service-id"><div class="form-group"><label for="edit-service-name">Назва</label><input type="text" id="edit-service-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="edit-service-duration">Тривалість (хв)</label><input type="number" id="edit-service-duration" required min="0"></div><div class="form-group" style="flex:1;"><label for="edit-service-price">Ціна (zł)</label><input type="number" id="edit-service-price" required min="0"></div></div><div class="form-group"><label for="edit-service-discount">Персональна знижка (%)</label><input type="number" id="edit-service-discount" min="0" max="100" value="0"></div><button type="submit">Зберегти</button></form></div></div>`; setupCategoriesLogic(); if (state.selectedCategoryId) { renderServicesForCategory(); } }
     function setupCategoriesLogic() { document.getElementById('add-category-form').onsubmit = handleAddCategory; document.getElementById('edit-category-modal').querySelector('.close-btn').onclick = () => document.getElementById('edit-category-modal').style.display = 'none'; document.getElementById('edit-category-form').onsubmit = handleUpdateCategory; const categoriesListEl = document.getElementById('categories-list'); categoriesListEl.innerHTML = state.categories.length > 0 ? '' : '<li>Немає категорій.</li>'; state.categories.forEach(category => { const li = document.createElement('li'); li.className = 'category-list-item'; li.dataset.id = category.id; if (category.id === state.selectedCategoryId) li.classList.add('selected'); li.innerHTML = `<span>${category.name} ${category.discount ? `<strong style="color:var(--danger-color);">-`+category.discount+'%</strong>' : ''}</span><div class="actions"><button class="btn btn-edit" data-id="${category.id}" data-name="${category.name}" data-discount="${category.discount || 0}">✏️</button><button class="btn btn-delete" data-id="${category.id}" data-name="${category.name}">🗑️</button></div>`; categoriesListEl.appendChild(li); }); categoriesListEl.onclick = (event) => { const target = event.target; const deleteBtn = target.closest('.btn-delete'); if (deleteBtn) { handleDeleteCategory(deleteBtn.dataset.id, deleteBtn.dataset.name); } else if (target.closest('.btn-edit')) { const btn = target.closest('.btn-edit'); showEditCategoryModal(btn.dataset.id, btn.dataset.name, btn.dataset.discount); } else if (target.closest('.category-list-item')) { state.selectedCategoryId = target.closest('.category-list-item').dataset.id; renderView('services'); } }; }
     function renderServicesForCategory() { const categoryId = state.selectedCategoryId; const servicesContainer = document.getElementById('services-container'); const category = state.categories.find(c => c.id === categoryId); const categoryName = category ? category.name : ''; servicesContainer.innerHTML = `<div class="content-card"><div style="display:flex; justify-content:space-between; align-items:center;"><h2>Послуги: ${categoryName}</h2><button id="add-service-btn" class="btn">Додати послугу</button></div><ul id="services-list" class="item-list"></ul></div>`; document.getElementById('add-service-btn').onclick = () => showServiceModal(); const servicesListEl = document.getElementById('services-list'); const filteredServices = state.services.filter(s => s.categoryId === categoryId).sort((a,b)=>a.name.localeCompare(b.name)); servicesListEl.innerHTML = filteredServices.length > 0 ? '' : '<li>Немає послуг в цій категорії.</li>'; filteredServices.forEach(service => { const finalDiscount = (service.discount > 0) ? service.discount : (category?.discount || 0); const discountedPrice = service.price * (1 - finalDiscount / 100); const li = document.createElement('li'); li.innerHTML = `<div><strong>${service.name}</strong><br><small>${service.duration || 'N/A'} хв. ${service.discount > 0 ? `(Знижка ${service.discount}%)` : ''}</small></div><div class="price-display">${finalDiscount > 0 ? `<span class="old-price">${service.price} zł</span>` : ''}<span class="new-price">${discountedPrice.toFixed(0)} zł</span></div><div class="actions"><button class="btn-edit btn-edit-service" data-id="${service.id}" data-name="${service.name}" data-duration="${service.duration}" data-price="${service.price}" data-discount="${service.discount || 0}">✏️</button><button class="btn-delete btn-delete-service" data-id="${service.id}" data-name="${service.name}">🗑️</button></div>`; servicesListEl.appendChild(li); }); servicesListEl.onclick = (event) => { const target = event.target.closest('button'); if (!target) return; const deleteBtn = target.closest('.btn-delete-service'); if (deleteBtn) handleDeleteService(deleteBtn.dataset.id, deleteBtn.dataset.name); if (target.classList.contains('btn-edit-service')) { showServiceModal(target.dataset.id, target.dataset); }}; }
-    async function handleAddCategory(event) { event.preventDefault(); const nameInput = document.getElementById('new-category-name'); const name = nameInput.value.trim(); if (!name) return; const action = () => addDoc(collection(db, 'serviceCategories'), { name, discount: 0 }); try { await logAndExecute('Створено категорію', { name }, action); nameInput.value = ''; } catch (e) { alert('Не вдалося додати.'); } }
-    async function handleDeleteCategory(id, name) { if (!confirm(`Видалити категорію "${name}" та всі послуги в ній?`)) return; try { const q = query(collection(db, 'services'), where('categoryId', '==', id)); const snapshot = await getDocs(q); const deletePromises = []; snapshot.forEach(doc => deletePromises.push(deleteDoc(doc.ref))); await Promise.all(deletePromises); await logAndExecute('Видалено категорію', { categoryId: id, name }, () => deleteDoc(doc(db, 'serviceCategories', id))); if (state.selectedCategoryId === id) { state.selectedCategoryId = null; } } catch (e) { alert('Не вдалося видалити.'); } }
+    async function handleAddCategory(event) { event.preventDefault(); const nameInput = document.getElementById('new-category-name'); const name = nameInput.value.trim(); if (!name) return; const action = () => addDoc(collection(db, 'serviceCategories'), { name, discount: 0 }); try { await logAndExecute('Створено категорію', { name }, action); nameInput.value = ''; } catch (e) { showNotification('Не вдалося додати.', "error"); } }
+    async function handleDeleteCategory(id, name) { showConfirmModal(`Видалити категорію "${name}" та всі послуги в ній?`, async () => { try { const q = query(collection(db, 'services'), where('categoryId', '==', id)); const snapshot = await getDocs(q); const deletePromises = []; snapshot.forEach(doc => deletePromises.push(deleteDoc(doc.ref))); await Promise.all(deletePromises); await logAndExecute('Видалено категорію', { categoryId: id, name }, () => deleteDoc(doc(db, 'serviceCategories', id))); if (state.selectedCategoryId === id) { state.selectedCategoryId = null; } } catch (e) { showNotification('Не вдалося видалити.', "error"); } }); }
     function showEditCategoryModal(id, name, discount) { const modal = document.getElementById('edit-category-modal'); modal.style.display = 'flex'; document.getElementById('edit-category-id').value = id; document.getElementById('edit-category-name').value = name; document.getElementById('edit-category-discount').value = discount || 0; }
-    async function handleUpdateCategory(event) { event.preventDefault(); const id = document.getElementById('edit-category-id').value; const name = document.getElementById('edit-category-name').value.trim(); const discount = parseFloat(document.getElementById('edit-category-discount').value) || 0; if (!name) return alert('Назва не може бути порожньою.'); const action = () => updateDoc(doc(db, 'serviceCategories', id), { name, discount }); try { await logAndExecute('Оновлено категорію', { categoryId: id, name }, action); document.getElementById('edit-category-modal').style.display = 'none'; } catch(e) { alert('Не вдалося оновити.'); } }
+    async function handleUpdateCategory(event) { event.preventDefault(); const id = document.getElementById('edit-category-id').value; const name = document.getElementById('edit-category-name').value.trim(); const discount = parseFloat(document.getElementById('edit-category-discount').value) || 0; if (!name) return showNotification('Назва не може бути порожньою.', "error"); const action = () => updateDoc(doc(db, 'serviceCategories', id), { name, discount }); try { await logAndExecute('Оновлено категорію', { categoryId: id, name }, action); document.getElementById('edit-category-modal').style.display = 'none'; } catch(e) { showNotification('Не вдалося оновити.', "error"); } }
     function showServiceModal(id = null, data = {}) { const modal = document.getElementById('edit-service-modal'); modal.style.display = 'flex'; modal.querySelector('h2').textContent = id ? 'Редагувати послугу' : 'Додати нову послугу'; document.getElementById('edit-service-id').value = id || ''; document.getElementById('edit-service-name').value = data.name || ''; document.getElementById('edit-service-duration').value = data.duration || ''; document.getElementById('edit-service-price').value = data.price || ''; document.getElementById('edit-service-discount').value = data.discount || 0; document.getElementById('edit-service-form').onsubmit = id ? handleUpdateService : handleAddService; document.querySelector('#edit-service-modal .close-btn').onclick = () => modal.style.display = 'none'; }
-    async function handleAddService(event) { event.preventDefault(); if (!state.selectedCategoryId) return alert('Спочатку оберіть категорію!'); const name = document.getElementById('edit-service-name').value.trim(); const duration = parseInt(document.getElementById('edit-service-duration').value); const price = parseFloat(document.getElementById('edit-service-price').value); const discount = parseFloat(document.getElementById('edit-service-discount').value) || 0; if (!name || !(duration>=0) || !(price>=0)) return alert('Заповніть усі поля коректно.'); const action = () => addDoc(collection(db, 'services'), { name, duration, price, discount, categoryId: state.selectedCategoryId }); try { await logAndExecute('Створено послугу', { name, categoryId: state.selectedCategoryId }, action); document.getElementById('edit-service-modal').style.display = 'none'; } catch (e) { alert('Не вдалося додати.'); } }
-    async function handleUpdateService(event) { event.preventDefault(); const id = document.getElementById('edit-service-id').value; const name = document.getElementById('edit-service-name').value.trim(); const duration = parseInt(document.getElementById('edit-service-duration').value); const price = parseFloat(document.getElementById('edit-service-price').value); const discount = parseFloat(document.getElementById('edit-service-discount').value) || 0; if (!name || !(duration>=0) || !(price>=0)) return alert('Заповніть усі поля коректно.'); const action = () => updateDoc(doc(db, 'services', id), { name, duration, price, discount }); try { await logAndExecute('Оновлено послугу', { serviceId: id, name }, action); document.getElementById('edit-service-modal').style.display = 'none'; } catch(e) { alert('Не вдалося оновити.'); } }
-    async function handleDeleteService(id, name) { if (!confirm(`Видалити послугу "${name}"?`)) return; const action = () => deleteDoc(doc(db, 'services', id)); try { await logAndExecute('Видалено послугу', { serviceId: id, name }, action); } catch (e) { alert('Не вдалося видалити.'); } }
+    async function handleAddService(event) { event.preventDefault(); if (!state.selectedCategoryId) return showNotification('Спочатку оберіть категорію!', "error"); const name = document.getElementById('edit-service-name').value.trim(); const duration = parseInt(document.getElementById('edit-service-duration').value); const price = parseFloat(document.getElementById('edit-service-price').value); const discount = parseFloat(document.getElementById('edit-service-discount').value) || 0; if (!name || !(duration>=0) || !(price>=0)) return showNotification('Заповніть усі поля коректно.', "error"); const action = () => addDoc(collection(db, 'services'), { name, duration, price, discount, categoryId: state.selectedCategoryId }); try { await logAndExecute('Створено послугу', { name, categoryId: state.selectedCategoryId }, action); document.getElementById('edit-service-modal').style.display = 'none'; } catch (e) { showNotification('Не вдалося додати.', "error"); } }
+    async function handleUpdateService(event) { event.preventDefault(); const id = document.getElementById('edit-service-id').value; const name = document.getElementById('edit-service-name').value.trim(); const duration = parseInt(document.getElementById('edit-service-duration').value); const price = parseFloat(document.getElementById('edit-service-price').value); const discount = parseFloat(document.getElementById('edit-service-discount').value) || 0; if (!name || !(duration>=0) || !(price>=0)) return showNotification('Заповніть усі поля коректно.', "error"); const action = () => updateDoc(doc(db, 'services', id), { name, duration, price, discount }); try { await logAndExecute('Оновлено послугу', { serviceId: id, name }, action); document.getElementById('edit-service-modal').style.display = 'none'; } catch(e) { showNotification('Не вдалося оновити.', "error"); } }
+    async function handleDeleteService(id, name) { showConfirmModal(`Видалити послугу "${name}"?`, async () => { const action = () => deleteDoc(doc(db, 'services', id)); try { await logAndExecute('Видалено послугу', { serviceId: id, name }, action); } catch (e) { showNotification('Не вдалося видалити.', "error"); } }); }
     // #endregion
 
     // #region Salary, Expenses, Notepad & Settings
@@ -2232,7 +2305,7 @@
         const amount = parseFloat(document.getElementById('expense-amount').value);
         const date = document.getElementById('expense-date').value;
         if (!description || !amount || !date) {
-            return alert("Будь ласка, заповніть усі поля.");
+            return showNotification("Будь ласка, заповніть усі поля.", "error");
         }
         
         const action = () => addDoc(collection(db, 'expenses'), {
@@ -2246,19 +2319,19 @@
             event.target.reset();
             document.getElementById('expense-date').valueAsDate = new Date();
         } catch (e) {
-            alert("Не вдалося додати витрату.");
+            showNotification("Не вдалося додати витрату.", "error");
         }
     }
 
     async function handleDeleteExpense(id, description) {
-        if(confirm('Ви впевнені, що хочете видалити цю витрату?')) {
+        showConfirmModal('Ви впевнені, що хочете видалити цю витрату?', async () => {
             const action = () => deleteDoc(doc(db, 'expenses', id));
             try {
                 await logAndExecute('Видалено загальну витрату', { expenseId: id, description }, action);
             } catch(e) {
-                alert("Не вдалося видалити витрату.");
+                showNotification("Не вдалося видалити витрату.", "error");
             }
-        }
+        });
     }
 
     function renderSalonExpensesView(container) {
@@ -2336,7 +2409,7 @@
         const date = document.getElementById('salon-expense-date').value;
         const salonId = document.getElementById('salon-expense-salon').value;
         if (!description || !amount || !date || !salonId) {
-            return alert("Будь ласка, заповніть усі поля.");
+            return showNotification("Будь ласка, заповніть усі поля.", "error");
         }
         
         const salon = state.salons.find(s => s.id === salonId);
@@ -2353,19 +2426,19 @@
             event.target.reset();
             document.getElementById('salon-expense-date').valueAsDate = new Date();
         } catch (e) {
-            alert("Не вдалося додати витрату.");
+            showNotification("Не вдалося додати витрату.", "error");
         }
     }
     
     async function handleDeleteSalonExpense(id, description) {
-        if(confirm('Ви впевнені, що хочете видалити цю витрату?')) {
+        showConfirmModal('Ви впевнені, що хочете видалити цю витрату?', async () => {
             const action = () => deleteDoc(doc(db, 'salonExpenses', id));
             try {
                 await logAndExecute('Видалено витрату салону', { expenseId: id, description }, action);
             } catch(e) {
-                alert("Не вдалося видалити витрату.");
+                showNotification("Не вдалося видалити витрату.", "error");
             }
-        }
+        });
     }
 
     function renderNotepadView(container) {
@@ -2422,20 +2495,20 @@
             await logAndExecute('Додано запис у блокнот', { content: content.substring(0, 50) + '...' }, action);
             contentInput.value = '';
         } catch (e) {
-            alert("Не вдалося додати запис.");
+            showNotification("Не вдалося додати запис.", "error");
         }
     }
 
     async function handleDeleteNotepadEntry(entryId) {
         if (!entryId) return;
-        if (confirm('Ви впевнені, що хочете видалити цей запис?')) {
+        showConfirmModal('Ви впевнені, що хочете видалити цей запис?', async () => {
             const action = () => deleteDoc(doc(db, 'notepadEntries', entryId));
             try {
                 await logAndExecute('Видалено запис з блокноту', { entryId }, action);
             } catch (e) {
-                alert("Не вдалося видалити запис.");
+                showNotification("Не вдалося видалити запис.", "error");
             }
-        }
+        });
     }
     
     function renderShopView(container) {
@@ -2518,7 +2591,7 @@
         const paymentType = document.getElementById('product-sale-payment-type').value;
         
         if (!description || !amount || amount <= 0 || !salonId || !paymentType) {
-            return alert("Будь ласка, заповніть усі поля коректно.");
+            return showNotification("Будь ласка, заповніть усі поля коректно.", "error");
         }
         
         const salon = state.salons.find(s => s.id === salonId);
@@ -2533,23 +2606,23 @@
 
         try {
             await logAndExecute('Зареєстровано продаж товару', { description, amount, salon: salon.name }, action);
-            alert('Продаж успішно зареєстровано!');
+            showNotification('Продаж успішно зареєстровано!');
             event.target.reset();
         } catch (e) {
-            alert("Не вдалося зареєструвати продаж.");
+            showNotification("Не вдалося зареєструвати продаж.", "error");
         }
     }
 
     async function handleDeleteProductSale(saleId, description) {
         if(!saleId) return;
-        if(confirm('Ви впевнені, що хочете видалити цей продаж? Цю дію не можна скасувати.')) {
+        showConfirmModal('Ви впевнені, що хочете видалити цей продаж? Цю дію не можна скасувати.', async () => {
             const action = () => deleteDoc(doc(db, "productSales", saleId));
             try {
                 await logAndExecute('Видалено продаж товару', { saleId, description }, action);
             } catch (e) {
-                alert('Не вдалося видалити продаж.');
+                showNotification('Не вдалося видалити продаж.', "error");
             }
-        }
+        });
     }
     
     function renderSettingsView(container) {
@@ -2689,8 +2762,7 @@
         const groupId = document.getElementById('edit-salary-group-id').value;
         const name = document.getElementById('salary-group-name').value.trim();
         if (!name) {
-            alert('Назва групи не може бути порожньою.');
-            return;
+            return showNotification('Назва групи не може бути порожньою.', "error");
         }
 
         const tiers = [];
@@ -2713,18 +2785,19 @@
             }
             document.getElementById('salary-group-modal').style.display = 'none';
         } catch (e) {
-            alert('Не вдалося зберегти групу.');
+            showNotification('Не вдалося зберегти групу.', "error");
         }
     }
 
     async function handleDeleteSalaryGroup(groupId, name) {
-        if (!confirm(`Ви впевнені, що хочете видалити групу "${name}"? Майстри, призначені до неї, залишаться без групи.`)) return;
-        const action = () => deleteDoc(doc(db, 'salaryGroups', groupId));
-        try {
-            await logAndExecute('Видалено групу зарплат', { groupId, name }, action);
-        } catch(e) {
-            alert('Не вдалося видалити групу.');
-        }
+        showConfirmModal(`Ви впевнені, що хочете видалити групу "${name}"? Майстри, призначені до неї, залишаться без групи.`, async () => {
+            const action = () => deleteDoc(doc(db, 'salaryGroups', groupId));
+            try {
+                await logAndExecute('Видалено групу зарплат', { groupId, name }, action);
+            } catch(e) {
+                showNotification('Не вдалося видалити групу.', "error");
+            }
+        });
     }
     
     async function handleAssignGroupToMaster(masterId, groupId) {
@@ -2734,7 +2807,7 @@
         try {
             await logAndExecute('Призначено групу майстру', { master: master.name, group: group?.name || 'Не призначено' }, action);
         } catch(e) {
-            alert('Не вдалося призначити групу.');
+            showNotification('Не вдалося призначити групу.', "error");
         }
     }
     
@@ -2747,7 +2820,7 @@
         const salonId = document.getElementById('report-salon-filter').value;
 
         if (!startDate || !endDate) {
-            alert('Будь ласка, оберіть обидві дати.');
+            showNotification('Будь ласка, оберіть обидві дати.', "error");
             btn.disabled = false; btn.textContent = 'Відправити звіт';
             return;
         }
@@ -2755,10 +2828,10 @@
             const generateReport = httpsCallable(functions, 'generateAndSendReport');
             const result = await generateReport({ startDate, endDate, salonId });
             await logAndExecute('Сформовано ручний звіт', { period: `${startDate} - ${endDate}` }, () => Promise.resolve());
-            alert(result.data.message);
+            showNotification(result.data.message);
         } catch (error) {
             console.error("Помилка виклику хмарної функції:", error);
-            alert(`Помилка: ${error.message}`);
+            showNotification(`Помилка: ${error.message}`, "error");
         } finally {
             btn.disabled = false;
             btn.textContent = 'Відправити звіт';
