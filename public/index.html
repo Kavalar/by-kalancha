@@ -362,7 +362,7 @@
             // true - форсує оновлення токену, щоб отримати найсвіжіші дані
             const tokenResult = await user.getIdTokenResult(true);
             const role = tokenResult.claims.role || 'master'; // Роль за замовчуванням - 'master'
-
+            
             // Зберігаємо дані користувача в стані додатку
             state.user = { 
                 uid: user.uid, 
@@ -522,6 +522,38 @@
             document.querySelector('.shop-tab').style.display = 'block';
         } else {
              document.querySelector('.shop-tab').style.display = 'none';
+        }
+
+        const userInfoDiv = document.querySelector('.user-info');
+        if (user.email === 's.pepelniy@gmail.com') {
+            const fixButton = document.createElement('button');
+            fixButton.id = 'force-role-update-btn';
+            fixButton.className = 'btn';
+            fixButton.style.backgroundColor = 'var(--warning-color)';
+            fixButton.style.color = '#000';
+            fixButton.style.marginTop = '1rem';
+            fixButton.textContent = 'ОДНОРАЗОВЕ ВИПРАВЛЕННЯ: Оновити ролі';
+            
+            fixButton.onclick = async () => {
+                if (!confirm('Це запустить процес оновлення ролей для всіх користувачів. Це потрібно зробити лише один раз. Продовжити?')) return;
+                
+                fixButton.disabled = true;
+                fixButton.textContent = 'Оновлення...';
+
+                try {
+                    const setAllUserClaims = httpsCallable(functions, 'setAllUserClaims');
+                    const result = await setAllUserClaims();
+                    alert('Ролі успішно оновлено! Будь ласка, ВИЙДІТЬ і ЗАЙДІТЬ в систему знову, щоб зміни вступили в силу.');
+                } catch (error) {
+                    console.error("Помилка оновлення ролей:", error);
+                    alert(`Помилка: ${error.message}`);
+                } finally {
+                    fixButton.disabled = false;
+                    fixButton.textContent = 'ОДНОРАЗОВЕ ВИПРАВЛЕННЯ: Оновити ролі';
+                }
+            };
+            const logoutBtn = document.getElementById('logout-btn');
+            userInfoDiv.insertBefore(fixButton, logoutBtn);
         }
 
         document.getElementById('logout-btn').onclick = () => {
