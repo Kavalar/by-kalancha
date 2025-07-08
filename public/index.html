@@ -861,6 +861,7 @@
                     case 'masterId': displayKey = 'ID Майстра'; break;
                     case 'staffId': displayKey = 'ID Співробітника'; break;
                     case 'appointmentId': displayKey = 'ID Запису'; break;
+                    case 'description': displayKey = 'Опис'; break;
                 }
                 return `${displayKey}: ${value}`;
             });
@@ -1873,14 +1874,18 @@
             </div>
             <div class="content-card">
                 <h3>Видача авансу</h3>
-                <form id="add-advance-form" class="form-row">
-                    <div class="form-group" style="flex:1;">
-                        <label for="advance-amount">Сума авансу (zł)</label>
-                        <input type="number" id="advance-amount" min="1" required>
+                <form id="add-advance-form">
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1;">
+                            <label for="advance-amount">Сума авансу (zł)</label>
+                            <input type="number" id="advance-amount" min="1" required>
+                        </div>
+                        <div class="form-group" style="flex:2;">
+                            <label for="advance-description">Опис (необов'язково)</label>
+                            <input type="text" id="advance-description">
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <button type="submit" class="btn">Видати аванс</button>
-                    </div>
+                    <button type="submit" class="btn">Видати аванс</button>
                 </form>
             </div>
             <div class="content-card">
@@ -1895,7 +1900,7 @@
             }
             const deleteButton = event.target.closest('.btn-delete-advance');
             if (deleteButton) {
-                handleDeleteAdvance(deleteButton.dataset.id, master.name, deleteButton.dataset.amount);
+                handleDeleteAdvance(deleteButton.dataset.id, master.name, deleteButton.dataset.amount, deleteButton.dataset.description);
                 return;
             }
         };
@@ -1909,10 +1914,13 @@
             if (listEl) {
                 listEl.innerHTML = state.viewingMasterAdvances.length === 0 ? '<li>Авансів ще не було.</li>' : state.viewingMasterAdvances.map(adv => `
                     <li>
-                        <span>${adv.date.toDate().toLocaleString('uk-UA')}</span>
+                        <div>
+                            <span>${adv.date.toDate().toLocaleString('uk-UA')}</span>
+                            ${adv.description ? `<br><small style="color: var(--gray-text);">${adv.description}</small>` : ''}
+                        </div>
                         <div class="actions">
                             <strong>${adv.amount} zł</strong>
-                            <button class="btn btn-delete btn-delete-advance" data-id="${adv.id}" data-amount="${adv.amount}">Видалити</button>
+                            <button class="btn btn-delete btn-delete-advance" data-id="${adv.id}" data-amount="${adv.amount}" data-description="${adv.description || ''}">Видалити</button>
                         </div>
                     </li>
                 `).join('');
@@ -1925,31 +1933,40 @@
         const masterId = state.viewingMasterId;
         const master = state.masters.find(m => m.id === masterId);
         const amountInput = document.getElementById('advance-amount');
+        const descriptionInput = document.getElementById('advance-description');
         const amount = parseFloat(amountInput.value);
+        const description = descriptionInput.value.trim();
+
         if (!masterId || !amount || amount <= 0) {
             return alert('Будь ласка, введіть коректну суму.');
         }
         
-        const action = () => addDoc(collection(db, 'masters', masterId, 'advances'), {
+        const data = {
             amount: amount,
             date: Timestamp.now()
-        });
+        };
+        if (description) {
+            data.description = description;
+        }
+
+        const action = () => addDoc(collection(db, 'masters', masterId, 'advances'), data);
 
         try {
-            await logAndExecute('Видано аванс майстру', { masterId, name: master.name, amount }, action);
+            await logAndExecute('Видано аванс майстру', { masterId, name: master.name, amount, description }, action);
             amountInput.value = '';
+            descriptionInput.value = '';
         } catch (e) {
             alert("Помилка при видачі авансу.");
         }
     }
 
-    async function handleDeleteAdvance(advanceId, masterName, amount) {
+    async function handleDeleteAdvance(advanceId, masterName, amount, description) {
         const masterId = state.viewingMasterId;
         if (!masterId || !advanceId) return;
         if (confirm('Ви впевнені, що хочете видалити цей аванс? Цю дію не можна скасувати.')) {
             const action = () => deleteDoc(doc(db, 'masters', masterId, 'advances', advanceId));
             try {
-                await logAndExecute('Видалено аванс майстра', { masterId, name: masterName, amount: parseFloat(amount) }, action);
+                await logAndExecute('Видалено аванс майстра', { masterId, name: masterName, amount: parseFloat(amount), description }, action);
             } catch (e) {
                 alert("Помилка при видаленні авансу.");
             }
@@ -2356,7 +2373,7 @@
             <li data-id="${entry.id}">
                 <div style="flex-grow: 1; word-break: break-word;">
                     <p>${entry.content.replace(/\n/g, '<br>')}</p>
-                    <small>${entry.authorEmail} - ${entry.createdAt.toDate().toLocaleString('uk-UA')}</small>
+                    <small>${entry.authorEmail} - ${entry.timestamp.toDate().toLocaleString('uk-UA')}</small>
                 </div>
                 ${state.user.role === 'admin' ? `<div class="actions"><button class="btn btn-delete btn-delete-notepad">🗑️</button></div>` : ''}
             </li>
