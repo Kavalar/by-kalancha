@@ -39,7 +39,7 @@
         .crm-layout { display: flex; height: 100vh; }
         .crm-nav { background: var(--primary-color); color: #ecf0f1; width: 240px; flex-shrink: 0; display: flex; flex-direction: column; padding: 1.5rem 0; box-shadow: 5px 0px 15px rgba(0,0,0,0.05); z-index: 10; }
         .crm-nav h1 { font-size: 1.5rem; text-align: center; margin: 0 0 2rem 0; color: #fff; letter-spacing: 1px; }
-        .crm-nav ul { list-style: none; padding: 0; margin: 0; flex-grow: 1; overflow-y: auto; } /* <-- FIX: Added overflow-y */
+        .crm-nav ul { list-style: none; padding: 0; margin: 0; flex-grow: 1; overflow-y: auto; }
         .crm-nav li { padding: 1rem 1.5rem; cursor: pointer; border-left: 4px solid transparent; transition: all .2s; }
         .crm-nav li.admin-only { display: none; }
         .crm-nav li:hover { background-color: rgba(255,255,255,0.05); }
@@ -358,14 +358,29 @@
             if (listenersAreActive) return;
             appContainer.innerHTML = '<h1>Завантаження...</h1>';
             
-            const userDocRef = doc(db, "users", user.uid);
-            const userDocSnap = await getDoc(userDocRef);
+            // Отримуємо токен користувача, щоб прочитати його роль (custom claim)
+            // true - форсує оновлення токену, щоб отримати найсвіжіші дані
+            const tokenResult = await user.getIdTokenResult(true);
+            const role = tokenResult.claims.role || 'master'; // Роль за замовчуванням - 'master'
+
+            // Зберігаємо дані користувача в стані додатку
             state.user = { 
                 uid: user.uid, 
                 email: user.email, 
-                role: userDocSnap.exists() ? userDocSnap.data().role : 'master',
-                salonId: userDocSnap.exists() ? userDocSnap.data().salonId : null
+                role: role,
+                salonId: tokenResult.claims.salonId || null // Можна також додати salonId в claims
             };
+            
+            // Перевіряємо, чи існує документ користувача в базі даних.
+            // Це потрібно, щоб хмарна функція могла спрацювати при зміні ролі в базі.
+            const userDocRef = doc(db, "users", user.uid);
+            const userDocSnap = await getDoc(userDocRef);
+            if (!userDocSnap.exists()) {
+                await setDoc(userDocRef, {
+                    email: user.email,
+                    role: 'master' // Роль за замовчуванням для нового користувача
+                });
+            }
 
             renderAppLayout(state.user);
             setupRealtimeListeners();
@@ -395,8 +410,8 @@
 
         Object.entries(collections).forEach(([stateKey, colName]) => {
             let q;
-            if (['notepadEntries', 'auditLog'].includes(colName)) {
-                q = query(collection(db, colName), orderBy("timestamp", "desc"));
+            if (['notepadEntries'].includes(colName)) {
+                q = query(collection(db, colName), orderBy("createdAt", "desc"));
             } else if (['productSales', 'salonExpenses'].includes(colName)) {
                  q = query(collection(db, colName), orderBy("date", "desc"));
             } else {
@@ -435,7 +450,7 @@
                 salaryGroups: 'salaryGroups',
                 staff: 'staff',
                 auditLog: 'auditLog',
-                expenses: 'expenses' // <-- FIX: Moved here from general collections
+                expenses: 'expenses'
             };
 
             Object.entries(adminCollections).forEach(([stateKey, colName]) => {
@@ -520,7 +535,6 @@
             if (target && target.dataset.view) renderView(target.dataset.view);
         };
         
-        // Setup all modal close buttons
         document.querySelectorAll('.modal-overlay').forEach(modal => {
             modal.querySelector('.close-btn')?.addEventListener('click', () => modal.style.display = 'none');
             modal.addEventListener('click', (e) => {
@@ -541,7 +555,6 @@
 
     function renderView(viewName) {
         if (!state.user) return;
-        // Role-based view restrictions
         const masterViews = ['calendar', 'appointments', 'notepad', 'salonExpenses'];
         if (state.user.role === 'master' && !masterViews.includes(viewName)) {
              viewName = 'calendar';
@@ -551,7 +564,6 @@
              viewName = 'calendar';
         }
 
-        // State cleanup on view change
         if (state.currentView === 'appointments' && viewName !== 'appointments') {
             state.editingAppointmentId = null;
             state.selectedClientForAppointment = null;
@@ -570,7 +582,6 @@
         }
         if(viewName !== 'appointments') state.appointmentsPage = 1;
 
-        // Update header and nav
         const viewTitles = { calendar: 'Календар', appointments: 'Запис', clients: 'Клієнти', clientDetail: 'Історія Клієнта', services: 'Послуги', masters: 'Майстри', masterDetail: 'Картка Майстра', shop: 'Магазин', salary: 'Зарплата', expenses: 'Загальні витрати', salonExpenses: 'Витрати в салоні', notepad: 'Блокнот', settings: 'Налаштування', staff: 'Персонал', staffDetail: 'Картка Співробітника', auditLog: 'Журнал дій' };
         document.getElementById('header-title').textContent = viewTitles[viewName] || 'Dashboard';
         
@@ -652,14 +663,12 @@
             });
         } catch (error) {
             console.error("Failed to log action:", error);
-            // Non-critical, so don't alert the user unless debugging
         }
     }
     // #endregion
 
     // #region Calendar View & Payments
     function renderDailySummary() {
-        // This function remains largely the same, just ensure all elements exist before proceeding
         const elements = ['summary-date-picker', 'summary-salon-filter', 'summary-advances', 'summary-salon-expenses', 'summary-product-sales', 'summary-total', 'summary-cash', 'summary-card', 'summary-blik', 'summary-services-count'];
         if (elements.some(id => !document.getElementById(id))) return;
 
@@ -885,7 +894,6 @@
                 ...(newStatus === 'completed' && !appointmentData.completedAt && { completedAt: Timestamp.now() })
             });
 
-            // FIX: Manually update local state to reflect changes immediately
             const appointmentIndex = state.appointments.findIndex(a => a.id === appointmentId);
             if (appointmentIndex !== -1) {
                 state.appointments[appointmentIndex].payments.push(newPayment);
@@ -895,7 +903,7 @@
             
             document.getElementById('payment-modal').style.display = 'none';
             logAction('edited', `Додано оплату ${amountToPay.toFixed(2)} zł (${paymentType}) до запису для ${appointmentData.clientName}`, { type: 'appointment', id: appointmentId });
-            renderView(state.currentView); // Re-render to update UI
+            renderView(state.currentView);
         } catch (e) {
             console.error("Помилка оплати:", e);
             alert('Не вдалося провести оплату. Помилка: ' + e.message);
@@ -1050,7 +1058,7 @@
         renderView('appointments');
     }
     // #endregion
-
+    
     // #region Appointments View
     async function handleSaveAppointment(event) {
         event.preventDefault();
@@ -1113,7 +1121,6 @@
             alert('Не вдалося зберегти запис.');
         }
     }
-    // Other appointment functions (render, setup logic, etc.) are mostly unchanged.
     function renderAppointmentsView(container) {
         const isEditMode = !!state.editingAppointmentId;
         let appointmentToEdit = null;
@@ -1391,7 +1398,7 @@
         return price;
     }
     // #endregion
-
+    
     // #region Staff Views
     function renderStaffView(container) {
         container.innerHTML = `
@@ -1605,7 +1612,7 @@
         }
     }
     // #endregion
-
+    
     // #region Audit Log View
     function renderAuditLogView(container) {
         let logHtml = state.auditLog.map(log => {
@@ -1636,7 +1643,7 @@
         `;
     }
     // #endregion
-
+    
     // #region Shop View
     async function handleDeleteProductSale(saleId) {
         if(!saleId) return;
@@ -1748,8 +1755,7 @@
         }
     }
     // #endregion
-
-    // All other functions (clients, masters, services, settings, etc.) are included for completeness.
+    
     // #region Clients Views
     function renderClientsView(container) {
         container.innerHTML = `<div class="content-card"><h2>База клієнтів</h2><div class="form-group"><input type="text" id="client-search" placeholder="Пошук за іменем або телефоном..."></div><ul id="clients-list" class="item-list"></ul></div>`;
@@ -1815,6 +1821,7 @@
         document.getElementById('back-to-clients-btn').onclick = () => renderView('clients');
     }
     // #endregion
+    
     // #region Masters View
     function renderMastersView(container) { 
         container.innerHTML = `<div class="content-card"><h2>Додати нового майстра</h2><form id="add-master-form"><div class="form-group"><label for="new-master-name">Ім'я та прізвище</label><input type="text" id="new-master-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="new-master-tier">Ранг</label><input type="text" id="new-master-tier" placeholder="напр. Топ-майстер"></div><div class="form-group" style="flex:1;"><label for="new-master-modifier">Націнка (%)</label><input type="number" id="new-master-modifier" value="0" min="0"></div></div><div class="form-group"><label>Спеціалізації</label><div id="new-master-categories" class="category-checkbox-group"></div></div><button class="btn btn-primary" type="submit">Додати майстра</button></form></div><div class="content-card" style="margin-top: 2rem;"><h2>Список майстрів</h2><ul id="masters-list" class="item-list"></ul></div><div class="modal-overlay" id="edit-master-modal"><div class="modal-panel"><div class="modal-header"><h2>Редагувати майстра</h2><button class="close-btn">&times;</button></div><form id="edit-master-form"><input type="hidden" id="edit-master-id"><div class="form-group"><label for="edit-master-name">Ім'я та прізвище</label><input type="text" id="edit-master-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="edit-master-tier">Ранг</label><input type="text" id="edit-master-tier"></div><div class="form-group" style="flex:1;"><label for="edit-master-modifier">Націнка (%)</label><input type="number" id="edit-master-modifier" min="0"></div></div><div class="form-group"><label>Спеціалізації</label><div id="edit-master-categories" class="category-checkbox-group"></div></div><div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem;"><label><input type="checkbox" id="edit-master-frozen"> Заморозити майстра (приховати з форм)</label></div><button type="submit" class="btn btn-primary">Зберегти зміни</button></form></div></div>`; 
@@ -1914,6 +1921,7 @@
     function showEditMasterModal(id) { const master = state.masters.find(m => m.id === id); if (!master) return alert('Майстра не знайдено!'); const modal = document.getElementById('edit-master-modal'); modal.style.display = 'flex'; document.getElementById('edit-master-id').value = id; document.getElementById('edit-master-name').value = master.name; document.getElementById('edit-master-tier').value = master.tier || ''; document.getElementById('edit-master-modifier').value = master.priceModifier || 0; document.getElementById('edit-master-frozen').checked = master.isFrozen || false; populateCategoryCheckboxes('edit-master-categories', master.categoryIds || []); }
     async function handleUpdateMaster(event) { event.preventDefault(); const id = document.getElementById('edit-master-id').value; const name = document.getElementById('edit-master-name').value.trim(); const tier = document.getElementById('edit-master-tier').value.trim(); const priceModifier = parseFloat(document.getElementById('edit-master-modifier').value) || 0; const categoryIds = Array.from(document.querySelectorAll('#edit-master-categories input:checked')).map(el => el.value); const isFrozen = document.getElementById('edit-master-frozen').checked; if (!name) return alert("Ім'я не може бути порожнім."); try { await updateDoc(doc(db, 'masters', id), { name, tier, priceModifier, categoryIds, isFrozen }); document.getElementById('edit-master-modal').style.display = 'none'; } catch(e) { alert('Не вдалося оновити.'); } }
     // #endregion
+    
     // #region Services View
     function renderServicesView(container) { container.innerHTML = `<div class="services-layout"><div class="content-card"><h2>Категорії</h2><form id="add-category-form" class="form-group"><input type="text" id="new-category-name" placeholder="Нова категорія..." required><button class="btn btn-primary" type="submit" style="width:100%; margin-top:0.5rem;">Додати</button></form><ul id="categories-list" class="item-list"></ul></div><div id="services-container"><div class="content-card"><p>Оберіть категорію зліва.</p></div></div></div><div class="modal-overlay" id="edit-category-modal"><div class="modal-panel"><div class="modal-header"><h2>Редагувати категорію</h2><button class="close-btn">&times;</button></div><form id="edit-category-form"><input type="hidden" id="edit-category-id"><div class="form-group"><label for="edit-category-name">Назва категорії</label><input type="text" id="edit-category-name" required></div><div class="form-group"><label for="edit-category-discount">Акційна знижка (%)</label><input type="number" id="edit-category-discount" min="0" max="100" value="0"></div><button type="submit" class="btn btn-primary">Зберегти зміни</button></form></div></div><div class="modal-overlay" id="edit-service-modal"><div class="modal-panel"><div class="modal-header"><h2 id="service-modal-title">Послуга</h2><button class="close-btn">&times;</button></div><form id="edit-service-form"><input type="hidden" id="edit-service-id"><div class="form-group"><label for="edit-service-name">Назва</label><input type="text" id="edit-service-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="edit-service-duration">Тривалість (хв)</label><input type="number" id="edit-service-duration" required min="0"></div><div class="form-group" style="flex:1;"><label for="edit-service-price">Ціна (zł)</label><input type="number" id="edit-service-price" required min="0"></div></div><div class="form-group"><label for="edit-service-discount">Персональна знижка (%)</label><input type="number" id="edit-service-discount" min="0" max="100" value="0"></div><button type="submit" class="btn btn-primary">Зберегти</button></form></div></div>`; setupCategoriesLogic(); if (state.selectedCategoryId) { renderServicesForCategory(); } }
     function setupCategoriesLogic() { document.getElementById('add-category-form').onsubmit = handleAddCategory; document.getElementById('edit-category-modal').querySelector('.close-btn').onclick = () => document.getElementById('edit-category-modal').style.display = 'none'; document.getElementById('edit-category-form').onsubmit = handleUpdateCategory; const categoriesListEl = document.getElementById('categories-list'); categoriesListEl.innerHTML = state.categories.length > 0 ? '' : '<li>Немає категорій.</li>'; state.categories.forEach(category => { const li = document.createElement('li'); li.className = 'category-list-item'; li.dataset.id = category.id; if (category.id === state.selectedCategoryId) li.classList.add('selected'); li.innerHTML = `<span>${category.name} ${category.discount ? `<strong style="color:var(--danger-color);">-`+category.discount+'%</strong>' : ''}</span><div class="actions"><button class="btn btn-edit" data-id="${category.id}" data-name="${category.name}" data-discount="${category.discount || 0}">✏️</button><button class="btn btn-delete" data-id="${category.id}">🗑️</button></div>`; categoriesListEl.appendChild(li); }); categoriesListEl.onclick = (event) => { const target = event.target; if (target.closest('.btn-delete')) { handleDeleteCategory(target.closest('.btn-delete').dataset.id); } else if (target.closest('.btn-edit')) { const btn = target.closest('.btn-edit'); showEditCategoryModal(btn.dataset.id, btn.dataset.name, btn.dataset.discount); } else if (target.closest('.category-list-item')) { state.selectedCategoryId = target.closest('.category-list-item').dataset.id; renderView('services'); } }; }
@@ -1927,6 +1935,7 @@
     async function handleUpdateService(event) { event.preventDefault(); const id = document.getElementById('edit-service-id').value; const name = document.getElementById('edit-service-name').value.trim(); const duration = parseInt(document.getElementById('edit-service-duration').value); const price = parseFloat(document.getElementById('edit-service-price').value); const discount = parseFloat(document.getElementById('edit-service-discount').value) || 0; if (!name || !(duration>=0) || !(price>=0)) return alert('Заповніть усі поля коректно.'); try { await updateDoc(doc(db, 'services', id), { name, duration, price, discount }); document.getElementById('edit-service-modal').style.display = 'none'; } catch(e) { alert('Не вдалося оновити.'); } }
     async function handleDeleteService(id) { if (!confirm('Видалити послугу?')) return; try { await deleteDoc(doc(db, 'services', id)); } catch (e) { alert('Не вдалося видалити.'); } }
     // #endregion
+    
     // #region Salary, Expenses, Notepad & Settings
     function renderSalaryView(container) {
         const masterOptions = state.masters.filter(m => !m.isFrozen).map(m => `<option value="${m.id}">${m.name}</option>`).join('');
@@ -2042,19 +2051,6 @@
         try { await addDoc(collection(db, 'notepadEntries'), { content, authorEmail: state.user.email, createdAt: Timestamp.now() }); contentInput.value = ''; } catch (e) { alert("Не вдалося додати запис."); }
     }
     async function handleDeleteNotepadEntry(entryId) { if (entryId && confirm('Ви впевнені?')) try { await deleteDoc(doc(db, 'notepadEntries', entryId)); } catch (e) { alert("Не вдалося видалити запис."); } }
-    function renderSettingsView(container) {
-        const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-        const salaryGroupOptions = state.salaryGroups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
-        const groupsListHtml = state.salaryGroups.map(group => `<li data-group-id="${group.id}"><span><strong>${group.name}</strong></span><div class="actions"><button class="btn btn-edit btn-edit-group">Редагувати</button><button class="btn btn-delete btn-delete-group">Видалити</button></div></li>`).join('');
-        const masterAssignmentHtml = state.masters.map(master => `<li data-master-id="${master.id}"><span>${master.name}</span><div class="actions"><select class="master-group-select"><option value="">Не призначено</option>${salaryGroupOptions}</select></div></li>`).join('');
-        container.innerHTML = `<div class="content-card"><h2>Керування групами зарплат</h2><ul id="salary-groups-list" class="item-list">${groupsListHtml || "<li>Немає створених груп</li>"}</ul><button id="add-new-group-btn" class="btn btn-primary" style="margin-top: 1rem;">Створити нову групу</button></div><div class="content-card"><h2>Призначення груп майстрам</h2><ul id="master-group-assignment-list" class="item-list">${masterAssignmentHtml}</ul></div><div class="content-card"><h2>Ручна відправка звіту</h2><form id="manual-report-form"><div class="form-row"><div class="form-group" style="flex:1;"><label for="report-start-date">Дата початку</label><input type="date" id="report-start-date" required></div><div class="form-group" style="flex:1;"><label for="report-end-date">Дата кінця</label><input type="date" id="report-end-date" required></div></div><div class="form-group"><label for="report-salon-filter">Салон</label><select id="report-salon-filter"><option value="all">Всі салони (Разом)</option>${salonOptions}</select></div><button type="submit" class="btn btn-primary">Відправити звіт</button></form></div><div class="content-card"><h2>Зміна паролю</h2><form id="change-password-form"><div class="form-group"><label for="new-password">Новий пароль</label><input type="password" id="new-password" required minlength="6" autocomplete="new-password"></div><div class="form-group"><label for="confirm-password">Підтвердіть новий пароль</label><input type="password" id="confirm-password" required minlength="6" autocomplete="new-password"></div><button type="submit" class="btn btn-primary">Змінити пароль</button><p id="password-change-status" style="margin-top: 1rem;"></p></form></div>`;
-        document.getElementById('add-new-group-btn').onclick = () => showSalaryGroupModal();
-        document.querySelectorAll('.btn-edit-group').forEach(btn => btn.onclick = () => showSalaryGroupModal(btn.closest('li').dataset.groupId));
-        document.querySelectorAll('.btn-delete-group').forEach(btn => btn.onclick = () => handleDeleteSalaryGroup(btn.closest('li').dataset.groupId));
-        document.querySelectorAll('.master-group-select').forEach(select => { const masterId = select.closest('li').dataset.masterId; const master = state.masters.find(m => m.id === masterId); if (master && master.salaryGroupId) select.value = master.salaryGroupId; select.onchange = (e) => handleAssignGroupToMaster(masterId, e.target.value); });
-        document.getElementById('manual-report-form').onsubmit = handleManualReport;
-        document.getElementById('change-password-form').onsubmit = handleChangePassword;
-    }
     function showSalaryGroupModal(groupId = null) {
         const modal = document.getElementById('salary-group-modal');
         const form = document.getElementById('salary-group-form');
@@ -2133,6 +2129,7 @@
         }
     }
     // #endregion
+    
     async function handleLogin(e) { 
         e.preventDefault();
         const email = document.getElementById('email').value.trim(); 
