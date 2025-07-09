@@ -309,6 +309,7 @@
         viewingStaffId: null,
         viewingStaffBonuses: [],
         viewingStaffAdvances: [],
+        staffPayouts: [],
         appointmentsPage: 1,
         appointmentsListDate: new Date(),
     };
@@ -800,34 +801,35 @@
 
             <div class="services-layout" style="margin-top: 2rem; grid-template-columns: 350px 1fr; ">
                 <div class="content-card">
-                    <h3>Аванси та Премії</h3>
+                    <h3>Операції з зарплатою</h3>
                     <form id="add-payment-form" class="form-group">
                         <div class="form-group">
                             <label for="payment-type">Тип</label>
                             <select id="payment-type">
+                                <option value="payout">Нарахувати ЗП</option>
                                 <option value="advance">Аванс</option>
                                 <option value="bonus">Премія</option>
                             </select>
+                        </div>
+                        <div class="form-group" id="payout-period-group">
+                            <label for="payout-period">Період (Місяць та Рік)</label>
+                            <input type="month" id="payout-period">
                         </div>
                         <div class="form-group">
                             <label for="payment-amount">Сума (zł)</label>
                             <input type="number" id="payment-amount" required min="1">
                         </div>
-                        <div class="form-group" id="bonus-description-group" style="display:none;">
-                            <label for="bonus-description">Опис премії</label>
-                            <textarea id="bonus-description" rows="2"></textarea>
+                        <div class="form-group" id="payment-description-group" style="display:none;">
+                            <label for="payment-description">Опис</label>
+                            <textarea id="payment-description" rows="2"></textarea>
                         </div>
                         <button type="submit" class="btn">Провести операцію</button>
                     </form>
                 </div>
                 <div id="history-container">
                     <div class="content-card">
-                        <h3>Історія Авансів</h3>
-                        <ul id="advances-history-list" class="item-list"><li>Завантаження...</li></ul>
-                    </div>
-                    <div class="content-card" style="margin-top:2rem;">
-                        <h3>Історія Премій</h3>
-                        <ul id="bonuses-history-list" class="item-list"><li>Завантаження...</li></ul>
+                        <h3>Історія нарахувань та виплат</h3>
+                        <ul id="payouts-history-list" class="item-list"><li>Завантаження...</li></ul>
                     </div>
                 </div>
             </div>
@@ -838,50 +840,74 @@
         document.getElementById('delete-staff-btn').onclick = () => handleDeleteStaff(person.id, person.name);
 
         const paymentTypeSelect = document.getElementById('payment-type');
-        const bonusDescriptionGroup = document.getElementById('bonus-description-group');
+        const payoutPeriodGroup = document.getElementById('payout-period-group');
+        const paymentDescriptionGroup = document.getElementById('payment-description-group');
+        const paymentAmountInput = document.getElementById('payment-amount');
+
         paymentTypeSelect.onchange = (e) => {
-            bonusDescriptionGroup.style.display = e.target.value === 'bonus' ? 'block' : 'none';
+            const isPayout = e.target.value === 'payout';
+            payoutPeriodGroup.style.display = isPayout ? 'block' : 'none';
+            paymentDescriptionGroup.style.display = isPayout ? 'none' : 'block';
+            paymentAmountInput.readOnly = isPayout;
+            if (isPayout) {
+                paymentAmountInput.value = person.fixedSalary || 0;
+            } else {
+                paymentAmountInput.value = '';
+            }
         };
+        paymentTypeSelect.dispatchEvent(new Event('change'));
+
         document.getElementById('add-payment-form').onsubmit = handleAddStaffPayment;
 
-        setupSubcollectionListener('advances', 'advances-history-list', 'viewingStaffAdvances', renderHistoryList);
-        setupSubcollectionListener('bonuses', 'bonuses-history-list', 'viewingStaffBonuses', renderHistoryList);
+        setupSubcollectionListener('payouts', 'payouts-history-list', 'staffPayouts', renderPayoutHistoryList);
     }
 
     function setupSubcollectionListener(subcollectionName, listElementId, stateKey, renderer) {
         const staffId = state.viewingStaffId;
         if (!staffId) return;
+        
+        const unsubscribers = {
+            advances: null,
+            bonuses: null,
+            payouts: null
+        };
+
+        staffSubcollectionUnsubscribers.forEach(unsub => unsub());
+        staffSubcollectionUnsubscribers = [];
 
         const collectionRef = collection(db, 'staff', staffId, subcollectionName);
         const unsubscribe = onSnapshot(query(collectionRef, orderBy("date", "desc")), (snapshot) => {
             state[stateKey] = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-            renderer(listElementId, state[stateKey], subcollectionName);
+            renderer(listElementId, state[stateKey]);
         });
         staffSubcollectionUnsubscribers.push(unsubscribe);
     }
 
-    function renderHistoryList(elementId, items, type) {
+    function renderPayoutHistoryList(elementId, items) {
         const listEl = document.getElementById(elementId);
         if (!listEl) return;
-        if (items.length === 0) {
+
+        const allItems = [
+            ...(state.staffPayouts || []).map(p => ({...p, type: 'Нарахування ЗП'})),
+            ...(state.viewingStaffAdvances || []).map(p => ({...p, type: 'Аванс', amount: -p.amount})),
+            ...(state.viewingStaffBonuses || []).map(p => ({...p, type: 'Премія'}))
+        ].sort((a,b) => b.date.toDate() - a.date.toDate());
+
+        if (allItems.length === 0) {
             listEl.innerHTML = `<li>Історія порожня.</li>`;
             return;
         }
-        listEl.innerHTML = items.map(item => `
-            <li>
+        listEl.innerHTML = allItems.map(item => `
+            <li style="color: ${item.amount < 0 ? 'var(--danger-color)' : 'var(--text-color)'}">
                 <div>
-                    <strong>${item.amount.toFixed(2)} zł</strong><br>
+                    <strong>${item.type} ${item.period ? `(${item.period})` : ''}</strong><br>
                     <small>${item.date.toDate().toLocaleDateString('uk-UA')} ${item.description ? ` - ${item.description}` : ''}</small>
                 </div>
                 <div class="actions">
-                    <button class="btn btn-delete btn-delete-history" data-id="${item.id}" data-type="${type}" data-amount="${item.amount}">🗑️</button>
+                    <strong>${item.amount.toFixed(2)} zł</strong>
                 </div>
             </li>
         `).join('');
-
-        listEl.querySelectorAll('.btn-delete-history').forEach(btn => {
-            btn.onclick = () => handleDeleteStaffHistory(btn.dataset.id, btn.dataset.type, btn.dataset.amount);
-        });
     }
 
     async function handleUpdateStaff(event) {
@@ -924,29 +950,38 @@
         event.preventDefault();
         const staffId = state.viewingStaffId;
         const person = state.staff.find(p => p.id === staffId);
-        const type = document.getElementById('payment-type').value; // 'advance' or 'bonus'
+        const type = document.getElementById('payment-type').value;
         const amount = parseFloat(document.getElementById('payment-amount').value);
-        const description = document.getElementById('bonus-description').value.trim();
+        const description = document.getElementById('payment-description').value.trim();
+        const period = document.getElementById('payout-period').value;
 
         if (isNaN(amount) || amount <= 0) return showNotification('Введіть коректну суму.', "error");
-        if (type === 'bonus' && !description) return showNotification('Будь ласка, додайте опис для премії.', "error");
 
-        const data = {
-            amount,
-            date: Timestamp.now(),
-            ...(type === 'bonus' && { description })
-        };
-        
-        const action = () => addDoc(collection(db, 'staff', staffId, `${type}s`), data);
-        const logAction = type === 'bonus' ? 'Нараховано премію' : 'Видано аванс';
-        const logDetails = { staffId, name: person.name, amount, ...(type === 'bonus' && { description }) };
+        let subcollectionName = `${type}s`;
+        let data = { amount, date: Timestamp.now() };
+        let logAction = '';
+        let logDetails = { staffId, name: person.name, amount };
+
+        if (type === 'payout') {
+            if (!period) return showNotification('Будь ласка, оберіть період для нарахування ЗП.', 'error');
+            data.period = period;
+            logAction = 'Нараховано ЗП';
+            logDetails.period = period;
+        } else {
+            if (description) data.description = description;
+            logAction = type === 'bonus' ? 'Нараховано премію' : 'Видано аванс';
+            if (description) logDetails.description = description;
+        }
+
+        const action = () => addDoc(collection(db, 'staff', staffId, subcollectionName), data);
 
         try {
             await logAndExecute(logAction, logDetails, action);
             event.target.reset();
-            document.getElementById('bonus-description-group').style.display = 'none';
+            document.getElementById('payment-type').dispatchEvent(new Event('change'));
+            showNotification('Операцію успішно проведено!');
         } catch (e) {
-            showNotification(`Не вдалося додати ${type}.`, "error");
+            showNotification(`Не вдалося провести операцію.`, "error");
         }
     }
 
@@ -1206,7 +1241,9 @@
                     const endTime = new Date(app.dateTime.toDate().getTime() + (app.duration || 60) * 60000);
                     
                     let backgroundColor = colorPalette[masterIndex % colorPalette.length];
-                    if (app.status === 'completed') {
+                    if (app.isInternal) {
+                        backgroundColor = 'var(--warning-color)';
+                    } else if (app.status === 'completed') {
                         backgroundColor = 'var(--success-color)';
                     } else if (app.status === 'partially_paid') {
                         backgroundColor = 'var(--warning-color)';
@@ -1214,6 +1251,7 @@
 
                     return { 
                         id: app.id,
+                        title: app.clientName,
                         start: app.dateTime.toDate(), 
                         end: endTime, 
                         resourceId: app.masterId,
@@ -1230,7 +1268,7 @@
                 const salon = state.salons.find(s => s.id === appointment.salonId);
                 const html = `
                     <div class="fc-event-main-frame">
-                        <div class="fc-event-title">${appointment.clientName}</div>
+                        <div class="fc-event-title">${appointment.clientName} ${appointment.isInternal ? ' (для своїх)' : ''}</div>
                         <div class="fc-event-service">${service?.name || ''}</div>
                         <div class="fc-event-service" style="opacity: 0.7;"><strong>${salon?.name || 'Не вказано'}</strong></div>
                     </div>
@@ -1288,21 +1326,26 @@
         const detailsEl = document.getElementById('action-modal-details');
         const buttonsEl = document.getElementById('action-modal-buttons');
         
-        const client = state.clients.find(c => c.id === appointment.clientId);
         const service = state.services.find(s => s.id === appointment.serviceId);
         const master = state.masters.find(m => m.id === appointment.masterId);
         const salon = state.salons.find(s => s.id === appointment.salonId);
 
-        let statusText = 'Очікує оплати';
+        let statusText = 'Очікує';
         if (appointment.status === 'completed') {
-            statusText = 'Оплачено';
+            statusText = 'Завершено';
         } else if (appointment.status === 'partially_paid') {
             const remaining = (appointment.finalPrice || 0) - (appointment.totalPaid || 0);
-            statusText = `Частково оплачено (залишилось ${remaining.toFixed(0)} zł)`;
+            statusText = `Частково оплачено (ще ${remaining.toFixed(0)} zł)`;
+        }
+
+        let clientInfoHtml = `<p><strong>Клієнт:</strong> ${appointment.clientName}</p>`;
+        if(appointment.isInternal){
+            clientInfoHtml = `<p><strong>Клієнт-майстер:</strong> ${appointment.clientName}</p>`;
+            statusText = 'Внутрішня послуга';
         }
 
         detailsEl.innerHTML = `
-            <p><strong>Клієнт:</strong> ${appointment.clientName} (${client?.phone || 'не вказано'})</p>
+            ${clientInfoHtml}
             <p><strong>Послуга:</strong> ${service?.name || 'Невідома послуга'}</p>
             <p><strong>Майстер:</strong> ${master?.name || 'Невідомий майстер'}</p>
             <p><strong>Салон:</strong> ${salon?.name || 'Не вказано'}</p>
@@ -1314,7 +1357,7 @@
             detailsEl.innerHTML += `<p><strong>Додаткова плата:</strong> ${appointment.additionalCharge.amount.toFixed(0)} zł (${appointment.additionalCharge.description || 'без опису'})</p>`;
         }
         if (appointment.payments && appointment.payments.length > 0) {
-            const paymentTypes = { cash: 'Готівка', card: 'Картка', blik: 'Blik' };
+            const paymentTypes = { cash: 'Готівка', card: 'Картка', blik: 'Blik', settlement: 'Взаєморозрахунок' };
             let paymentsHtml = '<hr style="margin: 1rem 0;"><p><strong>Історія оплат:</strong></p><ul style="padding-left: 20px; margin: 0;">';
             appointment.payments.forEach(p => {
                 const paymentTypeStr = paymentTypes[p.type] || p.type;
@@ -1326,7 +1369,10 @@
 
         let buttonsHtml = '';
         const remainingToPay = (appointment.finalPrice || 0) - (appointment.totalPaid || 0);
-        if (appointment.status !== 'completed' && remainingToPay > 0.001) {
+        
+        if (appointment.isInternal && appointment.status !== 'completed') {
+            buttonsHtml += `<button class="btn btn-complete-payment" data-action="settle">Провести по взаєморозрахунку</button>`;
+        } else if (!appointment.isInternal && appointment.status !== 'completed' && remainingToPay > 0.001) {
             buttonsHtml += `<button class="btn btn-complete-payment" data-action="pay">Внести / Додати оплату</button>`;
         }
         
@@ -1342,9 +1388,12 @@
             const button = event.target.closest('button');
             if (!button) return;
             const action = button.dataset.action;
+            modal.style.display = 'none';
 
             if (action === 'pay') {
                 openPaymentModal(appointment);
+            } else if (action === 'settle') {
+                handleSettleInternalService(appointment);
             } else if (action === 'edit') {
                 handleEditAppointment(appointment.id);
             } else if (action === 'cancel') {
@@ -1352,11 +1401,30 @@
             } else if (action === 'edit-payments') {
                 showEditPaymentsModal(appointment);
             }
-            document.getElementById('appointment-action-modal').style.display = 'none';
         };
         
         modal.querySelector('.close-btn').onclick = () => modal.style.display = 'none';
         modal.style.display = 'flex';
+    }
+
+    async function handleSettleInternalService(appointment) {
+        const amount = appointment.finalPrice; // Settle the full price
+        const newPayment = {
+            amount: amount,
+            type: 'settlement',
+            date: Timestamp.now()
+        };
+        const action = () => updateDoc(doc(db, 'appointments', appointment.id), {
+            payments: arrayUnion(newPayment),
+            totalPaid: increment(amount),
+            status: 'completed'
+        });
+        try {
+            await logAndExecute('Проведено взаєморозрахунок', { appointmentId: appointment.id, clientName: appointment.clientName, amount }, action);
+            showNotification('Взаєморозрахунок успішно проведено!');
+        } catch (e) {
+            showNotification('Не вдалося провести взаєморозрахунок.', 'error');
+        }
     }
 
     function showEditPaymentsModal(appointment) {
@@ -1539,7 +1607,7 @@
             <div class="content-card">
                 <h2 id="appointment-form-title">${isEditMode ? 'Редагувати запис' : 'Новий запис'}</h2>
                 <form id="appointment-form">
-                    <div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem; margin-bottom: 1rem;">
+                     <div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem; margin-bottom: 1rem;">
                         <label><input type="checkbox" id="internal-service-checkbox"> Внутрішня послуга (для майстра)</label>
                     </div>
 
@@ -1653,7 +1721,7 @@
                 document.getElementById('client-phone-input').value = client?.phone || '';
                 document.getElementById('client-phone-group').style.display = 'block';
             }
-
+            
             const service = state.services.find(s => s.id === appointmentToEdit.serviceId);
             if (service) {
                 state.selectedServiceForAppointment = service;
@@ -1722,29 +1790,28 @@
         const regularClientFields = document.getElementById('regular-client-fields');
         const masterClientFields = document.getElementById('master-client-fields');
         const masterAsClientSelect = document.getElementById('master-as-client-select');
+        const clientSearchInput = document.getElementById('client-search-input');
         
         const masterOptions = state.masters.filter(m => !m.isFrozen).map(m => `<option value="${m.id}">${m.name}</option>`).join('');
         masterAsClientSelect.innerHTML = `<option value="">Оберіть майстра-клієнта</option>${masterOptions}`;
         
         internalCheckbox.onchange = () => {
-            if (internalCheckbox.checked) {
-                regularClientFields.style.display = 'none';
-                masterClientFields.style.display = 'block';
-            } else {
-                regularClientFields.style.display = 'block';
-                masterClientFields.style.display = 'none';
-            }
+            const isInternal = internalCheckbox.checked;
+            regularClientFields.style.display = isInternal ? 'none' : 'block';
+            masterClientFields.style.display = isInternal ? 'block' : 'none';
+            clientSearchInput.required = !isInternal;
+            masterAsClientSelect.required = isInternal;
         };
+        internalCheckbox.dispatchEvent(new Event('change')); // Initial setup
 
         // Client search logic
-        const searchInput = document.getElementById('client-search-input');
         const searchResultsEl = document.getElementById('client-search-results');
         const phoneGroup = document.getElementById('client-phone-group');
         const phoneInput = document.getElementById('client-phone-input');
-        searchInput.oninput = () => {
+        clientSearchInput.oninput = () => {
             state.selectedClientForAppointment = null;
             phoneGroup.style.display = 'block'; phoneInput.required = true;
-            const searchTerm = searchInput.value.toLowerCase().trim();
+            const searchTerm = clientSearchInput.value.toLowerCase().trim();
             if (searchTerm.length < 2) { searchResultsEl.style.display = 'none'; return; }
             const results = state.clients.filter(c => c.name.toLowerCase().includes(searchTerm) || (c.phone && c.phone.includes(searchTerm)));
             searchResultsEl.innerHTML = results.length > 0 ? results.map(c => `<div data-id="${c.id}" data-name="${c.name}" data-phone="${c.phone}">${c.name} - ${c.phone}</div>`).join('') : '';
@@ -1753,12 +1820,12 @@
         searchResultsEl.onclick = (e) => {
             if(e.target.dataset.id) {
                 state.selectedClientForAppointment = { id: e.target.dataset.id, name: e.target.dataset.name, phone: e.target.dataset.phone };
-                searchInput.value = state.selectedClientForAppointment.name;
+                clientSearchInput.value = state.selectedClientForAppointment.name;
                 phoneInput.value = state.selectedClientForAppointment.phone;
                 searchResultsEl.style.display = 'none'; phoneGroup.style.display = 'block';
             }
         };
-        searchInput.onblur = () => { setTimeout(() => searchResultsEl.style.display = 'none', 200); };
+        clientSearchInput.onblur = () => { setTimeout(() => searchResultsEl.style.display = 'none', 200); };
         
         populateAppointmentFormDropdowns();
         const categorySelect = document.getElementById('appointment-category');
@@ -1928,7 +1995,6 @@
         const masterId = document.getElementById('appointment-master').value;
         const dateTimeString = document.getElementById('appointment-datetime').value;
         const salonId = document.getElementById('appointment-salon').value;
-
         if (!service || !masterId || !dateTimeString || !salonId) {
             return showNotification("Будь ласка, заповніть усі поля, включно з послугою та салоном.", "error");
         }
@@ -1977,7 +2043,6 @@
                 const receivingMaster = state.masters.find(m => m.id === receivingMasterId);
                 appointmentData.clientId = receivingMasterId; // Using master ID as client ID for internal services
                 appointmentData.clientName = `${receivingMaster.name} (Майстер)`;
-                appointmentData.isInternal = true;
                 logDetails.clientName = appointmentData.clientName;
             } else {
                 const clientName = document.getElementById('client-search-input').value.trim();
@@ -2000,7 +2065,6 @@
                 }
                 appointmentData.clientId = clientId;
                 appointmentData.clientName = clientName;
-                appointmentData.isInternal = false;
             }
 
             if (isEditMode) {
