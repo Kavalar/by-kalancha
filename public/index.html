@@ -451,7 +451,7 @@
         Object.entries(collections).forEach(([stateKey, colName]) => {
             let q;
             // Sorting by a consistent field, assuming 'timestamp' for logs and 'date' for financial records
-            if (['auditLog', 'notepadEntries', 'salonExpenses', 'expenses', 'productSales'].includes(colName)) {
+            if (['auditLog', 'salonExpenses', 'expenses', 'productSales'].includes(colName)) {
                  q = query(collection(db, colName), orderBy("timestamp", "desc"));
             } else if (colName === 'appointments') {
                  q = query(collection(db, colName), orderBy("dateTime", "desc"));
