@@ -447,9 +447,7 @@
 
         Object.entries(collections).forEach(([stateKey, colName]) => {
             let q;
-            if (colName === 'notepadEntries' || colName === 'auditLog') {
-                q = query(collection(db, colName), orderBy("timestamp", "desc"));
-            } else if (colName === 'productSales' || colName === 'salonExpenses' || colName === 'expenses') {
+            if (colName === 'productSales' || colName === 'salonExpenses' || colName === 'expenses') {
                  q = query(collection(db, colName), orderBy("date", "desc"));
             } else {
                 q = collection(db, colName);
@@ -968,7 +966,14 @@
 
     // #region Audit Log View
     function renderAuditLogView(container) {
-        const logEntriesHtml = state.auditLog.map(log => {
+        const sortedLogs = [...state.auditLog].sort((a, b) => {
+            const dateA = a.timestamp;
+            const dateB = b.timestamp;
+            if (!dateB || !dateB.toDate) return -1;
+            if (!dateA || !dateA.toDate) return 1;
+            return dateB.toDate() - dateA.toDate();
+        });
+        const logEntriesHtml = sortedLogs.map(log => {
             const detailsArray = Object.entries(log.details || {}).map(([key, value]) => {
                 let displayKey = key;
                 // Simple localization for keys
@@ -990,7 +995,7 @@
                 <li>
                     <div style="flex-grow: 1; word-break: break-word;">
                         <strong>${log.action}</strong><br>
-                        <small>${log.userEmail} - ${log.timestamp.toDate().toLocaleString('uk-UA')}</small>
+                        <small>${log.userEmail} - ${log.timestamp ? log.timestamp.toDate().toLocaleString('uk-UA') : 'Дата невідома'}</small>
                         ${detailsArray.length > 0 ? `<br><small style="color: var(--gray-text);">${detailsArray.join('; ')}</small>` : ''}
                     </div>
                 </li>
@@ -2498,15 +2503,26 @@
     }
 
     function renderNotepadView(container) {
-        const entriesHtml = state.notepadEntries.map(entry => `
+        const sortedEntries = [...state.notepadEntries].sort((a, b) => {
+            const dateA = a.timestamp || a.createdAt;
+            const dateB = b.timestamp || b.createdAt;
+            if (!dateB || !dateB.toDate) return -1;
+            if (!dateA || !dateA.toDate) return 1;
+            return dateB.toDate() - dateA.toDate();
+        });
+
+        const entriesHtml = sortedEntries.map(entry => {
+            const entryTimestamp = entry.timestamp || entry.createdAt;
+            return `
             <li data-id="${entry.id}">
                 <div style="flex-grow: 1; word-break: break-word;">
                     <p>${entry.content.replace(/\n/g, '<br>')}</p>
-                    <small>${entry.authorEmail} - ${entry.timestamp.toDate().toLocaleString('uk-UA')}</small>
+                    <small>${entry.authorEmail} - ${entryTimestamp ? entryTimestamp.toDate().toLocaleString('uk-UA') : 'Дата невідома'}</small>
                 </div>
                 ${state.user.role === 'admin' ? `<div class="actions"><button class="btn btn-delete btn-delete-notepad">🗑️</button></div>` : ''}
             </li>
-        `).join('');
+        `}).join('');
+
         container.innerHTML = `
             <div class="content-card">
                 <h2>Блокнот / Журнал записів</h2>
@@ -2545,7 +2561,7 @@
         const action = () => addDoc(collection(db, 'notepadEntries'), {
             content,
             authorEmail: state.user.email,
-            timestamp: Timestamp.now() // Changed from createdAt for consistency
+            timestamp: Timestamp.now()
         });
         try {
             await logAndExecute('Додано запис у блокнот', { content: content.substring(0, 50) + '...' }, action);
