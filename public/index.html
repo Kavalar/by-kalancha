@@ -450,8 +450,10 @@
 
         Object.entries(collections).forEach(([stateKey, colName]) => {
             let q;
-            // Sorting by a consistent field, assuming 'timestamp' for logs and 'date' for financial records
-            if (['auditLog', 'salonExpenses', 'expenses', 'productSales'].includes(colName)) {
+            
+            // [FIX 1] Removed 'salonExpenses' and 'notepadEntries' from server-side sorting
+            // to prevent crashes due to missing Firebase indexes.
+            if (['auditLog', 'expenses', 'productSales'].includes(colName)) {
                  q = query(collection(db, colName), orderBy("timestamp", "desc"));
             } else if (colName === 'appointments') {
                  q = query(collection(db, colName), orderBy("dateTime", "desc"));
@@ -462,10 +464,21 @@
 
             onSnapshot(q, snapshot => {
                 state[stateKey] = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
-                // Sort arrays that need it client-side
+                
+                // Client-side sorting for specific collections
                 if (['categories', 'masters', 'clients', 'staff', 'salons'].includes(stateKey)) {
                     state[stateKey].sort((a,b) => a.name.localeCompare(b.name));
                 }
+
+                // [FIX 2] Added robust client-side sorting for the collections that need it
+                if (stateKey === 'salonExpenses' || stateKey === 'notepadEntries') {
+                    state[stateKey].sort((a, b) => {
+                        const dateA = a.timestamp ? a.timestamp.toDate().getTime() : 0;
+                        const dateB = b.timestamp ? b.timestamp.toDate().getTime() : 0;
+                        return dateB - dateA; // Sort descending
+                    });
+                }
+
                 if (state.user) {
                     renderView(state.currentView);
                 }
@@ -1013,7 +1026,7 @@
     }
     // #endregion
 
-    // #region Daily Summary (No changes)
+    // #region Daily Summary (FIXED)
     function renderDailySummary() {
         const dateInput = document.getElementById('summary-date-picker');
         const salonInput = document.getElementById('summary-salon-filter');
@@ -1057,6 +1070,8 @@
         
         let productSalesCash = 0, productSalesCard = 0, productSalesBlik = 0;
         let filteredProductSales = state.productSales.filter(s => {
+            // [FIX] Check if timestamp exists before calling toDate()
+            if (!s || !s.timestamp) return false;
             const saleDate = s.timestamp.toDate();
             return saleDate >= startOfDay && saleDate <= endOfDay;
         });
@@ -1077,6 +1092,7 @@
 
         let totalAdvances = 0;
         state.advances.forEach(advance => {
+            if (!advance || !advance.date) return;
             const advanceDate = advance.date.toDate();
             if (advanceDate >= startOfDay && advanceDate <= endOfDay) {
                 totalAdvances += advance.amount;
@@ -1084,6 +1100,8 @@
         });
         let totalSalonExpenses = 0;
         let filteredSalonExpenses = state.salonExpenses.filter(e => {
+            // [FIX] Check if timestamp exists before calling toDate()
+            if (!e || !e.timestamp) return false;
             const expenseDate = e.timestamp.toDate();
             return expenseDate >= startOfDay && expenseDate <= endOfDay;
         });
@@ -2094,7 +2112,7 @@
     async function handleDeleteService(id, name) { showConfirmWithReasonModal(`Видалити послугу "${name}"?`, async (reason) => { const action = () => deleteDoc(doc(db, 'services', id)); const logDetails = { serviceId: id, name }; if (reason) logDetails.reason = reason; try { await logAndExecute('Видалено послугу', logDetails, action); } catch (e) { showNotification('Не вдалося видалити.', "error"); } }); }
     // #endregion
 
-    // #region Salary, Expenses, Notepad & Settings (No changes)
+    // #region Salary, Expenses, Notepad & Settings (with fixes)
     function renderSalaryView(container) {
         const masterOptions = state.masters.filter(m => !m.isFrozen).map(m => `<option value="${m.id}">${m.name}</option>`).join('');
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
@@ -2190,7 +2208,7 @@
         else {
             state.expenses.forEach(expense => {
                 const li = document.createElement('li');
-                li.innerHTML = `<div><strong>${expense.description}</strong><br><small>${expense.timestamp ? expense.timestamp.toDate().toLocaleDateString('uk-UA') : 'Дата невідома'} (${salon ? salon.name : 'Невідомий салон'})</small></div><div class="actions"><strong>${expense.amount.toFixed(2)} zł</strong>${state.user.role === 'admin' ? `<button class="btn btn-delete" data-id="${expense.id}" data-description="${expense.description}">🗑️</button>` : ''}</div>`;
+                li.innerHTML = `<div><strong>${expense.description}</strong><br><small>${expense.timestamp.toDate().toLocaleDateString('uk-UA')}</small></div><div class="actions"><strong>${expense.amount.toFixed(2)} zł</strong><button class="btn btn-delete" data-id="${expense.id}" data-description="${expense.description}">🗑️</button></div>`;
                 listEl.appendChild(li);
             });
         }
@@ -2246,7 +2264,9 @@
             state.salonExpenses.forEach(expense => {
                 const salon = state.salons.find(s => s.id === expense.salonId);
                 const li = document.createElement('li');
-                li.innerHTML = `<div><strong>${expense.description}</strong><br><small>${expense.timestamp.toDate().toLocaleDateString('uk-UA')} (${salon ? salon.name : 'Невідомий салон'})</small></div><div class="actions"><strong>${expense.amount.toFixed(2)} zł</strong>${state.user.role === 'admin' ? `<button class="btn btn-delete" data-id="${expense.id}" data-description="${expense.description}">🗑️</button>` : ''}</div>`;
+                // [FIX 3] Added a check for `expense.timestamp` to prevent rendering errors
+                const expenseDate = expense.timestamp ? expense.timestamp.toDate().toLocaleDateString('uk-UA') : 'Дата невідома';
+                li.innerHTML = `<div><strong>${expense.description}</strong><br><small>${expenseDate} (${salon ? salon.name : 'Невідомий салон'})</small></div><div class="actions"><strong>${expense.amount.toFixed(2)} zł</strong>${state.user.role === 'admin' ? `<button class="btn btn-delete" data-id="${expense.id}" data-description="${expense.description}">🗑️</button>` : ''}</div>`;
                 listEl.appendChild(li);
             });
         }
@@ -2329,9 +2349,10 @@
         const paymentTypes = { cash: '💵', card: '💳', blik: '📱' };
         const recentSalesHtml = state.productSales.slice(0, 10).map(sale => {
             const salon = state.salons.find(s => s.id === sale.salonId);
+            const saleDate = sale.timestamp ? sale.timestamp.toDate().toLocaleString('uk-UA') : 'Дата невідома';
             return `
                 <li>
-                    <div><strong>${sale.description}</strong><br><small>${sale.timestamp.toDate().toLocaleString('uk-UA')} (${salon ? salon.name : 'Невідомий салон'})</small></div>
+                    <div><strong>${sale.description}</strong><br><small>${saleDate} (${salon ? salon.name : 'Невідомий салон'})</small></div>
                     <div class="actions"><strong>${sale.amount.toFixed(2)} zł</strong><small>(${paymentTypes[sale.paymentType] || 'Н/Д'})</small>${state.user.role === 'admin' ? `<button class="btn btn-delete btn-delete-sale" data-id="${sale.id}" data-description="${sale.description}">🗑️</button>` : ''}</div>
                 </li>`;
         }).join('');
