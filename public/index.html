@@ -866,21 +866,19 @@
         const staffId = state.viewingStaffId;
         if (!staffId) return;
         
-        const unsubscribers = {
-            advances: null,
-            bonuses: null,
-            payouts: null
-        };
-
         staffSubcollectionUnsubscribers.forEach(unsub => unsub());
         staffSubcollectionUnsubscribers = [];
 
-        const collectionRef = collection(db, 'staff', staffId, subcollectionName);
-        const unsubscribe = onSnapshot(query(collectionRef, orderBy("date", "desc")), (snapshot) => {
-            state[stateKey] = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-            renderer(listElementId, state[stateKey]);
+        const subcollections = ['payouts', 'advances', 'bonuses'];
+        subcollections.forEach(name => {
+            const ref = collection(db, 'staff', staffId, name);
+            const q = query(ref, orderBy("date", "desc"));
+            const unsubscribe = onSnapshot(q, (snapshot) => {
+                state[`viewingStaff${name.charAt(0).toUpperCase() + name.slice(1)}`] = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderer(listElementId, state.staffPayouts);
+            });
+            staffSubcollectionUnsubscribers.push(unsubscribe);
         });
-        staffSubcollectionUnsubscribers.push(unsubscribe);
     }
 
     function renderPayoutHistoryList(elementId, items) {
@@ -2803,7 +2801,7 @@
     
     function renderShopView(container) {
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-        const paymentTypes = { cash: '💵', card: '💳', blik: '📱' };
+        const paymentTypes = { cash: '�', card: '💳', blik: '📱' };
         
         const recentSalesHtml = state.productSales.slice(0, 10).map(sale => {
             const salon = state.salons.find(s => s.id === sale.salonId);
