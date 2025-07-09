@@ -866,19 +866,21 @@
         const staffId = state.viewingStaffId;
         if (!staffId) return;
         
+        const unsubscribers = {
+            advances: null,
+            bonuses: null,
+            payouts: null
+        };
+
         staffSubcollectionUnsubscribers.forEach(unsub => unsub());
         staffSubcollectionUnsubscribers = [];
 
-        const subcollections = ['payouts', 'advances', 'bonuses'];
-        subcollections.forEach(name => {
-            const ref = collection(db, 'staff', staffId, name);
-            const q = query(ref, orderBy("date", "desc"));
-            const unsubscribe = onSnapshot(q, (snapshot) => {
-                state[`viewingStaff${name.charAt(0).toUpperCase() + name.slice(1)}`] = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-                renderer(listElementId, state.staffPayouts);
-            });
-            staffSubcollectionUnsubscribers.push(unsubscribe);
+        const collectionRef = collection(db, 'staff', staffId, subcollectionName);
+        const unsubscribe = onSnapshot(query(collectionRef, orderBy("date", "desc")), (snapshot) => {
+            state[stateKey] = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            renderer(listElementId, state[stateKey]);
         });
+        staffSubcollectionUnsubscribers.push(unsubscribe);
     }
 
     function renderPayoutHistoryList(elementId, items) {
@@ -1405,18 +1407,29 @@
         modal.style.display = 'flex';
     }
 
+    // ==================================================================
+    // === ОСНОВНЕ ВИПРАВЛЕННЯ У ФРОНТЕНДІ ===
+    // ==================================================================
     async function handleSettleInternalService(appointment) {
-        const amount = appointment.finalPrice; // Settle the full price
+        // Розраховуємо 50% від вартості послуги для взаєморозрахунку
+        const amount = appointment.finalPrice * 0.5; 
+
         const newPayment = {
             amount: amount,
             type: 'settlement',
-            date: Timestamp.now()
+            date: Timestamp.now(),
+            // ----> [ВИПРАВЛЕНО] Додаємо ID майстра, який отримав послугу (зберігається в clientId для внутрішніх послуг)
+            receivingMasterId: appointment.clientId 
         };
+
+        // Оновлюємо запис: тепер сума оплати - це 50%
         const action = () => updateDoc(doc(db, 'appointments', appointment.id), {
             payments: arrayUnion(newPayment),
-            totalPaid: increment(amount),
+            // ----> [ВИПРАВЛЕНО] Збільшуємо оплату на розраховану суму (50%), а не на повну
+            totalPaid: increment(amount), 
             status: 'completed'
         });
+        
         try {
             await logAndExecute('Проведено взаєморозрахунок', { appointmentId: appointment.id, clientName: appointment.clientName, amount }, action);
             showNotification('Взаєморозрахунок успішно проведено!');
@@ -2801,7 +2814,7 @@
     
     function renderShopView(container) {
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-        const paymentTypes = { cash: '�', card: '💳', blik: '📱' };
+        const paymentTypes = { cash: '💵', card: '💳', blik: '📱' };
         
         const recentSalesHtml = state.productSales.slice(0, 10).map(sale => {
             const salon = state.salons.find(s => s.id === sale.salonId);
