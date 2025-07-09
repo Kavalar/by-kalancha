@@ -2190,7 +2190,7 @@
         else {
             state.expenses.forEach(expense => {
                 const li = document.createElement('li');
-                li.innerHTML = `<div><strong>${expense.description}</strong><br><small>${expense.timestamp.toDate().toLocaleDateString('uk-UA')}</small></div><div class="actions"><strong>${expense.amount.toFixed(2)} zł</strong><button class="btn btn-delete" data-id="${expense.id}" data-description="${expense.description}">🗑️</button></div>`;
+                li.innerHTML = `<div><strong>${expense.description}</strong><br><small>${expense.timestamp ? expense.timestamp.toDate().toLocaleDateString('uk-UA') : 'Дата невідома'} (${salon ? salon.name : 'Невідомий салон'})</small></div><div class="actions"><strong>${expense.amount.toFixed(2)} zł</strong>${state.user.role === 'admin' ? `<button class="btn btn-delete" data-id="${expense.id}" data-description="${expense.description}">🗑️</button>` : ''}</div>`;
                 listEl.appendChild(li);
             });
         }
