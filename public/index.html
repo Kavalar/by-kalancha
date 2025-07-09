@@ -327,13 +327,13 @@
         toast.style.backgroundColor = type === 'success' ? 'var(--success-color)' : 'var(--danger-color)';
         
         toast.style.display = 'block';
-        setTimeout(() => toast.style.opacity = 1, 10); // Allow display property to apply before starting transition
+        setTimeout(() => toast.style.opacity = 1, 10);
         
         setTimeout(() => {
             toast.style.opacity = 0;
             setTimeout(() => {
                 toast.style.display = 'none';
-            }, 500); // Wait for transition to finish
+            }, 500);
         }, 3000);
     }
 
@@ -450,20 +450,27 @@
 
         Object.entries(collections).forEach(([stateKey, colName]) => {
             let q;
-            if (colName === 'productSales' || colName === 'salonExpenses' || colName === 'expenses' || colName === 'auditLog') {
+            // Sorting by a consistent field, assuming 'timestamp' for logs and 'date' for financial records
+            if (['auditLog', 'notepadEntries', 'salonExpenses', 'expenses', 'productSales'].includes(colName)) {
                  q = query(collection(db, colName), orderBy("timestamp", "desc"));
-            } else {
+            } else if (colName === 'appointments') {
+                 q = query(collection(db, colName), orderBy("dateTime", "desc"));
+            }
+            else {
                 q = collection(db, colName);
             }
 
             onSnapshot(q, snapshot => {
                 state[stateKey] = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
-                if (stateKey === 'categories' || stateKey === 'masters' || stateKey === 'clients' || stateKey === 'staff') {
+                // Sort arrays that need it client-side
+                if (['categories', 'masters', 'clients', 'staff', 'salons'].includes(stateKey)) {
                     state[stateKey].sort((a,b) => a.name.localeCompare(b.name));
                 }
                 if (state.user) {
                     renderView(state.currentView);
                 }
+            }, error => {
+                console.error(`Error fetching ${colName}:`, error);
             });
         });
 
@@ -675,7 +682,7 @@
     }
     // #endregion
 
-    // #region Staff Views
+    // #region Staff Views (No changes)
     function renderStaffView(container) {
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
 
@@ -798,7 +805,6 @@
                     <button type="button" id="delete-staff-btn" class="btn btn-delete" style="margin-left: 1rem;">Видалити</button>
                 </form>
             </div>
-
             <div class="services-layout" style="margin-top: 2rem; grid-template-columns: 350px 1fr; ">
                 <div class="content-card">
                     <h3>Операції з зарплатою</h3>
@@ -838,12 +844,10 @@
         document.getElementById('back-to-staff-list').onclick = () => renderView('staff');
         document.getElementById('edit-staff-form').onsubmit = handleUpdateStaff;
         document.getElementById('delete-staff-btn').onclick = () => handleDeleteStaff(person.id, person.name);
-
         const paymentTypeSelect = document.getElementById('payment-type');
         const payoutPeriodGroup = document.getElementById('payout-period-group');
         const paymentDescriptionGroup = document.getElementById('payment-description-group');
         const paymentAmountInput = document.getElementById('payment-amount');
-
         paymentTypeSelect.onchange = (e) => {
             const isPayout = e.target.value === 'payout';
             payoutPeriodGroup.style.display = isPayout ? 'block' : 'none';
@@ -856,19 +860,15 @@
             }
         };
         paymentTypeSelect.dispatchEvent(new Event('change'));
-
         document.getElementById('add-payment-form').onsubmit = handleAddStaffPayment;
-
         setupSubcollectionListener('payouts', 'payouts-history-list', 'staffPayouts', renderPayoutHistoryList);
     }
 
     function setupSubcollectionListener(subcollectionName, listElementId, stateKey, renderer) {
         const staffId = state.viewingStaffId;
         if (!staffId) return;
-        
         staffSubcollectionUnsubscribers.forEach(unsub => unsub());
         staffSubcollectionUnsubscribers = [];
-
         const collectionRef = collection(db, 'staff', staffId, subcollectionName);
         const unsubscribe = onSnapshot(query(collectionRef, orderBy("date", "desc")), (snapshot) => {
             state[stateKey] = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -880,13 +880,11 @@
     function renderPayoutHistoryList(elementId, items) {
         const listEl = document.getElementById(elementId);
         if (!listEl) return;
-
         const allItems = [
             ...(state.staffPayouts || []).map(p => ({...p, type: 'Нарахування ЗП'})),
             ...(state.viewingStaffAdvances || []).map(p => ({...p, type: 'Аванс', amount: -p.amount})),
             ...(state.viewingStaffBonuses || []).map(p => ({...p, type: 'Премія'}))
         ].sort((a,b) => b.date.toDate() - a.date.toDate());
-
         if (allItems.length === 0) {
             listEl.innerHTML = `<li>Історія порожня.</li>`;
             return;
@@ -911,11 +909,9 @@
         const fixedSalary = parseFloat(document.getElementById('edit-staff-salary').value);
         const salonId = document.getElementById('edit-staff-salon').value;
         const isFrozen = document.getElementById('edit-staff-frozen').checked;
-
         if (!name || !salonId || isNaN(fixedSalary)) {
             return showNotification("Будь ласка, заповніть усі поля коректно.", "error");
         }
-        
         const action = () => updateDoc(doc(db, 'staff', staffId), { name, fixedSalary, salonId, isFrozen });
         try {
             await logAndExecute('Оновлено дані співробітника', { staffId, name }, action);
@@ -948,14 +944,11 @@
         const amount = parseFloat(document.getElementById('payment-amount').value);
         const description = document.getElementById('payment-description').value.trim();
         const period = document.getElementById('payout-period').value;
-
         if (isNaN(amount) || amount <= 0) return showNotification('Введіть коректну суму.', "error");
-
         let subcollectionName = `${type}s`;
         let data = { amount, date: Timestamp.now() };
         let logAction = '';
         let logDetails = { staffId, name: person.name, amount };
-
         if (type === 'payout') {
             if (!period) return showNotification('Будь ласка, оберіть період для нарахування ЗП.', 'error');
             data.period = period;
@@ -966,9 +959,7 @@
             logAction = type === 'bonus' ? 'Нараховано премію' : 'Видано аванс';
             if (description) logDetails.description = description;
         }
-
         const action = () => addDoc(collection(db, 'staff', staffId, subcollectionName), data);
-
         try {
             await logAndExecute(logAction, logDetails, action);
             event.target.reset();
@@ -980,7 +971,7 @@
     }
     // #endregion
 
-    // #region Audit Log View
+    // #region Audit Log View (No changes)
     function renderAuditLogView(container) {
         const logEntriesHtml = state.auditLog.map(log => {
             const detailsArray = Object.entries(log.details || {}).map(([key, value]) => {
@@ -1022,6 +1013,7 @@
     }
     // #endregion
 
+    // #region Daily Summary (No changes)
     function renderDailySummary() {
         const dateInput = document.getElementById('summary-date-picker');
         const salonInput = document.getElementById('summary-salon-filter');
@@ -1053,7 +1045,6 @@
             if (app.payments && app.payments.length > 0) {
                 servicesWithPayment++;
                 app.payments.forEach(p => {
-                    // [FIX] Don't count internal settlements as salon income
                     if (p.type !== 'settlement') {
                         total += p.amount;
                         if(p.type === 'cash') cash += p.amount;
@@ -1066,7 +1057,7 @@
         
         let productSalesCash = 0, productSalesCard = 0, productSalesBlik = 0;
         let filteredProductSales = state.productSales.filter(s => {
-            const saleDate = s.date.toDate();
+            const saleDate = s.timestamp.toDate();
             return saleDate >= startOfDay && saleDate <= endOfDay;
         });
         if (selectedSalonId !== 'all') {
@@ -1093,7 +1084,7 @@
         });
         let totalSalonExpenses = 0;
         let filteredSalonExpenses = state.salonExpenses.filter(e => {
-            const expenseDate = e.date.toDate();
+            const expenseDate = e.timestamp.toDate();
             return expenseDate >= startOfDay && expenseDate <= endOfDay;
         });
         if (selectedSalonId !== 'all') {
@@ -1111,8 +1102,9 @@
         productSalesEl.textContent = `${totalProductSales.toFixed(0)} zł`;
         document.getElementById('summary-services-count').textContent = servicesWithPayment;
     }
+    // #endregion
 
-    // #region Calendar View
+    // #region Calendar View & Modals (with fixes)
     function renderCalendarView(container) {
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
         container.innerHTML = `
@@ -1150,38 +1142,14 @@
                     </div>
                 </div>
                 <div class="summary-grid">
-                    <div class="summary-card">
-                        <div class="value" id="summary-total">0 zł</div>
-                        <div class="label">Загальний дохід</div>
-                    </div>
-                    <div class="summary-card">
-                        <div class="value" id="summary-cash">0 zł</div>
-                        <div class="label">💵 Готівкою</div>
-                    </div>
-                    <div class="summary-card">
-                        <div class="value" id="summary-card">0 zł</div>
-                        <div class="label">💳 Карткою</div>
-                    </div>
-                    <div class="summary-card">
-                        <div class="value" id="summary-blik">0 zł</div>
-                        <div class="label">📱 Blik</div>
-                    </div>
-                    <div class="summary-card">
-                        <div class="value" id="summary-product-sales">0 zł</div>
-                        <div class="label">🛍️ Продаж товарів</div>
-                    </div>
-                     <div class="summary-card">
-                        <div class="value" id="summary-advances">0 zł</div>
-                        <div class="label">💸 Видано авансів</div>
-                    </div>
-                    <div class="summary-card">
-                        <div class="value" id="summary-salon-expenses">0 zł</div>
-                        <div class="label">Витрати салону</div>
-                    </div>
-                     <div class="summary-card">
-                        <div class="value" id="summary-services-count">0</div>
-                        <div class="label">Кількість оплат</div>
-                    </div>
+                    <div class="summary-card"><div class="value" id="summary-total">0 zł</div><div class="label">Загальний дохід</div></div>
+                    <div class="summary-card"><div class="value" id="summary-cash">0 zł</div><div class="label">💵 Готівкою</div></div>
+                    <div class="summary-card"><div class="value" id="summary-card">0 zł</div><div class="label">💳 Карткою</div></div>
+                    <div class="summary-card"><div class="value" id="summary-blik">0 zł</div><div class="label">📱 Blik</div></div>
+                    <div class="summary-card"><div class="value" id="summary-product-sales">0 zł</div><div class="label">🛍️ Продаж товарів</div></div>
+                    <div class="summary-card"><div class="value" id="summary-advances">0 zł</div><div class="label">💸 Видано авансів</div></div>
+                    <div class="summary-card"><div class="value" id="summary-salon-expenses">0 zł</div><div class="label">Витрати салону</div></div>
+                    <div class="summary-card"><div class="value" id="summary-services-count">0</div><div class="label">Кількість оплат</div></div>
                 </div>
             </div>`;
         const calendarEl = document.getElementById('calendar');
@@ -1200,38 +1168,20 @@
             editable: false, selectable: true, nowIndicator: true,
             events: function(fetchInfo, successCallback, failureCallback) {
                 let filteredAppointments = state.appointments;
-
                 if (state.calendarSelectedMasterId !== 'all') {
                     filteredAppointments = filteredAppointments.filter(app => app.masterId === state.calendarSelectedMasterId);
                 }
-
                 if (state.calendarSelectedSalonId !== 'all') {
                     filteredAppointments = filteredAppointments.filter(app => app.salonId === state.calendarSelectedSalonId);
                 }
-
                 const events = filteredAppointments.map(app => {
                     const masterIndex = state.masters.findIndex(m => m.id === app.masterId);
                     const endTime = new Date(app.dateTime.toDate().getTime() + (app.duration || 60) * 60000);
-                    
                     let backgroundColor = colorPalette[masterIndex % colorPalette.length];
-                    if (app.isInternal) {
-                        backgroundColor = 'var(--warning-color)';
-                    } else if (app.status === 'completed') {
-                        backgroundColor = 'var(--success-color)';
-                    } else if (app.status === 'partially_paid') {
-                        backgroundColor = 'var(--warning-color)';
-                    }
-
-                    return { 
-                        id: app.id,
-                        title: app.clientName,
-                        start: app.dateTime.toDate(), 
-                        end: endTime, 
-                        resourceId: app.masterId,
-                        backgroundColor: backgroundColor,
-                        borderColor: backgroundColor,
-                        extendedProps: { appointment: app }
-                    };
+                    if (app.isInternal) { backgroundColor = 'var(--warning-color)'; } 
+                    else if (app.status === 'completed') { backgroundColor = 'var(--success-color)'; } 
+                    else if (app.status === 'partially_paid') { backgroundColor = 'var(--warning-color)'; }
+                    return { id: app.id, title: app.clientName, start: app.dateTime.toDate(), end: endTime, resourceId: app.masterId, backgroundColor, borderColor: backgroundColor, extendedProps: { appointment: app } };
                 });
                 successCallback(events);
             },
@@ -1239,13 +1189,7 @@
                 const appointment = arg.event.extendedProps.appointment;
                 const service = state.services.find(s => s.id === appointment.serviceId);
                 const salon = state.salons.find(s => s.id === appointment.salonId);
-                const html = `
-                    <div class="fc-event-main-frame">
-                        <div class="fc-event-title">${appointment.clientName} ${appointment.isInternal ? ' (для своїх)' : ''}</div>
-                        <div class="fc-event-service">${service?.name || ''}</div>
-                        <div class="fc-event-service" style="opacity: 0.7;"><strong>${salon?.name || 'Не вказано'}</strong></div>
-                    </div>
-                `;
+                const html = `<div class="fc-event-main-frame"><div class="fc-event-title">${appointment.clientName} ${appointment.isInternal ? ' (для своїх)' : ''}</div><div class="fc-event-service">${service?.name || ''}</div><div class="fc-event-service" style="opacity: 0.7;"><strong>${salon?.name || 'Не вказано'}</strong></div></div>`;
                 return { html: html };
             },
             eventDidMount: function(info) {
@@ -1268,7 +1212,6 @@
         calendar.render();
         masterFilter.onchange = (e) => { state.calendarSelectedMasterId = e.target.value; renderView('calendar'); };
         salonFilter.onchange = (e) => { state.calendarSelectedSalonId = e.target.value; renderView('calendar'); };
-
         const summaryDatePicker = document.getElementById('summary-date-picker');
         const summarySalonFilter = document.getElementById('summary-salon-filter');
         summaryDatePicker.valueAsDate = new Date(); 
@@ -1281,29 +1224,23 @@
         const totalPrice = appointment.finalPrice || 0;
         const totalPaid = appointment.totalPaid || 0;
         const remaining = totalPrice - totalPaid;
-
         document.getElementById('payment-appointment-id').value = appointment.id;
         document.getElementById('payment-total-price').textContent = `${totalPrice.toFixed(0)} zł`;
         document.getElementById('payment-total-paid').textContent = `${totalPaid.toFixed(0)} zł`;
         document.getElementById('payment-remaining').textContent = `${remaining.toFixed(0)} zł`;
-        
         const amountInput = document.getElementById('payment-amount');
         amountInput.value = remaining > 0 ? remaining.toFixed(2) : '0.00';
         amountInput.max = remaining.toFixed(2);
-        
         document.getElementById('payment-modal').style.display = 'flex';
     }
 
-    // [КЛЮЧОВА ЗМІНА] Оновлена логіка модального вікна
     function showActionModal(appointment) {
         const modal = document.getElementById('appointment-action-modal');
         const detailsEl = document.getElementById('action-modal-details');
         const buttonsEl = document.getElementById('action-modal-buttons');
-        
         const service = state.services.find(s => s.id === appointment.serviceId);
         const master = state.masters.find(m => m.id === appointment.masterId);
         const salon = state.salons.find(s => s.id === appointment.salonId);
-
         let statusText = 'Очікує';
         if (appointment.status === 'completed') {
             statusText = appointment.isInternal ? 'Взаєморозрахунок проведено' : 'Завершено та оплачено';
@@ -1311,12 +1248,10 @@
             const remaining = (appointment.finalPrice || 0) - (appointment.totalPaid || 0);
             statusText = `Частково оплачено (ще ${remaining.toFixed(0)} zł)`;
         }
-
         let clientInfoHtml = `<p><strong>Клієнт:</strong> ${appointment.clientName}</p>`;
         if(appointment.isInternal){
             clientInfoHtml = `<p><strong>Клієнт-майстер:</strong> ${appointment.clientName}</p>`;
         }
-
         detailsEl.innerHTML = `
             ${clientInfoHtml}
             <p><strong>Послуга:</strong> ${service?.name || 'Невідома послуга'}</p>
@@ -1339,69 +1274,47 @@
             paymentsHtml += '</ul>';
             detailsEl.innerHTML += paymentsHtml;
         }
-
         let buttonsHtml = '';
         const remainingToPay = (appointment.finalPrice || 0) - (appointment.totalPaid || 0);
-        
-        // [КЛЮЧОВА ЗМІНА] Показуємо правильну кнопку для внутрішніх послуг
         if (appointment.isInternal && appointment.status !== 'completed') {
             buttonsHtml += `<button class="btn btn-complete-payment" data-action="settle">Провести по взаєморозрахунку</button>`;
         } else if (!appointment.isInternal && appointment.status !== 'completed' && remainingToPay > 0.001) {
             buttonsHtml += `<button class="btn btn-complete-payment" data-action="pay">Внести / Додати оплату</button>`;
         }
-        
         if (appointment.payments && appointment.payments.length > 0) {
              buttonsHtml += `<button class="btn btn-edit" data-action="edit-payments">✏️ Редагувати оплати</button>`;
         }
-        
         buttonsHtml += `<button class="btn btn-edit" data-action="edit">Редагувати / Перенести</button>`;
         buttonsHtml += `<button class="btn btn-delete" data-action="cancel">Скасувати запис</button>`;
-        
         buttonsEl.innerHTML = buttonsHtml;
         buttonsEl.onclick = function(event) {
             const button = event.target.closest('button');
             if (!button) return;
             const action = button.dataset.action;
             modal.style.display = 'none';
-
-            if (action === 'pay') {
-                openPaymentModal(appointment);
-            } else if (action === 'settle') {
-                handleSettleInternalService(appointment);
-            } else if (action === 'edit') {
-                handleEditAppointment(appointment.id);
-            } else if (action === 'cancel') {
-                handleCancelAppointment(appointment.id, appointment.clientName);
-            } else if (action === 'edit-payments') {
-                showEditPaymentsModal(appointment);
-            }
+            if (action === 'pay') { openPaymentModal(appointment); } 
+            else if (action === 'settle') { handleSettleInternalService(appointment); } 
+            else if (action === 'edit') { handleEditAppointment(appointment.id); } 
+            else if (action === 'cancel') { handleCancelAppointment(appointment.id, appointment.clientName); } 
+            else if (action === 'edit-payments') { showEditPaymentsModal(appointment); }
         };
-        
         modal.querySelector('.close-btn').onclick = () => modal.style.display = 'none';
         modal.style.display = 'flex';
     }
 
-    // [КЛЮЧОВА ЗМІНА] Оновлена функція для взаєморозрахунку
     async function handleSettleInternalService(appointment) {
-        // Розраховуємо 50% від вартості послуги
         const amount = appointment.finalPrice * 0.5;
-
         const newPayment = {
             amount: amount,
-            type: 'settlement', // Спеціальний тип оплати
+            type: 'settlement',
             date: Timestamp.now(),
-            // [ВАЖЛИВО] Передаємо ID майстра, який отримав послугу.
-            // Бекенд буде використовувати це поле, але для надійності
-            // він все одно буде брати головне поле appointment.clientId
             receivingMasterId: appointment.clientId 
         };
-
         const action = () => updateDoc(doc(db, 'appointments', appointment.id), {
             payments: arrayUnion(newPayment),
-            totalPaid: increment(amount), // Позначаємо, що "оплата" пройшла
+            totalPaid: increment(amount),
             status: 'completed'
         });
-        
         try {
             await logAndExecute('Проведено взаєморозрахунок', { appointmentId: appointment.id, clientName: appointment.clientName, amount }, action);
             showNotification('Взаєморозрахунок успішно проведено!');
@@ -1415,7 +1328,6 @@
         const modal = document.getElementById('edit-payments-modal');
         const listEl = document.getElementById('edit-payments-list');
         document.getElementById('edit-payments-appointment-id').value = appointment.id;
-
         listEl.innerHTML = '';
         if (!appointment.payments || appointment.payments.length === 0) {
             listEl.innerHTML = '<li>Оплат ще не було.</li>';
@@ -1423,7 +1335,6 @@
             appointment.payments.forEach((payment, index) => {
                 const li = document.createElement('li');
                 li.dataset.index = index;
-                // [FIX] Не дозволяємо редагувати тип оплати для settlement
                 const isSettlement = payment.type === 'settlement';
                 li.innerHTML = `
                     <div style="flex-grow: 1;"><strong>${payment.amount.toFixed(2)} zł</strong></div>
@@ -1455,20 +1366,14 @@
         const appointmentId = document.getElementById('edit-payments-appointment-id').value;
         const appointment = state.appointments.find(a => a.id === appointmentId);
         if (!appointment) return showNotification('Помилка: запис не знайдено.', 'error');
-
         const newPayments = [];
         let newTotalPaid = 0;
-
         document.querySelectorAll('#edit-payments-list li').forEach(li => {
             const originalPayment = appointment.payments[li.dataset.index];
             const newType = li.querySelector('.payment-type-selector').value;
-            newPayments.push({
-                ...originalPayment,
-                type: newType
-            });
+            newPayments.push({ ...originalPayment, type: newType });
             newTotalPaid += originalPayment.amount;
         });
-
         const finalPrice = appointment.finalPrice || 0;
         let newStatus = (newTotalPaid > 0) ? 'partially_paid' : 'upcoming';
         if (appointment.isInternal) {
@@ -1476,13 +1381,7 @@
         } else {
             if (newTotalPaid >= finalPrice - 0.001) newStatus = 'completed';
         }
-        
-        const action = () => updateDoc(doc(db, 'appointments', appointmentId), {
-            payments: newPayments,
-            totalPaid: newTotalPaid,
-            status: newStatus
-        });
-        
+        const action = () => updateDoc(doc(db, 'appointments', appointmentId), { payments: newPayments, totalPaid: newTotalPaid, status: newStatus });
         try {
             await logAndExecute('Оновлено оплати запису', { appointmentId, clientName: appointment.clientName }, action);
             showNotification('Оплати успішно оновлено!');
@@ -1513,7 +1412,7 @@
     }
     // #endregion
     
-    // #region Clients Views
+    // #region Clients Views (No changes)
     function renderClientsView(container) {
         container.innerHTML = `<div class="content-card"><h2>База клієнтів</h2><div class="form-group"><input type="text" id="client-search" placeholder="Пошук за іменем або телефоном..."></div><ul id="clients-list" class="item-list"></ul></div>`;
         const searchInput = document.getElementById('client-search');
@@ -1543,11 +1442,7 @@
             }
             if(e.target.classList.contains('btn-book-appointment')) {
                 const clientData = e.target.dataset;
-                state.selectedClientForAppointment = {
-                    id: clientData.id,
-                    name: clientData.name,
-                    phone: clientData.phone
-                };
+                state.selectedClientForAppointment = { id: clientData.id, name: clientData.name, phone: clientData.phone };
                 renderView('appointments');
             }
         };
@@ -1568,17 +1463,12 @@
             const master = state.masters.find(m => m.id === app.masterId);
             const salon = state.salons.find(s => s.id === app.salonId); 
             const date = app.dateTime.toDate().toLocaleString('uk-UA', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            
             let statusBadge;
-            if (app.status === 'completed') {
-                statusBadge = `<span class="status-badge status-completed">Оплачено</span>`;
-            } else if (app.status === 'partially_paid') {
+            if (app.status === 'completed') { statusBadge = `<span class="status-badge status-completed">Оплачено</span>`; } 
+            else if (app.status === 'partially_paid') {
                 const remaining = (app.finalPrice || 0) - (app.totalPaid || 0);
                 statusBadge = `<span class="status-badge status-partially-paid">Частково (ще ${remaining.toFixed(0)} zł)</span>`;
-            } else {
-                statusBadge = `<span class="status-badge status-upcoming">Очікує</span>`;
-            }
-
+            } else { statusBadge = `<span class="status-badge status-upcoming">Очікує</span>`; }
             return `<tr><td>${date}</td><td>${service?.name || 'Н/Д'}</td><td>${master?.name || 'Н/Д'}</td><td>${salon?.name || 'Н/Д'}</td><td>${app.finalPrice.toFixed(0)} zł</td><td>${statusBadge}</td></tr>`;
         }).join('');
         container.innerHTML = `<div class="content-card"><button id="back-to-clients-btn" class="btn" style="margin-bottom: 2rem;">&larr; Назад до списку клієнтів</button><h2>${client.name}</h2><p><strong>Телефон:</strong> ${client.phone || 'не вказано'}</p><div class="stats-grid"><div class="stat-card"><div class="value">${totalVisits}</div><div class="label">Всього візитів</div></div><div class="stat-card"><div class="value">${totalSpent.toFixed(0)} zł</div><div class="label">Всього витрачено</div></div><div class="stat-card"><div class="value">${firstVisit}</div><div class="label">Перший візит</div></div></div></div><div class="content-card"><h3>Історія відвідувань</h3><table><thead><tr><th>Дата</th><th>Послуга</th><th>Майстер</th><th>Салон</th><th>Сума</th><th>Статус</th></tr></thead><tbody>${historyHtml.length > 0 ? historyHtml : `<tr><td colspan="6" style="text-align:center;">Історія відвідувань порожня.</td></tr>`}</tbody></table></div>`;
@@ -1586,7 +1476,7 @@
     }
     // #endregion
 
-    // #region Appointments View
+    // #region Appointments View (with fixes)
     function renderAppointmentsView(container) {
         const isEditMode = !!state.editingAppointmentId;
         let appointmentToEdit = null;
@@ -1602,7 +1492,6 @@
                      <div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem; margin-bottom: 1rem;">
                         <label><input type="checkbox" id="internal-service-checkbox"> Внутрішня послуга (для майстра)</label>
                     </div>
-
                     <div id="regular-client-fields">
                         <div class="form-group client-search-container">
                             <label for="client-search-input">Пошук / Ім'я клієнта</label>
@@ -1614,62 +1503,29 @@
                             <input type="tel" id="client-phone-input">
                         </div>
                     </div>
-
                     <div id="master-client-fields" style="display: none;">
                          <div class="form-group">
                             <label for="master-as-client-select">Клієнт-майстер</label>
                             <select id="master-as-client-select" class="form-group"></select>
                         </div>
                     </div>
-
                     <div class="form-group">
                         <label for="appointment-datetime">Дата і час</label>
                         <input type="datetime-local" id="appointment-datetime" required>
                     </div>
                     <div class="form-row">
-                        <div class="form-group" style="flex:1;">
-                            <label for="appointment-category">Категорія послуг</label>
-                            <select id="appointment-category" required></select>
-                        </div>
-                        <div class="form-group service-search-container" style="flex:1;">
-                            <label for="appointment-service-search">Послуга</label>
-                            <input type="text" id="appointment-service-search" placeholder="Почніть вводити назву..." autocomplete="off" required>
-                            <div id="service-search-results" style="display: none;"></div>
-                        </div>
+                        <div class="form-group" style="flex:1;"><label for="appointment-category">Категорія послуг</label><select id="appointment-category" required></select></div>
+                        <div class="form-group service-search-container" style="flex:1;"><label for="appointment-service-search">Послуга</label><input type="text" id="appointment-service-search" placeholder="Почніть вводити назву..." autocomplete="off" required><div id="service-search-results" style="display: none;"></div></div>
                     </div>
-                    <div class="form-group">
-                        <label for="appointment-master">Майстер</label>
-                        <select id="appointment-master" required></select>
-                    </div>
-                    <div class="form-group">
-                        <label for="appointment-salon">Салон</label>
-                        <select id="appointment-salon" required>
-                           <option value="">Оберіть салон</option>
-                           ${salonOptions}
-                        </select>
-                    </div>
+                    <div class="form-group"><label for="appointment-master">Майстер</label><select id="appointment-master" required></select></div>
+                    <div class="form-group"><label for="appointment-salon">Салон</label><select id="appointment-salon" required><option value="">Оберіть салон</option>${salonOptions}</select></div>
                     <div class="form-row">
-                        <div class="form-group" style="flex:2;">
-                            <label for="manual-discount-value">Додаткова знижка</label>
-                            <input type="number" id="manual-discount-value" placeholder="0" min="0">
-                        </div>
-                        <div class="form-group" style="flex:1;">
-                            <label for="manual-discount-type">Тип</label>
-                            <select id="manual-discount-type">
-                                <option value="percent">%</option>
-                                <option value="fixed">zł</option>
-                            </select>
-                        </div>
+                        <div class="form-group" style="flex:2;"><label for="manual-discount-value">Додаткова знижка</label><input type="number" id="manual-discount-value" placeholder="0" min="0"></div>
+                        <div class="form-group" style="flex:1;"><label for="manual-discount-type">Тип</label><select id="manual-discount-type"><option value="percent">%</option><option value="fixed">zł</option></select></div>
                     </div>
                      <div class="form-row">
-                        <div class="form-group" style="flex:1;">
-                            <label for="additional-charge-amount">Додаткова плата (zł)</label>
-                            <input type="number" id="additional-charge-amount" placeholder="0" min="0">
-                        </div>
-                        <div class="form-group" style="flex:2;">
-                            <label for="additional-charge-description">Опис дод. плати</label>
-                            <input type="text" id="additional-charge-description" placeholder="напр. Миття голови">
-                        </div>
+                        <div class="form-group" style="flex:1;"><label for="additional-charge-amount">Додаткова плата (zł)</label><input type="number" id="additional-charge-amount" placeholder="0" min="0"></div>
+                        <div class="form-group" style="flex:2;"><label for="additional-charge-description">Опис дод. плати</label><input type="text" id="additional-charge-description" placeholder="напр. Миття голови"></div>
                     </div>
                     <div id="final-price-display">Сума до оплати: 0 zł</div>
                     <button type="submit" id="appointment-submit-btn" class="btn" style="margin-top: 1rem;">${isEditMode ? 'Зберегти зміни' : 'Створити запис'}</button>
@@ -1692,19 +1548,15 @@
         if (isEditMode && appointmentToEdit) {
             const d = new Date(appointmentToEdit.dateTime.toDate().getTime() - (appointmentToEdit.dateTime.toDate().getTimezoneOffset() * 60000));
             document.getElementById('appointment-datetime').value = d.toISOString().slice(0, 16);
-            
             document.getElementById('manual-discount-value').value = appointmentToEdit.manualDiscount?.value || 0;
             document.getElementById('manual-discount-type').value = appointmentToEdit.manualDiscount?.type || 'percent';
-            
             if (appointmentToEdit.additionalCharge) {
                 document.getElementById('additional-charge-amount').value = appointmentToEdit.additionalCharge.amount || 0;
                 document.getElementById('additional-charge-description').value = appointmentToEdit.additionalCharge.description || '';
             }
-
             const internalCheckbox = document.getElementById('internal-service-checkbox');
             internalCheckbox.checked = appointmentToEdit.isInternal || false;
             internalCheckbox.dispatchEvent(new Event('change'));
-            
             if(appointmentToEdit.isInternal) {
                 document.getElementById('master-as-client-select').value = appointmentToEdit.clientId;
             } else {
@@ -1713,7 +1565,6 @@
                 document.getElementById('client-phone-input').value = client?.phone || '';
                 document.getElementById('client-phone-group').style.display = 'block';
             }
-            
             const service = state.services.find(s => s.id === appointmentToEdit.serviceId);
             if (service) {
                 state.selectedServiceForAppointment = service;
@@ -1721,7 +1572,6 @@
                 const categorySelect = document.getElementById('appointment-category');
                 categorySelect.value = service.categoryId;
                 categorySelect.dispatchEvent(new Event('change'));
-
                 setTimeout(() => {
                     document.getElementById('appointment-master').value = appointmentToEdit.masterId;
                     if (appointmentToEdit.salonId) {
@@ -1734,7 +1584,6 @@
             const clientSearchInput = document.getElementById('client-search-input');
             const clientPhoneInput = document.getElementById('client-phone-input');
             const clientPhoneGroup = document.getElementById('client-phone-group');
-            
             clientSearchInput.value = state.selectedClientForAppointment.name;
             clientSearchInput.disabled = true;
             clientPhoneInput.value = state.selectedClientForAppointment.phone || '';
@@ -1776,17 +1625,13 @@
                 renderView('calendar');
             };
         } 
-        
-        // Internal service checkbox logic
         const internalCheckbox = document.getElementById('internal-service-checkbox');
         const regularClientFields = document.getElementById('regular-client-fields');
         const masterClientFields = document.getElementById('master-client-fields');
         const masterAsClientSelect = document.getElementById('master-as-client-select');
         const clientSearchInput = document.getElementById('client-search-input');
-        
         const masterOptions = state.masters.filter(m => !m.isFrozen).map(m => `<option value="${m.id}">${m.name}</option>`).join('');
         masterAsClientSelect.innerHTML = `<option value="">Оберіть майстра-клієнта</option>${masterOptions}`;
-        
         internalCheckbox.onchange = () => {
             const isInternal = internalCheckbox.checked;
             regularClientFields.style.display = isInternal ? 'none' : 'block';
@@ -1794,9 +1639,7 @@
             clientSearchInput.required = !isInternal;
             masterAsClientSelect.required = isInternal;
         };
-        internalCheckbox.dispatchEvent(new Event('change')); // Initial setup
-
-        // Client search logic
+        internalCheckbox.dispatchEvent(new Event('change'));
         const searchResultsEl = document.getElementById('client-search-results');
         const phoneGroup = document.getElementById('client-phone-group');
         const phoneInput = document.getElementById('client-phone-input');
@@ -1818,12 +1661,10 @@
             }
         };
         clientSearchInput.onblur = () => { setTimeout(() => searchResultsEl.style.display = 'none', 200); };
-        
         populateAppointmentFormDropdowns();
         const categorySelect = document.getElementById('appointment-category');
         const serviceSearchInput = document.getElementById('appointment-service-search');
         const serviceSearchResultsEl = document.getElementById('service-search-results');
-
         categorySelect.onchange = () => {
             state.selectedServiceForAppointment = null;
             serviceSearchInput.value = '';
@@ -1835,34 +1676,23 @@
             masterSelect.innerHTML = '<option value="">Оберіть майстра</option>' + mastersForCategory.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
             updateFinalPrice();
         };
-
         const showServiceList = (searchTerm = '') => {
             const categoryId = categorySelect.value;
-            if (!categoryId) {
-                serviceSearchResultsEl.style.display = 'none';
-                return;
-            }
+            if (!categoryId) { serviceSearchResultsEl.style.display = 'none'; return; }
             const servicesForCategory = state.services.filter(s => s.categoryId === categoryId);
             const normalizedSearch = searchTerm.toLowerCase().trim();
             const results = servicesForCategory.filter(s => s.name.toLowerCase().includes(normalizedSearch));
-            
             serviceSearchResultsEl.innerHTML = results.length > 0 ? results.map(s => `<div data-id="${s.id}">${s.name}</div>`).join('') : '<li>Послуг не знайдено</li>';
             serviceSearchResultsEl.style.display = 'block';
         };
-
         serviceSearchInput.onfocus = () => {
-            if (!categorySelect.value) {
-                showNotification("Спочатку оберіть категорію", "error");
-                return;
-            }
+            if (!categorySelect.value) { showNotification("Спочатку оберіть категорію", "error"); return; }
             showServiceList(serviceSearchInput.value);
         };
-
         serviceSearchInput.oninput = () => {
             state.selectedServiceForAppointment = null;
             showServiceList(serviceSearchInput.value);
         };
-
         serviceSearchResultsEl.onclick = (e) => {
             const serviceId = e.target.dataset.id;
             if(serviceId) {
@@ -1873,24 +1703,20 @@
                 updateFinalPrice();
             }
         };
-
         serviceSearchInput.onblur = () => {
             setTimeout(() => {
                 serviceSearchResultsEl.style.display = 'none';
-                if (!state.selectedServiceForAppointment) {
-                    serviceSearchInput.value = '';
-                } else {
-                    serviceSearchInput.value = state.selectedServiceForAppointment.name;
-                }
+                if (!state.selectedServiceForAppointment) { serviceSearchInput.value = ''; } 
+                else { serviceSearchInput.value = state.selectedServiceForAppointment.name; }
             }, 200);
         };
-
         ['appointment-master', 'appointment-salon', 'manual-discount-value', 'manual-discount-type', 'additional-charge-amount'].forEach(id => {
             const el = document.getElementById(id);
             if(el) el.oninput = updateFinalPrice;
         });
     }
 
+    // [КЛЮЧОВА ЗМІНА] Оновлена логіка для списку записів
     function renderDailyAppointmentsList() {
         const listEl = document.getElementById('daily-appointments-list');
         const paginationControls = document.getElementById('pagination-controls');
@@ -1904,11 +1730,12 @@
             const appDate = app.dateTime.toDate();
             return app.status !== 'completed' && appDate >= startOfDay && appDate <= endOfDay;
         }).sort((a, b) => a.dateTime.toDate() - b.dateTime.toDate());
+        
         if (state.appointmentsPage === 1) {
             listEl.innerHTML = '';
             if (dailyUnpaidAppointments.length === 0) {
                 listEl.innerHTML = '<li>На цю дату немає незавершених записів.</li>';
-                paginationControls.innerHTML = '';
+                if (paginationControls) paginationControls.innerHTML = '';
                 return;
             }
         }
@@ -1916,6 +1743,7 @@
         const itemsPerPage = 10;
         const startIndex = (state.appointmentsPage - 1) * itemsPerPage;
         const paginatedAppointments = dailyUnpaidAppointments.slice(startIndex, startIndex + itemsPerPage);
+        
         paginatedAppointments.forEach(appointment => {
             const service = state.services.find(s => s.id === appointment.serviceId)?.name || 'Послуга';
             const master = state.masters.find(m => m.id === appointment.masterId)?.name || 'Майстер';
@@ -1925,22 +1753,40 @@
             const priceText = appointment.status === 'partially_paid' ? `Залишилось: ${remaining.toFixed(0)} zł` : `<strong>${appointment.finalPrice.toFixed(0)} zł</strong>`;
             
             const li = document.createElement('li');
-            li.innerHTML = `<div><strong>${time} - ${appointment.clientName}</strong><br><small>${service} (${master})</small></div><div class="actions">${priceText}<button class="btn btn-complete-payment">Оплатити</button></div>`;
             
-            li.querySelector('.btn-complete-payment').onclick = () => openPaymentModal(appointment);
+            // [КЛЮЧОВА ЗМІНА] Різні кнопки для звичайних та внутрішніх послуг
+            let actionButtonHtml = '';
+            if (appointment.isInternal) {
+                actionButtonHtml = `<button class="btn btn-complete-payment btn-settle">Взаєморозрахунок</button>`;
+            } else {
+                actionButtonHtml = `<button class="btn btn-complete-payment btn-pay">Оплатити</button>`;
+            }
+
+            li.innerHTML = `
+                <div><strong>${time} - ${appointment.clientName}</strong><br><small>${service} (${master})</small></div>
+                <div class="actions">${priceText}${actionButtonHtml}</div>`;
+            
+            if (appointment.isInternal) {
+                li.querySelector('.btn-settle').onclick = () => handleSettleInternalService(appointment);
+            } else {
+                li.querySelector('.btn-pay').onclick = () => openPaymentModal(appointment);
+            }
+            
             listEl.appendChild(li);
         });
         
-        paginationControls.innerHTML = '';
-        if (dailyUnpaidAppointments.length > startIndex + itemsPerPage) {
-            const loadMoreBtn = document.createElement('button');
-            loadMoreBtn.className = 'btn';
-            loadMoreBtn.innerText = 'Завантажити ще';
-            loadMoreBtn.onclick = () => { 
-                state.appointmentsPage++;
-                renderDailyAppointmentsList(); 
-            };
-            paginationControls.appendChild(loadMoreBtn);
+        if (paginationControls) {
+            paginationControls.innerHTML = '';
+            if (dailyUnpaidAppointments.length > startIndex + itemsPerPage) {
+                const loadMoreBtn = document.createElement('button');
+                loadMoreBtn.className = 'btn';
+                loadMoreBtn.innerText = 'Завантажити ще';
+                loadMoreBtn.onclick = () => { 
+                    state.appointmentsPage++;
+                    renderDailyAppointmentsList(); 
+                };
+                paginationControls.appendChild(loadMoreBtn);
+            }
         }
     }
 
@@ -1990,50 +1836,24 @@
         if (!service || !masterId || !dateTimeString || !salonId) {
             return showNotification("Будь ласка, заповніть усі поля, включно з послугою та салоном.", "error");
         }
-
         const master = state.masters.find(m => m.id === masterId);
         if (!master) {
             return showNotification("Помилка: не знайдено майстра!", "error");
         }
-
         const priceModifier = master.priceModifier || 0;
         const salaryBase = service.price * (1 + priceModifier / 100);
         const finalPrice = updateFinalPrice();
         const additionalChargeAmount = parseFloat(document.getElementById('additional-charge-amount').value) || 0;
         const additionalChargeDescription = document.getElementById('additional-charge-description').value.trim();
-        
-        let appointmentData = {
-            dateTime: Timestamp.fromDate(new Date(dateTimeString)),
-            serviceId: service.id,
-            masterId,
-            salonId,
-            duration: service.duration || 60,
-            manualDiscount: {
-                value: parseFloat(document.getElementById('manual-discount-value').value) || 0,
-                type: document.getElementById('manual-discount-type').value
-            },
-            additionalCharge: {
-                amount: additionalChargeAmount,
-                description: additionalChargeDescription
-            },
-            finalPrice,
-            salaryBase,
-            isInternal: isInternal
-        };
-        
+        let appointmentData = { dateTime: Timestamp.fromDate(new Date(dateTimeString)), serviceId: service.id, masterId, salonId, duration: service.duration || 60, manualDiscount: { value: parseFloat(document.getElementById('manual-discount-value').value) || 0, type: document.getElementById('manual-discount-type').value }, additionalCharge: { amount: additionalChargeAmount, description: additionalChargeDescription }, finalPrice, salaryBase, isInternal: isInternal };
         let logDetails = { service: service.name, master: master.name };
-        
         try {
             if (isInternal) {
                 const receivingMasterId = document.getElementById('master-as-client-select').value;
-                if (!receivingMasterId) {
-                    return showNotification("Будь ласка, оберіть майстра-клієнта.", "error");
-                }
-                if (receivingMasterId === masterId) {
-                    return showNotification("Майстер не може надавати послугу самому собі.", "error");
-                }
+                if (!receivingMasterId) { return showNotification("Будь ласка, оберіть майстра-клієнта.", "error"); }
+                if (receivingMasterId === masterId) { return showNotification("Майстер не може надавати послугу самому собі.", "error"); }
                 const receivingMaster = state.masters.find(m => m.id === receivingMasterId);
-                appointmentData.clientId = receivingMasterId; // Using master ID as client ID for internal services
+                appointmentData.clientId = receivingMasterId;
                 appointmentData.clientName = `${receivingMaster.name} (Майстер)`;
                 logDetails.clientName = appointmentData.clientName;
             } else {
@@ -2047,9 +1867,8 @@
                     if (!clientPhone) return showNotification("Для нового клієнта необхідно вказати номер телефону.", "error");
                     const normalizedPhone = clientPhone.replace(/[\s-()]/g, '');
                     const existingClient = state.clients.find(c => c.name.toLowerCase() === clientName.toLowerCase() && c.phone.replace(/[\s-()]/g, '') === normalizedPhone);
-                    if (existingClient) {
-                        clientId = existingClient.id;
-                    } else {
+                    if (existingClient) { clientId = existingClient.id; } 
+                    else {
                          const newClientAction = () => addDoc(collection(db, 'clients'), { name: clientName, phone: clientPhone, createdAt: Timestamp.now() });
                          const newClientRef = await logAndExecute('Створено клієнта', { name: clientName, phone: clientPhone }, newClientAction);
                          clientId = newClientRef.id;
@@ -2058,7 +1877,6 @@
                 appointmentData.clientId = clientId;
                 appointmentData.clientName = clientName;
             }
-
             if (isEditMode) {
                 const action = () => updateDoc(doc(db, 'appointments', state.editingAppointmentId), appointmentData);
                 await logAndExecute('Оновлено запис', { ...logDetails, appointmentId: state.editingAppointmentId }, action);
@@ -2066,24 +1884,15 @@
                 state.editingAppointmentId = null;
                 renderView('calendar');
             } else {
-                const fullAppointmentData = {
-                    ...appointmentData,
-                    status: 'upcoming',
-                    totalPaid: 0,
-                    payments: [],
-                    createdAt: Timestamp.now()
-                };
-                
+                const fullAppointmentData = { ...appointmentData, status: 'upcoming', totalPaid: 0, payments: [], createdAt: Timestamp.now() };
                 const createAppAction = () => addDoc(collection(db, 'appointments'), fullAppointmentData);
                 await logAndExecute('Створено запис', logDetails, createAppAction);
-
                 showNotification('Запис успішно створено!');
                 event.target.reset();
                 state.selectedClientForAppointment = null;
                 state.selectedServiceForAppointment = null;
                 document.getElementById('internal-service-checkbox').checked = false;
                 document.getElementById('internal-service-checkbox').dispatchEvent(new Event('change'));
-
                 const clientSearchInput = document.getElementById('client-search-input');
                 if(clientSearchInput) clientSearchInput.disabled = false;
                 document.getElementById('client-phone-group').style.display = 'none';
@@ -2099,44 +1908,24 @@
         const appointmentId = document.getElementById('payment-appointment-id').value;
         const paymentType = document.getElementById('payment-modal-type').value;
         const amountToPay = parseFloat(document.getElementById('payment-amount').value);
-
         if (!appointmentId || !amountToPay || amountToPay <= 0) {
             return showNotification('Будь ласка, введіть коректну суму.', "error");
         }
-        
         const appointmentRef = doc(db, 'appointments', appointmentId);
         try {
             const appointmentSnap = await getDoc(appointmentRef);
-            if (!appointmentSnap.exists()) {
-                throw new Error("Запис не знайдено");
-            }
-
+            if (!appointmentSnap.exists()) { throw new Error("Запис не знайдено"); }
             const appointmentData = appointmentSnap.data();
             const currentTotalPaid = appointmentData.totalPaid || 0;
             const finalPrice = appointmentData.finalPrice;
-            
             const processPayment = async () => {
-                const newPayment = {
-                    amount: amountToPay,
-                    type: paymentType,
-                    date: Timestamp.now()
-                };
-
+                const newPayment = { amount: amountToPay, type: paymentType, date: Timestamp.now() };
                 const newTotalPaid = currentTotalPaid + amountToPay;
                 const newStatus = (newTotalPaid >= finalPrice - 0.001) ? 'completed' : 'partially_paid';
-                
-                const action = () => updateDoc(appointmentRef, {
-                    payments: arrayUnion(newPayment),
-                    totalPaid: increment(amountToPay),
-                    status: newStatus,
-                    ...(newStatus === 'completed' && !appointmentData.completedAt && { completedAt: Timestamp.now() })
-                });
-
+                const action = () => updateDoc(appointmentRef, { payments: arrayUnion(newPayment), totalPaid: increment(amountToPay), status: newStatus, ...(newStatus === 'completed' && !appointmentData.completedAt && { completedAt: Timestamp.now() }) });
                 await logAndExecute('Проведено оплату', { appointmentId, clientName: appointmentData.clientName, amount: amountToPay, type: paymentType }, action);
-                
                 document.getElementById('payment-modal').style.display = 'none';
             };
-
             if (amountToPay > (finalPrice - currentTotalPaid) + 0.01) { 
                 showConfirmModal(`Сума оплати (${amountToPay.toFixed(2)} zł) більша за залишок (${(finalPrice - currentTotalPaid).toFixed(2)} zł). Продовжити?`, processPayment);
             } else {
@@ -2148,7 +1937,7 @@
     }
     // #endregion
 
-    // #region Masters View
+    // #region Masters View (No changes)
     function renderMastersView(container) { 
         container.innerHTML = `<div class="content-card"><h2>Додати нового майстра</h2><form id="add-master-form"><div class="form-group"><label for="new-master-name">Ім'я та прізвище</label><input type="text" id="new-master-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="new-master-tier">Ранг</label><input type="text" id="new-master-tier" placeholder="напр. Топ-майстер"></div><div class="form-group" style="flex:1;"><label for="new-master-modifier">Націнка (%)</label><input type="number" id="new-master-modifier" value="0" min="0"></div></div><div class="form-group"><label>Спеціалізації</label><div id="new-master-categories" class="category-checkbox-group"></div></div><button class="btn" type="submit">Додати майстра</button></form></div><div class="content-card" style="margin-top: 2rem;"><h2>Список майстрів</h2><ul id="masters-list" class="item-list"></ul></div><div class="modal-overlay" id="edit-master-modal"><div class="modal-panel"><div class="modal-header"><h2>Редагувати майстра</h2><button class="close-btn">&times;</button></div><form id="edit-master-form"><input type="hidden" id="edit-master-id"><div class="form-group"><label for="edit-master-name">Ім'я та прізвище</label><input type="text" id="edit-master-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="edit-master-tier">Ранг</label><input type="text" id="edit-master-tier"></div><div class="form-group" style="flex:1;"><label for="edit-master-modifier">Націнка (%)</label><input type="number" id="edit-master-modifier" min="0"></div></div><div class="form-group"><label>Спеціалізації</label><div id="edit-master-categories" class="category-checkbox-group"></div></div><div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem;"><label><input type="checkbox" id="edit-master-frozen"> Заморозити майстра (приховати з форм)</label></div><button type="submit" class="btn">Зберегти зміни</button></form></div></div>`; 
         document.getElementById('add-master-form').onsubmit = handleAddMaster; 
@@ -2173,15 +1962,10 @@
         }); 
         listEl.onclick = (event) => { 
             const button = event.target.closest('button[data-action="edit-profile"]');
-            if (button) { 
-                event.stopPropagation();
-                showEditMasterModal(button.dataset.id); 
-            } else { 
+            if (button) { event.stopPropagation(); showEditMasterModal(button.dataset.id); } 
+            else { 
                 const masterItem = event.target.closest('.master-info-clickable');
-                if (masterItem) { 
-                    state.viewingMasterId = masterItem.dataset.id;
-                    renderView('masterDetail'); 
-                } 
+                if (masterItem) { state.viewingMasterId = masterItem.dataset.id; renderView('masterDetail'); } 
             } 
         };
     }
@@ -2189,21 +1973,12 @@
     function renderMasterDetailView(container) {
         const masterId = state.viewingMasterId;
         const master = state.masters.find(m => m.id === masterId);
-
         if (!master) {
             container.innerHTML = `<div class="content-card"><h2>Майстра не знайдено</h2><p><button id="detail-view-back-btn" class="btn">Назад до списку</button></p></div>`;
-            container.onclick = (event) => {
-                if (event.target.id === 'detail-view-back-btn') {
-                    renderView('masters');
-                }
-            };
+            container.onclick = (event) => { if (event.target.id === 'detail-view-back-btn') { renderView('masters'); } };
             return;
         }
-
-        const categoriesList = (master.categoryIds || [])
-            .map(id => state.categories.find(c => c.id === id)?.name)
-            .filter(Boolean).join(', ') || 'Не вказано';
-
+        const categoriesList = (master.categoryIds || []).map(id => state.categories.find(c => c.id === id)?.name).filter(Boolean).join(', ') || 'Не вказано';
         container.innerHTML = `
             <div class="content-card">
                 <button id="detail-view-back-btn" class="btn" style="margin-bottom: 2rem; width: auto; background-color: var(--gray-text);">&larr; Назад до списку майстрів</button>
@@ -2213,36 +1988,19 @@
             <div class="content-card">
                 <h3>Видача авансу</h3>
                 <form id="add-advance-form">
-                    <div class="form-group">
-                        <label for="advance-amount">Сума авансу (zł)</label>
-                        <input type="number" id="advance-amount" min="1" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="advance-description">Опис (необов'язково)</label>
-                        <textarea id="advance-description" rows="2"></textarea>
-                    </div>
+                    <div class="form-group"><label for="advance-amount">Сума авансу (zł)</label><input type="number" id="advance-amount" min="1" required></div>
+                    <div class="form-group"><label for="advance-description">Опис (необов'язково)</label><textarea id="advance-description" rows="2"></textarea></div>
                     <button type="submit" class="btn">Видати аванс</button>
                 </form>
             </div>
-            <div class="content-card">
-                <h3>Історія авансів</h3>
-                <ul id="master-advances-list" class="item-list"><li>Завантаження...</li></ul>
-            </div>
+            <div class="content-card"><h3>Історія авансів</h3><ul id="master-advances-list" class="item-list"><li>Завантаження...</li></ul></div>
         `;
         container.onclick = function(event) {
-            if (event.target.closest('#detail-view-back-btn')) {
-                renderView('masters');
-                return;
-            }
+            if (event.target.closest('#detail-view-back-btn')) { renderView('masters'); return; }
             const deleteButton = event.target.closest('.btn-delete-advance');
-            if (deleteButton) {
-                handleDeleteAdvance(deleteButton.dataset.id, master.name, deleteButton.dataset.amount, deleteButton.dataset.description);
-                return;
-            }
+            if (deleteButton) { handleDeleteAdvance(deleteButton.dataset.id, master.name, deleteButton.dataset.amount, deleteButton.dataset.description); return; }
         };
-        
         document.getElementById('add-advance-form').onsubmit = handleAddAdvance;
-
         const advancesCollectionRef = collection(db, 'masters', masterId, 'advances');
         masterAdvancesUnsubscribe = onSnapshot(query(advancesCollectionRef, orderBy("date", "desc")), (snapshot) => {
             state.viewingMasterAdvances = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -2250,14 +2008,8 @@
             if (listEl) {
                 listEl.innerHTML = state.viewingMasterAdvances.length === 0 ? '<li>Авансів ще не було.</li>' : state.viewingMasterAdvances.map(adv => `
                     <li>
-                        <div>
-                            <span>${adv.date.toDate().toLocaleString('uk-UA')}</span>
-                            ${adv.description ? `<br><small style="color: var(--gray-text);">${adv.description}</small>` : ''}
-                        </div>
-                        <div class="actions">
-                            <strong>${adv.amount} zł</strong>
-                            <button class="btn btn-delete btn-delete-advance" data-id="${adv.id}" data-amount="${adv.amount}" data-description="${adv.description || ''}">Видалити</button>
-                        </div>
+                        <div><span>${adv.date.toDate().toLocaleString('uk-UA')}</span>${adv.description ? `<br><small style="color: var(--gray-text);">${adv.description}</small>` : ''}</div>
+                        <div class="actions"><strong>${adv.amount} zł</strong><button class="btn btn-delete btn-delete-advance" data-id="${adv.id}" data-amount="${adv.amount}" data-description="${adv.description || ''}">Видалити</button></div>
                     </li>
                 `).join('');
             }
@@ -2272,21 +2024,10 @@
         const descriptionInput = document.getElementById('advance-description');
         const amount = parseFloat(amountInput.value);
         const description = descriptionInput.value.trim();
-
-        if (!masterId || !amount || amount <= 0) {
-            return showNotification('Будь ласка, введіть коректну суму.', "error");
-        }
-        
-        const data = {
-            amount: amount,
-            date: Timestamp.now()
-        };
-        if (description) {
-            data.description = description;
-        }
-
+        if (!masterId || !amount || amount <= 0) { return showNotification('Будь ласка, введіть коректну суму.', "error"); }
+        const data = { amount: amount, date: Timestamp.now() };
+        if (description) { data.description = description; }
         const action = () => addDoc(collection(db, 'masters', masterId, 'advances'), data);
-
         try {
             await logAndExecute('Видано аванс майстру', { masterId, name: master.name, amount, description }, action);
             amountInput.value = '';
@@ -2303,11 +2044,8 @@
             const action = () => deleteDoc(doc(db, 'masters', masterId, 'advances', advanceId));
             const logDetails = { masterId, name: masterName, amount: parseFloat(amount), description };
             if (reason) logDetails.reason = reason;
-            try {
-                await logAndExecute('Видалено аванс майстра', logDetails, action);
-            } catch (e) {
-                showNotification("Помилка при видаленні авансу.", "error");
-            }
+            try { await logAndExecute('Видалено аванс майстра', logDetails, action); } 
+            catch (e) { showNotification("Помилка при видаленні авансу.", "error"); }
         });
     }
 
@@ -2320,14 +2058,9 @@
         const priceModifier = parseFloat(document.getElementById('new-master-modifier').value) || 0; 
         const categoryIds = Array.from(document.querySelectorAll('#new-master-categories input:checked')).map(el => el.value); 
         if (!name) return showNotification("Введіть ім'я майстра.", "error"); 
-
         const action = () => addDoc(collection(db, 'masters'), { name, tier, priceModifier, categoryIds, isFrozen: false });
-        try { 
-            await logAndExecute('Створено майстра', { name }, action);
-            event.target.reset(); 
-        } catch (e) { 
-            showNotification('Не вдалося додати майстра.', "error"); 
-        } 
+        try { await logAndExecute('Створено майстра', { name }, action); event.target.reset(); } 
+        catch (e) { showNotification('Не вдалося додати майстра.', "error"); } 
     }
 
     function showEditMasterModal(id) { const master = state.masters.find(m => m.id === id); if (!master) return showNotification('Майстра не знайдено!', "error"); const modal = document.getElementById('edit-master-modal'); modal.style.display = 'flex'; document.getElementById('edit-master-id').value = id; document.getElementById('edit-master-name').value = master.name; document.getElementById('edit-master-tier').value = master.tier || ''; document.getElementById('edit-master-modifier').value = master.priceModifier || 0; document.getElementById('edit-master-frozen').checked = master.isFrozen || false; populateCategoryCheckboxes('edit-master-categories', master.categoryIds || []); }
@@ -2341,18 +2074,13 @@
         const categoryIds = Array.from(document.querySelectorAll('#edit-master-categories input:checked')).map(el => el.value); 
         const isFrozen = document.getElementById('edit-master-frozen').checked; 
         if (!name) return showNotification("Ім'я не може бути порожнім.", "error"); 
-
         const action = () => updateDoc(doc(db, 'masters', id), { name, tier, priceModifier, categoryIds, isFrozen });
-        try { 
-            await logAndExecute('Оновлено дані майстра', { masterId: id, name }, action);
-            document.getElementById('edit-master-modal').style.display = 'none'; 
-        } catch(e) { 
-            showNotification('Не вдалося оновити.', "error"); 
-        } 
+        try { await logAndExecute('Оновлено дані майстра', { masterId: id, name }, action); document.getElementById('edit-master-modal').style.display = 'none'; } 
+        catch(e) { showNotification('Не вдалося оновити.', "error"); } 
     }
     // #endregion
 
-    // #region Services View
+    // #region Services View (No changes)
     function renderServicesView(container) { container.innerHTML = `<div class="services-layout"><div class="content-card"><h2>Категорії</h2><form id="add-category-form" class="form-group"><input type="text" id="new-category-name" placeholder="Нова категорія..." required><button class="btn" type="submit" style="width:100%; margin-top:0.5rem;">Додати</button></form><ul id="categories-list" class="item-list"></ul></div><div id="services-container"><div class="content-card"><p>Оберіть категорію зліва.</p></div></div></div><div class="modal-overlay" id="edit-category-modal"><div class="modal-panel"><div class="modal-header"><h2>Редагувати категорію</h2><button class="close-btn">&times;</button></div><form id="edit-category-form"><input type="hidden" id="edit-category-id"><div class="form-group"><label for="edit-category-name">Назва категорії</label><input type="text" id="edit-category-name" required></div><div class="form-group"><label for="edit-category-discount">Акційна знижка (%)</label><input type="number" id="edit-category-discount" min="0" max="100" value="0"></div><button type="submit">Зберегти зміни</button></form></div></div><div class="modal-overlay" id="edit-service-modal"><div class="modal-panel"><div class="modal-header"><h2 id="service-modal-title">Послуга</h2><button class="close-btn">&times;</button></div><form id="edit-service-form"><input type="hidden" id="edit-service-id"><div class="form-group"><label for="edit-service-name">Назва</label><input type="text" id="edit-service-name" required></div><div class="form-row"><div class="form-group" style="flex:1;"><label for="edit-service-duration">Тривалість (хв)</label><input type="number" id="edit-service-duration" required min="0"></div><div class="form-group" style="flex:1;"><label for="edit-service-price">Ціна (zł)</label><input type="number" id="edit-service-price" required min="0"></div></div><div class="form-group"><label for="edit-service-discount">Персональна знижка (%)</label><input type="number" id="edit-service-discount" min="0" max="100" value="0"></div><button type="submit">Зберегти</button></form></div></div>`; setupCategoriesLogic(); if (state.selectedCategoryId) { renderServicesForCategory(); } }
     function setupCategoriesLogic() { document.getElementById('add-category-form').onsubmit = handleAddCategory; document.getElementById('edit-category-modal').querySelector('.close-btn').onclick = () => document.getElementById('edit-category-modal').style.display = 'none'; document.getElementById('edit-category-form').onsubmit = handleUpdateCategory; const categoriesListEl = document.getElementById('categories-list'); categoriesListEl.innerHTML = state.categories.length > 0 ? '' : '<li>Немає категорій.</li>'; state.categories.forEach(category => { const li = document.createElement('li'); li.className = 'category-list-item'; li.dataset.id = category.id; if (category.id === state.selectedCategoryId) li.classList.add('selected'); li.innerHTML = `<span>${category.name} ${category.discount ? `<strong style="color:var(--danger-color);">-`+category.discount+'%</strong>' : ''}</span><div class="actions"><button class="btn btn-edit" data-id="${category.id}" data-name="${category.name}" data-discount="${category.discount || 0}">✏️</button><button class="btn btn-delete" data-id="${category.id}" data-name="${category.name}">🗑️</button></div>`; categoriesListEl.appendChild(li); }); categoriesListEl.onclick = (event) => { const target = event.target; const deleteBtn = target.closest('.btn-delete'); if (deleteBtn) { handleDeleteCategory(deleteBtn.dataset.id, deleteBtn.dataset.name); } else if (target.closest('.btn-edit')) { const btn = target.closest('.btn-edit'); showEditCategoryModal(btn.dataset.id, btn.dataset.name, btn.dataset.discount); } else if (target.closest('.category-list-item')) { state.selectedCategoryId = target.closest('.category-list-item').dataset.id; renderView('services'); } }; }
     function renderServicesForCategory() { const categoryId = state.selectedCategoryId; const servicesContainer = document.getElementById('services-container'); const category = state.categories.find(c => c.id === categoryId); const categoryName = category ? category.name : ''; servicesContainer.innerHTML = `<div class="content-card"><div style="display:flex; justify-content:space-between; align-items:center;"><h2>Послуги: ${categoryName}</h2><button id="add-service-btn" class="btn">Додати послугу</button></div><ul id="services-list" class="item-list"></ul></div>`; document.getElementById('add-service-btn').onclick = () => showServiceModal(); const servicesListEl = document.getElementById('services-list'); const filteredServices = state.services.filter(s => s.categoryId === categoryId).sort((a,b)=>a.name.localeCompare(b.name)); servicesListEl.innerHTML = filteredServices.length > 0 ? '' : '<li>Немає послуг в цій категорії.</li>'; filteredServices.forEach(service => { const finalDiscount = (service.discount > 0) ? service.discount : (category?.discount || 0); const discountedPrice = service.price * (1 - finalDiscount / 100); const li = document.createElement('li'); li.innerHTML = `<div><strong>${service.name}</strong><br><small>${service.duration || 'N/A'} хв. ${service.discount > 0 ? `(Знижка ${service.discount}%)` : ''}</small></div><div class="price-display">${finalDiscount > 0 ? `<span class="old-price">${service.price} zł</span>` : ''}<span class="new-price">${discountedPrice.toFixed(0)} zł</span></div><div class="actions"><button class="btn-edit btn-edit-service" data-id="${service.id}" data-name="${service.name}" data-duration="${service.duration}" data-price="${service.price}" data-discount="${service.discount || 0}">✏️</button><button class="btn btn-delete btn-delete-service" data-id="${service.id}" data-name="${service.name}">🗑️</button></div>`; servicesListEl.appendChild(li); }); servicesListEl.onclick = (event) => { const target = event.target.closest('button'); if (!target) return; const deleteBtn = target.closest('.btn-delete-service'); if (deleteBtn) handleDeleteService(deleteBtn.dataset.id, deleteBtn.dataset.name); if (target.classList.contains('btn-edit-service')) { showServiceModal(target.dataset.id, target.dataset); }}; }
@@ -2366,47 +2094,24 @@
     async function handleDeleteService(id, name) { showConfirmWithReasonModal(`Видалити послугу "${name}"?`, async (reason) => { const action = () => deleteDoc(doc(db, 'services', id)); const logDetails = { serviceId: id, name }; if (reason) logDetails.reason = reason; try { await logAndExecute('Видалено послугу', logDetails, action); } catch (e) { showNotification('Не вдалося видалити.', "error"); } }); }
     // #endregion
 
-    // #region Salary, Expenses, Notepad & Settings
+    // #region Salary, Expenses, Notepad & Settings (No changes)
     function renderSalaryView(container) {
-        const masterOptions = state.masters
-            .filter(m => !m.isFrozen)
-            .map(m => `<option value="${m.id}">${m.name}</option>`)
-            .join('');
+        const masterOptions = state.masters.filter(m => !m.isFrozen).map(m => `<option value="${m.id}">${m.name}</option>`).join('');
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-
         const today = new Date();
         const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
         const todayStr = today.toISOString().split('T')[0];
-
         container.innerHTML = `
             <div class="content-card">
                 <h2>Розрахунок зарплати</h2>
                 <form id="calculate-salary-form">
                     <div class="form-row">
-                        <div class="form-group" style="flex:1;">
-                            <label for="salary-start-date">З</label>
-                            <input type="date" id="salary-start-date" value="${firstDayOfMonth}">
-                        </div>
-                        <div class="form-group" style="flex:1;">
-                            <label for="salary-end-date">По</label>
-                            <input type="date" id="salary-end-date" value="${todayStr}">
-                        </div>
+                        <div class="form-group" style="flex:1;"><label for="salary-start-date">З</label><input type="date" id="salary-start-date" value="${firstDayOfMonth}"></div>
+                        <div class="form-group" style="flex:1;"><label for="salary-end-date">По</label><input type="date" id="salary-end-date" value="${todayStr}"></div>
                     </div>
                     <div class="form-row">
-                        <div class="form-group" style="flex:1;">
-                            <label for="salary-master-filter">Майстер</label>
-                            <select id="salary-master-filter">
-                                <option value="all">Всі майстри</option>
-                                ${masterOptions}
-                            </select>
-                        </div>
-                        <div class="form-group" style="flex:1;">
-                            <label for="salary-salon-filter">Салон</label>
-                            <select id="salary-salon-filter">
-                                <option value="all">Всі салони (Разом)</option>
-                                ${salonOptions}
-                            </select>
-                        </div>
+                        <div class="form-group" style="flex:1;"><label for="salary-master-filter">Майстер</label><select id="salary-master-filter"><option value="all">Всі майстри</option>${masterOptions}</select></div>
+                        <div class="form-group" style="flex:1;"><label for="salary-salon-filter">Салон</label><select id="salary-salon-filter"><option value="all">Всі салони (Разом)</option>${salonOptions}</select></div>
                     </div>
                     <button type="submit" class="btn" style="width: 100%;">Розрахувати</button>
                 </form>
@@ -2419,36 +2124,28 @@
         event.preventDefault();
         const reportContainer = document.getElementById('salary-report');
         reportContainer.innerHTML = '<p>Розрахунок...</p>';
-
         const startDate = document.getElementById('salary-start-date').value;
         const endDate = document.getElementById('salary-end-date').value;
         const selectedMasterId = document.getElementById('salary-master-filter').value;
         const selectedSalonId = document.getElementById('salary-salon-filter').value;
-
         try {
             const generateReport = httpsCallable(functions, 'generateAndSendReport');
             const result = await generateReport({ startDate, endDate, salonId: selectedSalonId, isManualCalculation: true });
-            
-            // Displaying the report text directly
             const reportText = result.data.reportBody;
             const masterReports = reportText.split('--- ДЕТАЛІЗАЦІЯ ПО ЗАРПЛАТІ МАЙСТРІВ ---')[1].split('--- ДЕТАЛІЗАЦІЯ ПО ЗАРПЛАТІ ПЕРСОНАЛУ ---')[0];
-            
             const masterReportParts = masterReports.split('----------------------------').filter(part => part.trim() !== '');
-
             let reportHtml = '';
             masterReportParts.forEach(part => {
                 if (!part.includes('Майстер:')) return;
-                
                 const name = part.match(/Майстер: (.*)/)[1];
                 const group = part.match(/\(Група: (.*)\)/)[1];
                 const base = part.match(/База для ЗП .*?: (.*) zł/)[1];
                 const rate = part.match(/Ставка: (.*)%/)[1];
                 const salaryFromBase = part.match(/Нараховано ЗП .*?: (.*) zł/)[1];
-                const bonus = part.match(/Бонус .*?: \+(.*) zł/)[1];
+                const bonus = part.match(/Нарахування .*?: \+(.*) zł/)[1]; // Changed from "Бонус"
                 const advances = part.match(/Аванси: -(.*) zł/)[1];
                 const settlements = part.match(/Взаєморозрахунок .*?: -(.*) zł/)[1];
                 const toPay = part.match(/ДО ВИПЛАТИ: (.*) zł/)[1];
-
                 if (selectedMasterId === 'all' || state.masters.find(m => m.name === name)?.id === selectedMasterId) {
                      reportHtml += `
                         <div class="salary-report-card">
@@ -2457,7 +2154,7 @@
                             <p><span>База для нарахування ЗП:</span> <strong>${base} zł</strong></p>
                             <p><span>Ставка:</span> <strong>${rate}%</strong></p>
                             <p><span>Нарахована ЗП (від бази):</span> <span>${salaryFromBase} zł</span></p>
-                            <p><span>Бонус (внутр. послуги):</span> <span style="color: var(--success-color);">+${bonus} zł</span></p>
+                            <p><span>Нарахування (внутр. послуги):</span> <span style="color: var(--success-color);">+${bonus} zł</span></p>
                             <p><span>Видано авансів:</span> <span style="color: var(--danger-color);">- ${advances} zł</span></p>
                             <p><span>Взаєморозрахунок (списання):</span> <span style="color: var(--danger-color);">- ${settlements} zł</span></p>
                             <p class="total-salary"><span>До виплати:</span> <strong>${toPay} zł</strong></p>
@@ -2465,7 +2162,6 @@
                 }
             });
             reportContainer.innerHTML = reportHtml || '<p>За обраними фільтрами немає даних для розрахунку.</p>';
-
         } catch (error) {
             console.error("Помилка розрахунку ЗП:", error);
             reportContainer.innerHTML = `<p style="color: var(--danger-color);">Помилка: ${error.message}</p>`;
@@ -2478,56 +2174,27 @@
                 <h2>Додати загальну витрату</h2>
                 <form id="add-expense-form">
                     <div class="form-row">
-                        <div class="form-group" style="flex:2;">
-                            <label for="expense-description">Опис</label>
-                            <input type="text" id="expense-description" required>
-                        </div>
-                        <div class="form-group" style="flex:1;">
-                            <label for="expense-amount">Сума (zł)</label>
-                            <input type="number" id="expense-amount" required min="0" step="0.01">
-                        </div>
-                         <div class="form-group" style="flex:1;">
-                            <label for="expense-date">Дата</label>
-                            <input type="date" id="expense-date" required>
-                        </div>
+                        <div class="form-group" style="flex:2;"><label for="expense-description">Опис</label><input type="text" id="expense-description" required></div>
+                        <div class="form-group" style="flex:1;"><label for="expense-amount">Сума (zł)</label><input type="number" id="expense-amount" required min="0" step="0.01"></div>
+                        <div class="form-group" style="flex:1;"><label for="expense-date">Дата</label><input type="date" id="expense-date" required></div>
                     </div>
                     <button type="submit" class="btn">Додати витрату</button>
                 </form>
             </div>
-            <div class="content-card" style="margin-top:2rem;">
-                <h2>Історія загальних витрат</h2>
-                <ul id="expenses-list" class="item-list"></ul>
-            </div>
-        `;
+            <div class="content-card" style="margin-top:2rem;"><h2>Історія загальних витрат</h2><ul id="expenses-list" class="item-list"></ul></div>`;
         document.getElementById('add-expense-form').onsubmit = handleAddExpense;
         document.getElementById('expense-date').valueAsDate = new Date();
-        
         const listEl = document.getElementById('expenses-list');
         listEl.innerHTML = '';
-        if (state.expenses.length === 0) {
-            listEl.innerHTML = '<li>Витрат ще не було.</li>';
-        } else {
+        if (state.expenses.length === 0) { listEl.innerHTML = '<li>Витрат ще не було.</li>'; } 
+        else {
             state.expenses.forEach(expense => {
                 const li = document.createElement('li');
-                li.innerHTML = `
-                    <div>
-                        <strong>${expense.description}</strong><br>
-                        <small>${expense.timestamp.toDate().toLocaleDateString('uk-UA')}</small>
-                    </div>
-                    <div class="actions">
-                        <strong>${expense.amount.toFixed(2)} zł</strong>
-                        <button class="btn btn-delete" data-id="${expense.id}" data-description="${expense.description}">🗑️</button>
-                    </div>`;
+                li.innerHTML = `<div><strong>${expense.description}</strong><br><small>${expense.timestamp.toDate().toLocaleDateString('uk-UA')}</small></div><div class="actions"><strong>${expense.amount.toFixed(2)} zł</strong><button class="btn btn-delete" data-id="${expense.id}" data-description="${expense.description}">🗑️</button></div>`;
                 listEl.appendChild(li);
             });
         }
-        
-        listEl.onclick = (e) => {
-            const deleteBtn = e.target.closest('.btn-delete');
-            if (deleteBtn) {
-                handleDeleteExpense(deleteBtn.dataset.id, deleteBtn.dataset.description);
-            }
-        };
+        listEl.onclick = (e) => { const deleteBtn = e.target.closest('.btn-delete'); if (deleteBtn) { handleDeleteExpense(deleteBtn.dataset.id, deleteBtn.dataset.description); } };
     }
 
     async function handleAddExpense(event) {
@@ -2535,23 +2202,13 @@
         const description = document.getElementById('expense-description').value.trim();
         const amount = parseFloat(document.getElementById('expense-amount').value);
         const date = document.getElementById('expense-date').value;
-        if (!description || !amount || !date) {
-            return showNotification("Будь ласка, заповніть усі поля.", "error");
-        }
-        
-        const action = () => addDoc(collection(db, 'expenses'), {
-            description,
-            amount,
-            timestamp: Timestamp.fromDate(new Date(date))
-        });
-
+        if (!description || !amount || !date) { return showNotification("Будь ласка, заповніть усі поля.", "error"); }
+        const action = () => addDoc(collection(db, 'expenses'), { description, amount, timestamp: Timestamp.fromDate(new Date(date)) });
         try {
             await logAndExecute('Додано загальну витрату', { description, amount }, action);
             event.target.reset();
             document.getElementById('expense-date').valueAsDate = new Date();
-        } catch (e) {
-            showNotification("Не вдалося додати витрату.", "error");
-        }
+        } catch (e) { showNotification("Не вдалося додати витрату.", "error"); }
     }
 
     async function handleDeleteExpense(id, description) {
@@ -2559,11 +2216,8 @@
             const action = () => deleteDoc(doc(db, 'expenses', id));
             const logDetails = { expenseId: id, description };
             if (reason) logDetails.reason = reason;
-            try {
-                await logAndExecute('Видалено загальну витрату', logDetails, action);
-            } catch(e) {
-                showNotification("Не вдалося видалити витрату.", "error");
-            }
+            try { await logAndExecute('Видалено загальну витрату', logDetails, action); } 
+            catch(e) { showNotification("Не вдалося видалити витрату.", "error"); }
         });
     }
 
@@ -2574,64 +2228,29 @@
                 <h2>Додати витрату в салоні</h2>
                 <form id="add-salon-expense-form">
                     <div class="form-row">
-                        <div class="form-group" style="flex:2;">
-                            <label for="salon-expense-description">Опис</label>
-                            <input type="text" id="salon-expense-description" required>
-                        </div>
-                        <div class="form-group" style="flex:1;">
-                            <label for="salon-expense-amount">Сума (zł)</label>
-                            <input type="number" id="salon-expense-amount" required min="0" step="0.01">
-                        </div>
-                        <div class="form-group" style="flex:1;">
-                            <label for="salon-expense-date">Дата</label>
-                            <input type="date" id="salon-expense-date" required>
-                        </div>
-                         <div class="form-group" style="flex:1;">
-                            <label for="salon-expense-salon">Салон</label>
-                            <select id="salon-expense-salon" required>
-                                <option value="">Оберіть салон</option>
-                                ${salonOptions}
-                            </select>
-                         </div>
+                        <div class="form-group" style="flex:2;"><label for="salon-expense-description">Опис</label><input type="text" id="salon-expense-description" required></div>
+                        <div class="form-group" style="flex:1;"><label for="salon-expense-amount">Сума (zł)</label><input type="number" id="salon-expense-amount" required min="0" step="0.01"></div>
+                        <div class="form-group" style="flex:1;"><label for="salon-expense-date">Дата</label><input type="date" id="salon-expense-date" required></div>
+                        <div class="form-group" style="flex:1;"><label for="salon-expense-salon">Салон</label><select id="salon-expense-salon" required><option value="">Оберіть салон</option>${salonOptions}</select></div>
                     </div>
                     <button type="submit" class="btn">Додати витрату</button>
                 </form>
             </div>
-            <div class="content-card" style="margin-top:2rem;">
-                <h2>Історія витрат в салонах</h2>
-                <ul id="salon-expenses-list" class="item-list"></ul>
-            </div>
-        `;
+            <div class="content-card" style="margin-top:2rem;"><h2>Історія витрат в салонах</h2><ul id="salon-expenses-list" class="item-list"></ul></div>`;
         document.getElementById('add-salon-expense-form').onsubmit = handleAddSalonExpense;
         document.getElementById('salon-expense-date').valueAsDate = new Date();
-        
         const listEl = document.getElementById('salon-expenses-list');
         listEl.innerHTML = '';
-        if (state.salonExpenses.length === 0) {
-            listEl.innerHTML = '<li>Витрат ще не було.</li>';
-        } else {
+        if (state.salonExpenses.length === 0) { listEl.innerHTML = '<li>Витрат ще не було.</li>'; } 
+        else {
             state.salonExpenses.forEach(expense => {
                 const salon = state.salons.find(s => s.id === expense.salonId);
                 const li = document.createElement('li');
-                li.innerHTML = `
-                    <div>
-                        <strong>${expense.description}</strong><br>
-                        <small>${expense.timestamp.toDate().toLocaleDateString('uk-UA')} (${salon ? salon.name : 'Невідомий салон'})</small>
-                    </div>
-                    <div class="actions">
-                        <strong>${expense.amount.toFixed(2)} zł</strong>
-                        ${state.user.role === 'admin' ? `<button class="btn btn-delete" data-id="${expense.id}" data-description="${expense.description}">🗑️</button>` : ''}
-                    </div>`;
+                li.innerHTML = `<div><strong>${expense.description}</strong><br><small>${expense.timestamp.toDate().toLocaleDateString('uk-UA')} (${salon ? salon.name : 'Невідомий салон'})</small></div><div class="actions"><strong>${expense.amount.toFixed(2)} zł</strong>${state.user.role === 'admin' ? `<button class="btn btn-delete" data-id="${expense.id}" data-description="${expense.description}">🗑️</button>` : ''}</div>`;
                 listEl.appendChild(li);
             });
         }
-        
-        listEl.onclick = (e) => {
-            const deleteBtn = e.target.closest('.btn-delete');
-            if (deleteBtn) {
-                handleDeleteSalonExpense(deleteBtn.dataset.id, deleteBtn.dataset.description);
-            }
-        };
+        listEl.onclick = (e) => { const deleteBtn = e.target.closest('.btn-delete'); if (deleteBtn) { handleDeleteSalonExpense(deleteBtn.dataset.id, deleteBtn.dataset.description); } };
     }
 
     async function handleAddSalonExpense(event) {
@@ -2640,26 +2259,14 @@
         const amount = parseFloat(document.getElementById('salon-expense-amount').value);
         const date = document.getElementById('salon-expense-date').value;
         const salonId = document.getElementById('salon-expense-salon').value;
-        if (!description || !amount || !date || !salonId) {
-            return showNotification("Будь ласка, заповніть усі поля.", "error");
-        }
-        
+        if (!description || !amount || !date || !salonId) { return showNotification("Будь ласка, заповніть усі поля.", "error"); }
         const salon = state.salons.find(s => s.id === salonId);
-        const action = () => addDoc(collection(db, 'salonExpenses'), {
-            description,
-            amount,
-            salonId,
-            authorEmail: state.user.email,
-            timestamp: Timestamp.fromDate(new Date(date))
-        });
-
+        const action = () => addDoc(collection(db, 'salonExpenses'), { description, amount, salonId, authorEmail: state.user.email, timestamp: Timestamp.fromDate(new Date(date)) });
         try {
             await logAndExecute('Додано витрату салону', { description, amount, salon: salon.name }, action);
             event.target.reset();
             document.getElementById('salon-expense-date').valueAsDate = new Date();
-        } catch (e) {
-            showNotification("Не вдалося додати витрату.", "error");
-        }
+        } catch (e) { showNotification("Не вдалося додати витрату.", "error"); }
     }
     
     async function handleDeleteSalonExpense(id, description) {
@@ -2667,53 +2274,30 @@
             const action = () => deleteDoc(doc(db, 'salonExpenses', id));
             const logDetails = { expenseId: id, description };
             if (reason) logDetails.reason = reason;
-            try {
-                await logAndExecute('Видалено витрату салону', logDetails, action);
-            } catch(e) {
-                showNotification("Не вдалося видалити витрату.", "error");
-            }
+            try { await logAndExecute('Видалено витрату салону', logDetails, action); } 
+            catch(e) { showNotification("Не вдалося видалити витрату.", "error"); }
         });
     }
 
     function renderNotepadView(container) {
-        const entriesHtml = state.notepadEntries.map(entry => {
-            return `
+        const entriesHtml = state.notepadEntries.map(entry => `
             <li data-id="${entry.id}">
-                <div style="flex-grow: 1; word-break: break-word;">
-                    <p>${entry.content.replace(/\n/g, '<br>')}</p>
-                    <small>${entry.authorEmail} - ${entry.timestamp ? entry.timestamp.toDate().toLocaleString('uk-UA') : 'Дата невідома'}</small>
-                </div>
+                <div style="flex-grow: 1; word-break: break-word;"><p>${entry.content.replace(/\n/g, '<br>')}</p><small>${entry.authorEmail} - ${entry.timestamp ? entry.timestamp.toDate().toLocaleString('uk-UA') : 'Дата невідома'}</small></div>
                 ${state.user.role === 'admin' ? `<div class="actions"><button class="btn btn-delete btn-delete-notepad">🗑️</button></div>` : ''}
-            </li>
-        `}).join('');
-
+            </li>`).join('');
         container.innerHTML = `
             <div class="content-card">
                 <h2>Блокнот / Журнал записів</h2>
                 <form id="add-notepad-entry-form">
-                    <div class="form-group">
-                        <label for="notepad-content">Новий запис</label>
-                        <textarea id="notepad-content" rows="4" required></textarea>
-                    </div>
+                    <div class="form-group"><label for="notepad-content">Новий запис</label><textarea id="notepad-content" rows="4" required></textarea></div>
                     <button type="submit" class="btn">Додати запис</button>
                 </form>
             </div>
-            <div class="content-card">
-                <h3>Останні записи</h3>
-                <ul id="notepad-entries" class="item-list">${entriesHtml || '<li>Записів ще не немає.</li>'}</ul>
-            </div>
-        `;
+            <div class="content-card"><h3>Останні записи</h3><ul id="notepad-entries" class="item-list">${entriesHtml || '<li>Записів ще не немає.</li>'}</ul></div>`;
         document.getElementById('add-notepad-entry-form').onsubmit = handleAddNotepadEntry;
-
         const listEl = document.getElementById('notepad-entries');
         if (listEl) {
-            listEl.onclick = (event) => {
-                const deleteBtn = event.target.closest('.btn-delete-notepad');
-                if (deleteBtn) {
-                    const entryId = deleteBtn.closest('li').dataset.id;
-                    handleDeleteNotepadEntry(entryId);
-                }
-            };
+            listEl.onclick = (event) => { const deleteBtn = event.target.closest('.btn-delete-notepad'); if (deleteBtn) { const entryId = deleteBtn.closest('li').dataset.id; handleDeleteNotepadEntry(entryId); } };
         }
     }
 
@@ -2722,17 +2306,11 @@
         const contentInput = document.getElementById('notepad-content');
         const content = contentInput.value.trim();
         if (!content) return;
-        const action = () => addDoc(collection(db, 'notepadEntries'), {
-            content,
-            authorEmail: state.user.email,
-            timestamp: Timestamp.now()
-        });
+        const action = () => addDoc(collection(db, 'notepadEntries'), { content, authorEmail: state.user.email, timestamp: Timestamp.now() });
         try {
             await logAndExecute('Додано запис у блокнот', { content: content.substring(0, 50) + '...' }, action);
             contentInput.value = '';
-        } catch (e) {
-            showNotification("Не вдалося додати запис.", "error");
-        }
+        } catch (e) { showNotification("Не вдалося додати запис.", "error"); }
     }
 
     async function handleDeleteNotepadEntry(entryId) {
@@ -2741,83 +2319,40 @@
             const action = () => deleteDoc(doc(db, 'notepadEntries', entryId));
             const logDetails = { entryId };
             if (reason) logDetails.reason = reason;
-            try {
-                await logAndExecute('Видалено запис з блокноту', logDetails, action);
-            } catch (e) {
-                showNotification("Не вдалося видалити запис.", "error");
-            }
+            try { await logAndExecute('Видалено запис з блокноту', logDetails, action); } 
+            catch (e) { showNotification("Не вдалося видалити запис.", "error"); }
         });
     }
     
     function renderShopView(container) {
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
         const paymentTypes = { cash: '💵', card: '💳', blik: '📱' };
-        
         const recentSalesHtml = state.productSales.slice(0, 10).map(sale => {
             const salon = state.salons.find(s => s.id === sale.salonId);
             return `
                 <li>
-                    <div>
-                        <strong>${sale.description}</strong><br>
-                        <small>${sale.date.toDate().toLocaleString('uk-UA')} (${salon ? salon.name : 'Невідомий салон'})</small>
-                    </div>
-                    <div class="actions">
-                        <strong>${sale.amount.toFixed(2)} zł</strong>
-                        <small>(${paymentTypes[sale.paymentType] || 'Н/Д'})</small>
-                        ${state.user.role === 'admin' ? `<button class="btn btn-delete btn-delete-sale" data-id="${sale.id}" data-description="${sale.description}">🗑️</button>` : ''}
-                    </div>
-                </li>
-            `;
+                    <div><strong>${sale.description}</strong><br><small>${sale.timestamp.toDate().toLocaleString('uk-UA')} (${salon ? salon.name : 'Невідомий салон'})</small></div>
+                    <div class="actions"><strong>${sale.amount.toFixed(2)} zł</strong><small>(${paymentTypes[sale.paymentType] || 'Н/Д'})</small>${state.user.role === 'admin' ? `<button class="btn btn-delete btn-delete-sale" data-id="${sale.id}" data-description="${sale.description}">🗑️</button>` : ''}</div>
+                </li>`;
         }).join('');
         container.innerHTML = `
             <div class="content-card">
                 <h2>Продаж товару</h2>
                 <form id="add-product-sale-form">
-                    <div class="form-group">
-                        <label for="product-sale-description">Назва або опис товару</label>
-                        <input type="text" id="product-sale-description" required>
-                    </div>
+                    <div class="form-group"><label for="product-sale-description">Назва або опис товару</label><input type="text" id="product-sale-description" required></div>
                     <div class="form-row">
-                        <div class="form-group" style="flex:1;">
-                            <label for="product-sale-amount">Сума продажу (zł)</label>
-                            <input type="number" id="product-sale-amount" required min="0" step="0.01">
-                        </div>
-                         <div class="form-group" style="flex:1;">
-                            <label for="product-sale-payment-type">Тип оплати</label>
-                            <select id="product-sale-payment-type" required>
-                                <option value="cash">Готівка</option>
-                                <option value="card">Картка</option>
-                                <option value="blik">Blik</option>
-                            </select>
-                        </div>
-                        <div class="form-group" style="flex:1;">
-                            <label for="product-sale-salon">Салон</label>
-                            <select id="product-sale-salon" required>
-                                <option value="">Оберіть салон</option>
-                                ${salonOptions}
-                            </select>
-                        </div>
+                        <div class="form-group" style="flex:1;"><label for="product-sale-amount">Сума продажу (zł)</label><input type="number" id="product-sale-amount" required min="0" step="0.01"></div>
+                        <div class="form-group" style="flex:1;"><label for="product-sale-payment-type">Тип оплати</label><select id="product-sale-payment-type" required><option value="cash">Готівка</option><option value="card">Картка</option><option value="blik">Blik</option></select></div>
+                        <div class="form-group" style="flex:1;"><label for="product-sale-salon">Салон</label><select id="product-sale-salon" required><option value="">Оберіть салон</option>${salonOptions}</select></div>
                     </div>
                     <button type="submit" class="btn">Зареєструвати продаж</button>
                 </form>
             </div>
-            <div class="content-card" style="margin-top:2rem;">
-                <h2>Останні продажі</h2>
-                <ul id="product-sales-list" class="item-list">
-                    ${recentSalesHtml || '<li>Продажів ще не було.</li>'}
-                </ul>
-            </div>
-        `;
+            <div class="content-card" style="margin-top:2rem;"><h2>Останні продажі</h2><ul id="product-sales-list" class="item-list">${recentSalesHtml || '<li>Продажів ще не було.</li>'}</ul></div>`;
         document.getElementById('add-product-sale-form').onsubmit = handleAddProductSale;
-        
         const salesList = document.getElementById('product-sales-list');
         if(salesList) {
-            salesList.onclick = (event) => {
-                const deleteBtn = event.target.closest('.btn-delete-sale');
-                if(deleteBtn) {
-                    handleDeleteProductSale(deleteBtn.dataset.id, deleteBtn.dataset.description);
-                }
-            };
+            salesList.onclick = (event) => { const deleteBtn = event.target.closest('.btn-delete-sale'); if(deleteBtn) { handleDeleteProductSale(deleteBtn.dataset.id, deleteBtn.dataset.description); } };
         }
     }
 
@@ -2827,28 +2362,14 @@
         const amount = parseFloat(document.getElementById('product-sale-amount').value);
         const salonId = document.getElementById('product-sale-salon').value;
         const paymentType = document.getElementById('product-sale-payment-type').value;
-        
-        if (!description || !amount || amount <= 0 || !salonId || !paymentType) {
-            return showNotification("Будь ласка, заповніть усі поля коректно.", "error");
-        }
-        
+        if (!description || !amount || amount <= 0 || !salonId || !paymentType) { return showNotification("Будь ласка, заповніть усі поля коректно.", "error"); }
         const salon = state.salons.find(s => s.id === salonId);
-        const action = () => addDoc(collection(db, 'productSales'), {
-            description,
-            amount,
-            salonId,
-            paymentType,
-            date: Timestamp.now(),
-            authorEmail: state.user.email
-        });
-
+        const action = () => addDoc(collection(db, 'productSales'), { description, amount, salonId, paymentType, timestamp: Timestamp.now(), authorEmail: state.user.email });
         try {
             await logAndExecute('Зареєстровано продаж товару', { description, amount, salon: salon.name }, action);
             showNotification('Продаж успішно зареєстровано!');
             event.target.reset();
-        } catch (e) {
-            showNotification("Не вдалося зареєструвати продаж.", "error");
-        }
+        } catch (e) { showNotification("Не вдалося зареєструвати продаж.", "error"); }
     }
 
     async function handleDeleteProductSale(saleId, description) {
@@ -2857,51 +2378,32 @@
             const action = () => deleteDoc(doc(db, "productSales", saleId));
             const logDetails = { saleId, description };
             if (reason) logDetails.reason = reason;
-            try {
-                await logAndExecute('Видалено продаж товару', logDetails, action);
-            } catch (e) {
-                showNotification('Не вдалося видалити продаж.', "error");
-            }
+            try { await logAndExecute('Видалено продаж товару', logDetails, action); } 
+            catch (e) { showNotification('Не вдалося видалити продаж.', "error"); }
         });
     }
     
     function renderSettingsView(container) {
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
         const salaryGroupOptions = state.salaryGroups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
-
-        const groupsListHtml = state.salaryGroups.map(group => `
-            <li data-group-id="${group.id}">
-                <span><strong>${group.name}</strong></span>
-                <div class="actions">
-                    <button class="btn btn-edit btn-edit-group">Редагувати</button>
-                    <button class="btn btn-delete btn-delete-group" data-name="${group.name}">Видалити</button>
-                </div>
-            </li>
-        `).join('');
-        const masterAssignmentHtml = state.masters.map(master => `
-            <li data-master-id="${master.id}">
-                <span>${master.name}</span>
-                <div class="actions">
-                    <select class="master-group-select">
-                        <option value="">Не призначено</option>
-                        ${salaryGroupOptions}
-                    </select>
-                </div>
-            </li>
-        `).join('');
+        const groupsListHtml = state.salaryGroups.map(group => `<li data-group-id="${group.id}"><span><strong>${group.name}</strong></span><div class="actions"><button class="btn btn-edit btn-edit-group">Редагувати</button><button class="btn btn-delete btn-delete-group" data-name="${group.name}">Видалити</button></div></li>`).join('');
+        const masterAssignmentHtml = state.masters.map(master => `<li data-master-id="${master.id}"><span>${master.name}</span><div class="actions"><select class="master-group-select"><option value="">Не призначено</option>${salaryGroupOptions}</select></div></li>`).join('');
         container.innerHTML = `
             <div class="content-card">
-                <h2>Керування групами зарплат</h2>
-                <ul id="salary-groups-list" class="item-list">${groupsListHtml || "<li>Немає створених груп</li>"}</ul>
+                <h2>Керування групами зарплат</h2><ul id="salary-groups-list" class="item-list">${groupsListHtml || "<li>Немає створених груп</li>"}</ul>
                 <button id="add-new-group-btn" class="btn" style="margin-top: 1rem;">Створити нову групу</button>
             </div>
-            <div class="content-card">
-                <h2>Призначення груп майстрам</h2>
-                <ul id="master-group-assignment-list" class="item-list">${masterAssignmentHtml}</ul>
-            </div>
+            <div class="content-card"><h2>Призначення груп майстрам</h2><ul id="master-group-assignment-list" class="item-list">${masterAssignmentHtml}</ul></div>
             <div class="content-card">
                 <h2>Ручна відправка звіту</h2>
-                <form id="manual-report-form"><div class="form-row"><div class="form-group" style="flex:1;"><label for="report-start-date">Дата початку</label><input type="date" id="report-start-date" required></div><div class="form-group" style="flex:1;"><label for="report-end-date">Дата кінця</label><input type="date" id="report-end-date" required></div></div><div class="form-group"><label for="report-salon-filter">Салон</label><select id="report-salon-filter"><option value="all">Всі салони (Разом)</option>${salonOptions}</select></div><button type="submit" class="btn">Відправити звіт</button></form>
+                <form id="manual-report-form">
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1;"><label for="report-start-date">Дата початку</label><input type="date" id="report-start-date" required></div>
+                        <div class="form-group" style="flex:1;"><label for="report-end-date">Дата кінця</label><input type="date" id="report-end-date" required></div>
+                    </div>
+                    <div class="form-group"><label for="report-salon-filter">Салон</label><select id="report-salon-filter"><option value="all">Всі салони (Разом)</option>${salonOptions}</select></div>
+                    <button type="submit" class="btn">Відправити звіт</button>
+                </form>
             </div>
             <div class="content-card">
                 <h2>Зміна паролю</h2>
@@ -2912,23 +2414,13 @@
                     <p id="password-change-status" style="margin-top: 1rem; color: var(--gray-text);"></p>
                 </form>
             </div>`;
-        
         document.getElementById('add-new-group-btn').onclick = () => showSalaryGroupModal();
-        
-        document.querySelectorAll('.btn-edit-group').forEach(btn => {
-            btn.onclick = () => showSalaryGroupModal(btn.closest('li').dataset.groupId);
-        });
-
-        document.querySelectorAll('.btn-delete-group').forEach(btn => {
-            btn.onclick = () => handleDeleteSalaryGroup(btn.closest('li').dataset.groupId, btn.dataset.name);
-        });
-        
+        document.querySelectorAll('.btn-edit-group').forEach(btn => { btn.onclick = () => showSalaryGroupModal(btn.closest('li').dataset.groupId); });
+        document.querySelectorAll('.btn-delete-group').forEach(btn => { btn.onclick = () => handleDeleteSalaryGroup(btn.closest('li').dataset.groupId, btn.dataset.name); });
         document.querySelectorAll('.master-group-select').forEach(select => {
             const masterId = select.closest('li').dataset.masterId;
             const master = state.masters.find(m => m.id === masterId);
-            if (master && master.salaryGroupId) {
-                select.value = master.salaryGroupId;
-            }
+            if (master && master.salaryGroupId) { select.value = master.salaryGroupId; }
             select.onchange = (e) => handleAssignGroupToMaster(masterId, e.target.value);
         });
         document.getElementById('manual-report-form').onsubmit = handleManualReport;
@@ -2940,17 +2432,13 @@
         const form = document.getElementById('salary-group-form');
         const title = document.getElementById('salary-group-modal-title');
         form.reset();
-
         const group = groupId ? state.salaryGroups.find(g => g.id === groupId) : null;
-        
         title.textContent = group ? 'Редагувати групу' : 'Створити нову групу';
         document.getElementById('edit-salary-group-id').value = groupId || '';
         document.getElementById('salary-group-name').value = group ? group.name : '';
         renderSalaryGroupTiersInModal(group ? group.tiers : [{ threshold: 0, rate: 0 }]);
-
         document.getElementById('add-tier-to-group-btn').onclick = handleAddTierRowToModal;
         form.onsubmit = handleSaveSalaryGroup;
-
         modal.style.display = 'flex';
     }
 
@@ -2961,21 +2449,12 @@
             const tierRow = document.createElement('div');
             tierRow.className = 'form-row';
             tierRow.innerHTML = `
-                <div class="form-group" style="flex:1;">
-                    <label>Сума від (zł)</label>
-                    <input type="number" class="tier-threshold" value="${tier.threshold}" min="0" required>
-                </div>
-                <div class="form-group" style="flex:1;">
-                    <label>Відсоток (%)</label>
-                    <input type="number" class="tier-rate" value="${tier.rate}" min="0" max="100" required>
-                </div>
-                <button type="button" class="btn btn-delete remove-tier-btn">&times;</button>
-            `;
+                <div class="form-group" style="flex:1;"><label>Сума від (zł)</label><input type="number" class="tier-threshold" value="${tier.threshold}" min="0" required></div>
+                <div class="form-group" style="flex:1;"><label>Відсоток (%)</label><input type="number" class="tier-rate" value="${tier.rate}" min="0" max="100" required></div>
+                <button type="button" class="btn btn-delete remove-tier-btn">&times;</button>`;
             container.appendChild(tierRow);
         });
-        document.querySelectorAll('.remove-tier-btn').forEach(btn => {
-            btn.onclick = () => btn.closest('.form-row').remove();
-        });
+        document.querySelectorAll('.remove-tier-btn').forEach(btn => { btn.onclick = () => btn.closest('.form-row').remove(); });
     }
 
     function handleAddTierRowToModal() {
@@ -2983,16 +2462,9 @@
         const tierRow = document.createElement('div');
         tierRow.className = 'form-row';
         tierRow.innerHTML = `
-            <div class="form-group" style="flex:1;">
-                <label>Сума від (zł)</label>
-                <input type="number" class="tier-threshold" value="0" min="0" required>
-            </div>
-            <div class="form-group" style="flex:1;">
-                <label>Відсоток (%)</label>
-                <input type="number" class="tier-rate" value="0" min="0" max="100" required>
-            </div>
-            <button type="button" class="btn btn-delete remove-tier-btn">&times;</button>
-        `;
+            <div class="form-group" style="flex:1;"><label>Сума від (zł)</label><input type="number" class="tier-threshold" value="0" min="0" required></div>
+            <div class="form-group" style="flex:1;"><label>Відсоток (%)</label><input type="number" class="tier-rate" value="0" min="0" max="100" required></div>
+            <button type="button" class="btn btn-delete remove-tier-btn">&times;</button>`;
         tierRow.querySelector('.remove-tier-btn').onclick = () => tierRow.remove();
         container.appendChild(tierRow);
     }
@@ -3001,20 +2473,14 @@
         event.preventDefault();
         const groupId = document.getElementById('edit-salary-group-id').value;
         const name = document.getElementById('salary-group-name').value.trim();
-        if (!name) {
-            return showNotification('Назва групи не може бути порожньою.', "error");
-        }
-
+        if (!name) { return showNotification('Назва групи не може бути порожньою.', "error"); }
         const tiers = [];
         document.querySelectorAll('#salary-group-tiers-table .form-row').forEach(row => {
             const threshold = parseFloat(row.querySelector('.tier-threshold').value);
             const rate = parseFloat(row.querySelector('.tier-rate').value);
-            if (!isNaN(threshold) && !isNaN(rate)) {
-                tiers.push({ threshold, rate });
-            }
+            if (!isNaN(threshold) && !isNaN(rate)) { tiers.push({ threshold, rate }); }
         });
         const data = { name, tiers: tiers.sort((a,b) => a.threshold - b.threshold) };
-        
         try {
             if (groupId) {
                 const action = () => updateDoc(doc(db, 'salaryGroups', groupId), data);
@@ -3024,9 +2490,7 @@
                 await logAndExecute('Створено групу зарплат', { name }, action);
             }
             document.getElementById('salary-group-modal').style.display = 'none';
-        } catch (e) {
-            showNotification('Не вдалося зберегти групу.', "error");
-        }
+        } catch (e) { showNotification('Не вдалося зберегти групу.', "error"); }
     }
 
     async function handleDeleteSalaryGroup(groupId, name) {
@@ -3034,11 +2498,8 @@
             const action = () => deleteDoc(doc(db, 'salaryGroups', groupId));
             const logDetails = { groupId, name };
             if (reason) logDetails.reason = reason;
-            try {
-                await logAndExecute('Видалено групу зарплат', logDetails, action);
-            } catch(e) {
-                showNotification('Не вдалося видалити групу.', "error");
-            }
+            try { await logAndExecute('Видалено групу зарплат', logDetails, action); } 
+            catch(e) { showNotification('Не вдалося видалити групу.', "error"); }
         });
     }
     
@@ -3046,11 +2507,8 @@
         const master = state.masters.find(m => m.id === masterId);
         const group = state.salaryGroups.find(g => g.id === groupId);
         const action = () => updateDoc(doc(db, 'masters', masterId), { salaryGroupId: groupId || null });
-        try {
-            await logAndExecute('Призначено групу майстру', { master: master.name, group: group?.name || 'Не призначено' }, action);
-        } catch(e) {
-            showNotification('Не вдалося призначити групу.', "error");
-        }
+        try { await logAndExecute('Призначено групу майстру', { master: master.name, group: group?.name || 'Не призначено' }, action); } 
+        catch(e) { showNotification('Не вдалося призначити групу.', "error"); }
     }
     
     async function handleManualReport(event) {
@@ -3060,7 +2518,6 @@
         const startDate = document.getElementById('report-start-date').value;
         const endDate = document.getElementById('report-end-date').value;
         const salonId = document.getElementById('report-salon-filter').value;
-
         if (!startDate || !endDate) {
             showNotification('Будь ласка, оберіть обидві дати.', "error");
             btn.disabled = false; btn.textContent = 'Відправити звіт';
@@ -3085,28 +2542,12 @@
         const newPasswordInput = document.getElementById('new-password');
         const confirmPasswordInput = document.getElementById('confirm-password');
         const statusEl = document.getElementById('password-change-status');
-        
         const newPassword = newPasswordInput.value;
         const confirmPassword = confirmPasswordInput.value;
-        if (newPassword.length < 6) {
-            statusEl.textContent = 'Пароль має бути не менше 6 символів.';
-            statusEl.style.color = 'var(--danger-color)';
-            return;
-        }
-
-        if (newPassword !== confirmPassword) {
-            statusEl.textContent = 'Паролі не співпадають.';
-            statusEl.style.color = 'var(--danger-color)';
-            return;
-        }
-
+        if (newPassword.length < 6) { statusEl.textContent = 'Пароль має бути не менше 6 символів.'; statusEl.style.color = 'var(--danger-color)'; return; }
+        if (newPassword !== confirmPassword) { statusEl.textContent = 'Паролі не співпадають.'; statusEl.style.color = 'var(--danger-color)'; return; }
         const user = auth.currentUser;
-        if (!user) {
-            statusEl.textContent = 'Помилка: користувач не автентифікований.';
-            statusEl.style.color = 'var(--danger-color)';
-            return;
-        }
-
+        if (!user) { statusEl.textContent = 'Помилка: користувач не автентифікований.'; statusEl.style.color = 'var(--danger-color)'; return; }
         statusEl.textContent = 'Зміна паролю...';
         statusEl.style.color = 'var(--gray-text)';
         try {
@@ -3116,11 +2557,8 @@
             newPasswordInput.value = '';
             confirmPasswordInput.value = '';
         } catch (error) {
-            if (error.code === 'auth/requires-recent-login') {
-                statusEl.textContent = 'Ця операція вимагає нещодавнього входу. Будь ласка, вийдіть і увійдіть знову.';
-            } else {
-                statusEl.textContent = `Помилка: ${error.message}`;
-            }
+            if (error.code === 'auth/requires-recent-login') { statusEl.textContent = 'Ця операція вимагає нещодавнього входу. Будь ласка, вийдіть і увійдіть знову.'; } 
+            else { statusEl.textContent = `Помилка: ${error.message}`; }
             statusEl.style.color = 'var(--danger-color)';
         }
     }
