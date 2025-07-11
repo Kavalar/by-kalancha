@@ -1942,34 +1942,43 @@
     async function handleSaveAppointment(event) {
     event.preventDefault();
     
-    // --- ВИПРАВЛЕННЯ: Додано перевірку ролі користувача на самому початку ---
     const isEditMode = !!state.editingAppointmentId;
     if (!isEditMode && state.user.role !== 'admin' && state.user.role !== 'salon_admin') {
         showNotification("У вас недостатньо прав для створення запису.", "error");
-        return; // Зупиняємо функцію
+        return;
     }
-    // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
 
-    const isInternal = document.getElementById('internal-service-checkbox').checked;
     const service = state.selectedServiceForAppointment;
     const masterId = document.getElementById('appointment-master').value;
     const dateTimeString = document.getElementById('appointment-datetime').value;
     const salonId = document.getElementById('appointment-salon').value;
     
-    if (!service || !masterId || !dateTimeString || !salonId) {
-        [cite_start]return showNotification("Будь ласка, заповніть усі поля, включно з послугою та салоном.", "error"); [cite: 760, 761]
+    // --- ПОКРАЩЕНА ПЕРЕВІРКА ПОЛІВ ---
+    if (!dateTimeString) {
+        return showNotification("Будь ласка, вкажіть дату і час.", "error");
     }
+    if (!service) {
+        return showNotification("Будь ласка, оберіть послугу зі списку результатів пошуку.", "error");
+    }
+    if (!masterId) {
+        return showNotification("Будь ласка, оберіть майстра.", "error");
+    }
+    if (!salonId) {
+        return showNotification("Будь ласка, оберіть салон.", "error");
+    }
+    // --- КІНЕЦЬ ПОКРАЩЕНОЇ ПЕРЕВІРКИ ---
 
-    [cite_start]const master = state.masters.find(m => m.id === masterId); [cite: 761]
+    const isInternal = document.getElementById('internal-service-checkbox').checked;
+    const master = state.masters.find(m => m.id === masterId);
     if (!master) {
-        [cite_start]return showNotification("Помилка: не знайдено майстра!", "error"); [cite: 762]
+        return showNotification("Помилка: не знайдено майстра!", "error");
     }
 
-    const priceModifier = master.priceModifier || [cite_start]0; [cite: 763]
-    [cite_start]const salaryBase = service.price * (1 + priceModifier / 100); [cite: 764]
-    [cite_start]const finalPrice = updateFinalPrice(); [cite: 764]
-    const additionalChargeAmount = parseFloat(document.getElementById('additional-charge-amount').value) || [cite_start]0; [cite: 764]
-    [cite_start]const additionalChargeDescription = document.getElementById('additional-charge-description').value.trim(); [cite: 765]
+    const priceModifier = master.priceModifier || 0;
+    const salaryBase = service.price * (1 + priceModifier / 100);
+    const finalPrice = updateFinalPrice();
+    const additionalChargeAmount = parseFloat(document.getElementById('additional-charge-amount').value) || 0;
+    const additionalChargeDescription = document.getElementById('additional-charge-description').value.trim();
     
     let appointmentData = { 
         dateTime: Timestamp.fromDate(new Date(dateTimeString)), 
@@ -1982,63 +1991,63 @@
         finalPrice, 
         salaryBase, 
         isInternal: isInternal 
-    [cite_start]}; [cite: 765, 766, 767]
-    [cite_start]let logDetails = { service: service.name, master: master.name }; [cite: 768]
+    };
+    let logDetails = { service: service.name, master: master.name };
 
     try {
         if (isInternal) {
-            [cite_start]const receivingMasterId = document.getElementById('master-as-client-select').value; [cite: 768]
-            if (!receivingMasterId) { return showNotification("Будь ласка, оберіть майстра-клієнта.", "error"); [cite_start]} [cite: 769]
-            if (receivingMasterId === masterId) { return showNotification("Майстер не може надавати послугу самому собі.", "error"); [cite_start]} [cite: 769]
-            [cite_start]const receivingMaster = state.masters.find(m => m.id === receivingMasterId); [cite: 770]
-            [cite_start]appointmentData.clientId = receivingMasterId; [cite: 771]
-            [cite_start]appointmentData.clientName = `${receivingMaster.name} (Майстер)`; [cite: 771]
-            [cite_start]logDetails.clientName = appointmentData.clientName; [cite: 771]
+            const receivingMasterId = document.getElementById('master-as-client-select').value;
+            if (!receivingMasterId) { return showNotification("Будь ласка, оберіть майстра-клієнта.", "error"); }
+            if (receivingMasterId === masterId) { return showNotification("Майстер не може надавати послугу самому собі.", "error"); }
+            const receivingMaster = state.masters.find(m => m.id === receivingMasterId);
+            appointmentData.clientId = receivingMasterId;
+            appointmentData.clientName = `${receivingMaster.name} (Майстер)`;
+            logDetails.clientName = appointmentData.clientName;
         } else {
-            [cite_start]const clientName = document.getElementById('client-search-input').value.trim(); [cite: 772]
-            [cite_start]logDetails.clientName = clientName; [cite: 773]
+            const clientName = document.getElementById('client-search-input').value.trim();
+            logDetails.clientName = clientName;
             let clientId;
-            [cite_start]let clientPhone = document.getElementById('client-phone-input').value.trim(); [cite: 773]
+            let clientPhone = document.getElementById('client-phone-input').value.trim();
             if (state.selectedClientForAppointment) {
-                [cite_start]clientId = state.selectedClientForAppointment.id; [cite: 773]
+                clientId = state.selectedClientForAppointment.id;
             } else {
-                [cite_start]if (!clientPhone) return showNotification("Для нового клієнта необхідно вказати номер телефону.", "error"); [cite: 774]
-                [cite_start]const normalizedPhone = clientPhone.replace(/[\s-()]/g, ''); [cite: 775]
-                [cite_start]const existingClient = state.clients.find(c => c.name.toLowerCase() === clientName.toLowerCase() && c.phone.replace(/[\s-()]/g, '') === normalizedPhone); [cite: 775]
-                if (existingClient) { clientId = existingClient.id; [cite_start]} [cite: 776]
+                if (!clientPhone) return showNotification("Для нового клієнта необхідно вказати номер телефону.", "error");
+                const normalizedPhone = clientPhone.replace(/[\s-()]/g, '');
+                const existingClient = state.clients.find(c => c.name.toLowerCase() === clientName.toLowerCase() && c.phone.replace(/[\s-()]/g, '') === normalizedPhone);
+                if (existingClient) { clientId = existingClient.id; }
                 else {
-                     [cite_start]const newClientAction = () => addDoc(collection(db, 'clients'), { name: clientName, phone: clientPhone, createdAt: Timestamp.now() }); [cite: 776]
-                     [cite_start]const newClientRef = await logAndExecute('Створено клієнта', { name: clientName, phone: clientPhone }, newClientAction); [cite: 777]
-                     [cite_start]clientId = newClientRef.id; [cite: 777]
+                     const newClientAction = () => addDoc(collection(db, 'clients'), { name: clientName, phone: clientPhone, createdAt: Timestamp.now() });
+                     const newClientRef = await logAndExecute('Створено клієнта', { name: clientName, phone: clientPhone }, newClientAction);
+                     clientId = newClientRef.id;
                 }
             }
-            [cite_start]appointmentData.clientId = clientId; [cite: 778]
-            [cite_start]appointmentData.clientName = clientName; [cite: 779]
+            appointmentData.clientId = clientId;
+            appointmentData.clientName = clientName;
         }
 
         if (isEditMode) {
-            [cite_start]const action = () => updateDoc(doc(db, 'appointments', state.editingAppointmentId), appointmentData); [cite: 779]
-            [cite_start]await logAndExecute('Оновлено запис', { ...logDetails, appointmentId: state.editingAppointmentId }, action); [cite: 780]
-            [cite_start]showNotification('Запис успішно оновлено!'); [cite: 780]
-            [cite_start]state.editingAppointmentId = null; [cite: 780]
-            [cite_start]renderView('calendar'); [cite: 780]
+            const action = () => updateDoc(doc(db, 'appointments', state.editingAppointmentId), appointmentData);
+            await logAndExecute('Оновлено запис', { ...logDetails, appointmentId: state.editingAppointmentId }, action);
+            showNotification('Запис успішно оновлено!');
+            state.editingAppointmentId = null;
+            renderView('calendar');
         } else {
-            [cite_start]const fullAppointmentData = { ...appointmentData, status: 'upcoming', totalPaid: 0, payments: [], createdAt: Timestamp.now() }; [cite: 781]
-            [cite_start]const createAppAction = () => addDoc(collection(db, 'appointments'), fullAppointmentData); [cite: 782]
-            [cite_start]await logAndExecute('Створено запис', logDetails, createAppAction); [cite: 782]
-            [cite_start]showNotification('Запис успішно створено!'); [cite: 782]
-            [cite_start]event.target.reset(); [cite: 782]
-            [cite_start]state.selectedClientForAppointment = null; [cite: 782]
-            [cite_start]state.selectedServiceForAppointment = null; [cite: 783]
-            [cite_start]document.getElementById('internal-service-checkbox').checked = false; [cite: 783]
-            [cite_start]document.getElementById('internal-service-checkbox').dispatchEvent(new Event('change')); [cite: 783]
-            [cite_start]const clientSearchInput = document.getElementById('client-search-input'); [cite: 783]
-            [cite_start]if(clientSearchInput) clientSearchInput.disabled = false; [cite: 784]
-            [cite_start]document.getElementById('client-phone-group').style.display = 'none'; [cite: 784]
-            [cite_start]updateFinalPrice(); [cite: 784]
+            const fullAppointmentData = { ...appointmentData, status: 'upcoming', totalPaid: 0, payments: [], createdAt: Timestamp.now() };
+            const createAppAction = () => addDoc(collection(db, 'appointments'), fullAppointmentData);
+            await logAndExecute('Створено запис', logDetails, createAppAction);
+            showNotification('Запис успішно створено!');
+            event.target.reset();
+            state.selectedClientForAppointment = null;
+            state.selectedServiceForAppointment = null;
+            document.getElementById('internal-service-checkbox').checked = false;
+            document.getElementById('internal-service-checkbox').dispatchEvent(new Event('change'));
+            const clientSearchInput = document.getElementById('client-search-input');
+            if(clientSearchInput) clientSearchInput.disabled = false;
+            document.getElementById('client-phone-group').style.display = 'none';
+            updateFinalPrice();
         }
     } catch (e) {
-        [cite_start]showNotification('Не вдалося зберегти запис.', "error"); [cite: 784]
+        showNotification('Не вдалося зберегти запис.', "error");
     }
 }
      
