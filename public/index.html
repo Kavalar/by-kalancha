@@ -105,47 +105,13 @@
         .salary-report-card p { margin: 0.5rem 0; display: flex; justify-content: space-between; }
         .salary-report-card .total-salary { font-weight: bold; font-size: 1.2rem; color: var(--danger-color); border-top: 1px solid var(--border-color); padding-top: 0.5rem; margin-top: 0.5rem;}
         
-        /* [НОВА ФІШКА: Видача ЗП] - Стилі для карток видачі ЗП */
-        .payout-card {
-            background: #fff;
-            padding: 1.5rem;
-            border-radius: 8px;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        .payout-card h3 {
-            margin: 0 0 1.5rem 0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .payout-card-details p {
-            margin: 0.75rem 0;
-            display: flex;
-            justify-content: space-between;
-            font-size: 1.1rem;
-            padding-bottom: 0.75rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-        .payout-card-details p:last-child {
-            border-bottom: none;
-        }
-        .payout-card-details strong {
-            font-weight: 600;
-        }
-        .payout-card-details .balance-due {
-            font-size: 1.3rem;
-            color: var(--danger-color);
-            font-weight: bold;
-        }
-        .payout-action-form {
-            margin-top: 1.5rem;
-            padding-top: 1.5rem;
-            border-top: 2px solid var(--main-bg);
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-        }
+        .payout-card { background: #fff; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .payout-card h3 { margin: 0 0 1.5rem 0; display: flex; justify-content: space-between; align-items: center; }
+        .payout-card-details p { margin: 0.75rem 0; display: flex; justify-content: space-between; font-size: 1.1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color); }
+        .payout-card-details p:last-child { border-bottom: none; }
+        .payout-card-details strong { font-weight: 600; }
+        .payout-card-details .balance-due { font-size: 1.3rem; color: var(--danger-color); font-weight: bold; }
+        .payout-action-form { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 2px solid var(--main-bg); display: flex; gap: 1rem; align-items: center; }
 
         .status-badge { padding: 0.2em 0.6em; border-radius: 10px; font-size: 0.8em; color: white; }
         .status-completed { background-color: var(--success-color); }
@@ -223,7 +189,7 @@
     <div class="modal-panel">
         <div class="modal-header">
             <h2 id="action-modal-title">Деталі запису</h2>
-             <button class="close-btn">&times;</button>
+            <button class="close-btn">&times;</button>
         </div>
         <div id="action-modal-details">
         </div>
@@ -330,38 +296,14 @@
     const appContainer = document.getElementById('app');
 
     let state = {
-        user: null,
-        salons: [],
-        expenses: [],
-        salonExpenses: [],
-        productSales: [], 
-        advances: [],
-        salaryGroups: [],
-        notepadEntries: [],
-        staff: [],
-        auditLog: [],
-        selectedCategoryId: null,
-        categories: [],
-        services: [],
-        masters: [],
-        appointments: [],
-        clients: [],
-        currentView: 'calendar',
-        preselectedAppointment: null,
-        calendarSelectedMasterId: 'all',
-        calendarSelectedSalonId: 'all',
-        editingAppointmentId: null,
-        selectedClientForAppointment: null,
-        selectedServiceForAppointment: null,
-        viewingClientId: null,
-        viewingMasterId: null,
-        viewingMasterAdvances: [],
-        viewingStaffId: null,
-        viewingStaffBonuses: [],
-        viewingStaffAdvances: [],
-        staffPayouts: [],
-        appointmentsPage: 1,
-        appointmentsListDate: new Date(),
+        user: null, salons: [], expenses: [], salonExpenses: [], productSales: [], 
+        salaryGroups: [], notepadEntries: [], staff: [], auditLog: [], selectedCategoryId: null,
+        categories: [], services: [], masters: [], appointments: [], clients: [],
+        currentView: 'calendar', preselectedAppointment: null, calendarSelectedMasterId: 'all',
+        calendarSelectedSalonId: 'all', editingAppointmentId: null, selectedClientForAppointment: null,
+        selectedServiceForAppointment: null, viewingClientId: null, viewingMasterId: null,
+        viewingMasterAdvances: [], viewingStaffId: null, viewingStaffBonuses: [],
+        viewingStaffAdvances: [], staffPayouts: [], appointmentsPage: 1, appointmentsListDate: new Date(),
     };
     let listenersAreActive = false;
     let masterAdvancesUnsubscribe = null;
