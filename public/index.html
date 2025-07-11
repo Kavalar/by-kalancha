@@ -194,6 +194,7 @@ let state = {
             </div>
         </main>
     </div>`;
+
     document.getElementById('logout-btn').onclick = () => {
         listenersAreActive = false;
         if(masterAdvancesUnsubscribe) masterAdvancesUnsubscribe();
@@ -201,18 +202,21 @@ let state = {
         staffSubcollectionUnsubscribers = [];
         signOut(auth);
     };
+
     document.getElementById('main-nav').onclick = (event) => {
         const target = event.target.closest('li');
-        if (target) renderView(target.dataset.view);
+        if (target) {
+            renderView(target.dataset.view);
+        }
     };
 
-    // --- ПОЧАТОК ВИПРАВЛЕННЯ: Додано перевірки на існування модальних вікон ---
     const paymentModal = document.getElementById('payment-modal');
     if (paymentModal) {
         paymentModal.querySelector('.close-btn').onclick = () => {
             paymentModal.style.display = 'none';
         };
     }
+
     const paymentForm = document.getElementById('payment-form');
     if (paymentForm) {
         paymentForm.onsubmit = handleConfirmPayment;
@@ -233,7 +237,7 @@ let state = {
     }
     
     const actionModal = document.getElementById('appointment-action-modal');
-    if(actionModal) {
+    if (actionModal) {
         actionModal.querySelector('.close-btn').onclick = () => {
             actionModal.style.display = 'none';
         };
@@ -244,12 +248,17 @@ let state = {
         editPaymentsModal.querySelector('.close-btn').onclick = () => {
             editPaymentsModal.style.display = 'none';
         };
-        document.getElementById('cancel-edit-payments-btn').onclick = () => {
-            editPaymentsModal.style.display = 'none';
-        };
-        document.getElementById('edit-payments-form').onsubmit = handleUpdatePayments;
+        const cancelBtn = document.getElementById('cancel-edit-payments-btn');
+        if(cancelBtn) {
+            cancelBtn.onclick = () => {
+                editPaymentsModal.style.display = 'none';
+            };
+        }
+        const editForm = document.getElementById('edit-payments-form');
+        if(editForm) {
+            editForm.onsubmit = handleUpdatePayments;
+        }
     }
-    // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
 
     renderView(state.currentView);
 }
