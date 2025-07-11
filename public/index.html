@@ -109,19 +109,23 @@
     const functions = getFunctions(app, 'europe-central2');
     const appContainer = document.getElementById('app');
 
-    let state = {
-        user: null, salons: [], expenses: [], salonExpenses: [], productSales: [], 
-        salaryGroups: [], notepadEntries: [], staff: [], auditLog: [], selectedCategoryId: null,
-        categories: [], services: [], masters: [], appointments: [], clients: [],
-        currentView: 'calendar', preselectedAppointment: null, calendarSelectedMasterId: 'all',
-        calendarSelectedSalonId: 'all', editingAppointmentId: null, selectedClientForAppointment: null,
-        selectedServiceForAppointment: null, viewingClientId: null, viewingMasterId: null,
-        viewingMasterAdvances: [], viewingMasterBonuses: [], viewingStaffId: null, viewingStaffBonuses: [],
-        viewingStaffAdvances: [], staffPayouts: [], appointmentsPage: 1, appointmentsListDate: new Date(),
-    };
+let state = {
+    user: null, salons: [], expenses: [], salonExpenses: [], productSales: [], 
+    salaryGroups: [], notepadEntries: [], staff: [], auditLog: [], selectedCategoryId: null,
+    categories: [], services: [], masters: [], appointments: [], clients: [],
+    currentView: 'calendar', preselectedAppointment: null, calendarSelectedMasterId: 'all',
+    calendarSelectedSalonId: 'all', editingAppointmentId: null, selectedClientForAppointment: null,
+    selectedServiceForAppointment: null, viewingClientId: null, viewingMasterId: null,
+    viewingMasterAdvances: [], viewingStaffId: null, viewingStaffBonuses: [],
+    viewingStaffAdvances: [], staffPayouts: [], appointmentsPage: 1, appointmentsListDate: new Date(),
+};
+
+// --- ПОЧАТОК ВИПРАВЛЕННЯ: Відновлюємо всі потрібні змінні ---
     let listenersAreActive = false;
-    let mainUnsubscribers = [];
+    let masterAdvancesUnsubscribe = null;
     let staffSubcollectionUnsubscribers = [];
+    let mainUnsubscribers = [];
+// --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
 
     // ... (код для showNotification, showConfirmModal, showConfirmWithReasonModal)
 
@@ -137,187 +141,118 @@
                 role: userDocSnap.exists() ? userDocSnap.data().role : 'master',
                 salonId: userDocSnap.exists() ? userDocSnap.data().salonId : null
             };
-            renderAppLayout(state.user);
-            setupRealtimeListeners();
-        } else {
-            mainUnsubscribers.forEach(unsub => unsub());
-            mainUnsubscribers = [];
-            staffSubcollectionUnsubscribers.forEach(unsub => unsub());
-            staffSubcollectionUnsubscribers = [];
-            listenersAreActive = false;
-            renderLoginView();
-        }
-    });
-
-    function setupRealtimeListeners() {
-        if (listenersAreActive) return;
-        mainUnsubscribers.forEach(unsub => unsub());
-        mainUnsubscribers = [];
-        const collections = { 
-            salons: 'salons', categories: 'serviceCategories', services: 'services', 
-            masters: 'masters', appointments: 'appointments', clients: 'clients',
-            expenses: 'expenses', salonExpenses: 'salonExpenses', notepadEntries: 'notepadEntries',
-            productSales: 'productSales', staff: 'staff', auditLog: 'auditLog',
-            salaryGroups: 'salaryGroups'
-        };
-        const userRole = state.user.role;
-        const userSalonId = state.user.salonId;
-        Object.entries(collections).forEach(([stateKey, colName]) => {
-            if ((colName === 'expenses' || colName === 'auditLog' || colName === 'salaryGroups') && userRole !== 'admin') {
-                return; 
-            }
-            let q;
-            let baseQuery = collection(db, colName);
-            const collectionsToFilter = ['appointments', 'salonExpenses', 'productSales', 'staff'];
-            if (userRole === 'salon_admin') {
-                if (collectionsToFilter.includes(colName)) q = query(baseQuery, where("salonId", "==", userSalonId));
-                else if (colName === 'masters') q = query(baseQuery, where("salonIds", "array-contains", userSalonId));
-                else q = query(baseQuery);
-            } else { q = query(baseQuery); }
-            if (colName === 'appointments') q = query(q, orderBy("dateTime", "desc"));
-            const unsubscribe = onSnapshot(q, snapshot => {
-                let docs = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
-                if (['auditLog', 'expenses', 'productSales', 'salonExpenses', 'notepadEntries'].includes(colName)) {
-                    docs.sort((a, b) => {
-                        const timeA = (a.timestamp || a.date)?.toDate().getTime() || 0;
-                        const timeB = (b.timestamp || b.date)?.toDate().getTime() || 0;
-                        return timeB - timeA;
-                    });
-                }
-                state[stateKey] = docs;
-                if (['categories', 'masters', 'clients', 'staff', 'salons'].includes(stateKey)) {
-                    state[stateKey].sort((a,b) => a.name.localeCompare(b.name));
-                }
-                if (state.user) renderView(state.currentView);
-            }, error => console.error(`Error fetching ${colName}:`, error.message));
-            mainUnsubscribers.push(unsubscribe);
-        });
-        listenersAreActive = true;
-    }
-
-    // #region Core App Logic & Audit
-    async function logAndExecute(action, details, operationFn) {
-        try {
-            const operationResult = await operationFn();
-            await addDoc(collection(db, 'auditLog'), {
-                action: action,
-                details: details,
-                userEmail: state.user.email,
-                timestamp: Timestamp.now()
-            });
-            return operationResult;
-        } catch (error) {
-            console.error(`Error during logged action "${action}":`, error);
-            throw error;
-        }
-    }
-
-    function renderLoginView() {
-        appContainer.innerHTML = `<div class="auth-bg"><div class="auth-card"><h1>Вхід у CRM</h1><div id="login-error" class="error-msg"></div><input id="email" type="email" placeholder="Email" autocomplete="username" autofocus><input id="password" type="password" placeholder="Пароль" autocomplete="current-password"><button id="login-btn">Увійти</button></div></div>`;
-        document.getElementById('login-btn').onclick = handleLogin;
-    }
-
-    function renderAppLayout(user) {
-        let adminTabs = '';
-        if (user.role === 'admin') {
-            adminTabs = `
-                <li data-view="salary">Звіт по ЗП</li>
-                <li data-view="payouts">Видача ЗП</li> <li data-view="expenses">Загальні витрати</li>
-                <li data-view="settings">Налаштування</li>
-                <li data-view="staff">Персонал</li>
-                <li data-view="auditLog">Журнал дій</li>
-            `;
-        }
-
-        let shopTab = '';
-        if (user.role === 'admin' || user.role === 'salon_admin') {
-            // [НОВА ФІШКА: Видача ЗП] - Додаємо таб для salon_admin, якщо його ще немає в adminTabs
-            const payoutTabForSalonAdmin = user.role === 'salon_admin' ? '<li data-view="payouts">Видача ЗП</li>' : '';
-            shopTab = `
-                <li data-view="shop">Магазин</li>
-                ${payoutTabForSalonAdmin}
-            `;
-        }
-        
-        const allUserTabs = `
-            <li data-view="salonExpenses">Витрати в салоні</li>
-            <li data-view="notepad">Блокнот</li>
+            function renderAppLayout(user) {
+    let adminTabs = '';
+    if (user.role === 'admin') {
+        adminTabs = `
+            <li data-view="salary">Звіт по ЗП</li>
+            <li data-view="payouts">Видача ЗП</li> <li data-view="expenses">Загальні витрати</li>
+            <li data-view="settings">Налаштування</li>
+            <li data-view="staff">Персонал</li>
+            <li data-view="auditLog">Журнал дій</li>
         `;
-        
-        appContainer.innerHTML = `
-        <div class="crm-layout">
-            <nav class="crm-nav" id="main-nav">
-                <h1>Lashroom CRM</h1>
-                <ul>
-                    <li data-view="calendar">Календар</li>
-                    <li data-view="appointments">Запис</li>
-                    <li data-view="clients">Клієнти</li>
-                    <li data-view="services">Послуги</li>
-                    <li data-view="masters">Майстри</li>
-                    ${shopTab}
-                    ${allUserTabs}
-                    ${adminTabs}
-                </ul>
-                <div class="user-info">
-                    <span>${user.email} (${user.role})</span>
-                    <button id="logout-btn" class="btn">Вийти</button>
-                </div>
-            </nav>
-            <main class="crm-main">
-                <header class="crm-header">
-                    <h2 id="header-title"></h2>
-                </header>
-                <div class="crm-content">
-                    <div class="content-wrapper" id="content-wrapper"></div>
-                </div>
-            </main>
-        </div>`;
-
-        document.getElementById('logout-btn').onclick = () => {
-            listenersAreActive = false;
-            if(masterAdvancesUnsubscribe) masterAdvancesUnsubscribe();
-            staffSubcollectionUnsubscribers.forEach(unsub => unsub());
-            staffSubcollectionUnsubscribers = [];
-            signOut(auth);
-        };
-        document.getElementById('main-nav').onclick = (event) => {
-            const target = event.target.closest('li');
-            if (target) renderView(target.dataset.view);
-        };
-        document.getElementById('payment-modal').querySelector('.close-btn').onclick = () => {
-            document.getElementById('payment-modal').style.display = 'none';
-        };
-        document.getElementById('payment-form').onsubmit = handleConfirmPayment;
-
-        // [НОВА ФІШКА: Видача ЗП]
-        document.getElementById('payout-history-modal').querySelector('.close-btn').onclick = () => {
-            document.getElementById('payout-history-modal').style.display = 'none';
-        };
-
-        document.getElementById('salary-group-modal').querySelector('.close-btn').onclick = () => {
-            document.getElementById('salary-group-modal').style.display = 'none';
-        };
-        
-        const actionModal = document.getElementById('appointment-action-modal');
-        if(actionModal) {
-            actionModal.querySelector('.close-btn').onclick = () => {
-                actionModal.style.display = 'none';
-            };
-        }
-        
-        const editPaymentsModal = document.getElementById('edit-payments-modal');
-        if (editPaymentsModal) {
-            editPaymentsModal.querySelector('.close-btn').onclick = () => {
-                editPaymentsModal.style.display = 'none';
-            };
-            document.getElementById('cancel-edit-payments-btn').onclick = () => {
-                editPaymentsModal.style.display = 'none';
-            };
-            document.getElementById('edit-payments-form').onsubmit = handleUpdatePayments;
-        }
-
-        renderView(state.currentView);
     }
+
+    let shopTab = '';
+    if (user.role === 'admin' || user.role === 'salon_admin') {
+        const payoutTabForSalonAdmin = user.role === 'salon_admin' ? '<li data-view="payouts">Видача ЗП</li>' : '';
+        shopTab = `
+            <li data-view="shop">Магазин</li>
+            ${payoutTabForSalonAdmin}
+        `;
+    }
+    
+    const allUserTabs = `
+        <li data-view="salonExpenses">Витрати в салоні</li>
+        <li data-view="notepad">Блокнот</li>
+    `;
+    appContainer.innerHTML = `
+    <div class="crm-layout">
+        <nav class="crm-nav" id="main-nav">
+            <h1>Lashroom CRM</h1>
+            <ul>
+                <li data-view="calendar">Календар</li>
+                <li data-view="appointments">Запис</li>
+                <li data-view="clients">Клієнти</li>
+                <li data-view="services">Послуги</li>
+                <li data-view="masters">Майстри</li>
+                ${shopTab}
+                ${allUserTabs}
+                ${adminTabs}
+            </ul>
+            <div class="user-info">
+                <span>${user.email} (${user.role})</span>
+                <button id="logout-btn" class="btn">Вийти</button>
+            </div>
+        </nav>
+        <main class="crm-main">
+            <header class="crm-header">
+                <h2 id="header-title"></h2>
+            </header>
+            <div class="crm-content">
+                <div class="content-wrapper" id="content-wrapper"></div>
+            </div>
+        </main>
+    </div>`;
+    document.getElementById('logout-btn').onclick = () => {
+        listenersAreActive = false;
+        if(masterAdvancesUnsubscribe) masterAdvancesUnsubscribe();
+        staffSubcollectionUnsubscribers.forEach(unsub => unsub());
+        staffSubcollectionUnsubscribers = [];
+        signOut(auth);
+    };
+    document.getElementById('main-nav').onclick = (event) => {
+        const target = event.target.closest('li');
+        if (target) renderView(target.dataset.view);
+    };
+
+    // --- ПОЧАТОК ВИПРАВЛЕННЯ: Додано перевірки на існування модальних вікон ---
+    const paymentModal = document.getElementById('payment-modal');
+    if (paymentModal) {
+        paymentModal.querySelector('.close-btn').onclick = () => {
+            paymentModal.style.display = 'none';
+        };
+    }
+    const paymentForm = document.getElementById('payment-form');
+    if (paymentForm) {
+        paymentForm.onsubmit = handleConfirmPayment;
+    }
+
+    const payoutHistoryModal = document.getElementById('payout-history-modal');
+    if (payoutHistoryModal) {
+        payoutHistoryModal.querySelector('.close-btn').onclick = () => {
+            payoutHistoryModal.style.display = 'none';
+        };
+    }
+
+    const salaryGroupModal = document.getElementById('salary-group-modal');
+    if (salaryGroupModal) {
+        salaryGroupModal.querySelector('.close-btn').onclick = () => {
+            salaryGroupModal.style.display = 'none';
+        };
+    }
+    
+    const actionModal = document.getElementById('appointment-action-modal');
+    if(actionModal) {
+        actionModal.querySelector('.close-btn').onclick = () => {
+            actionModal.style.display = 'none';
+        };
+    }
+    
+    const editPaymentsModal = document.getElementById('edit-payments-modal');
+    if (editPaymentsModal) {
+        editPaymentsModal.querySelector('.close-btn').onclick = () => {
+            editPaymentsModal.style.display = 'none';
+        };
+        document.getElementById('cancel-edit-payments-btn').onclick = () => {
+            editPaymentsModal.style.display = 'none';
+        };
+        document.getElementById('edit-payments-form').onsubmit = handleUpdatePayments;
+    }
+    // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
+
+    renderView(state.currentView);
+}
 
     function renderView(viewName) {
         if (!state.user) return;
