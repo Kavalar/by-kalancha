@@ -515,9 +515,11 @@
 
                 if (stateKey === 'salonExpenses' || stateKey === 'notepadEntries') {
                     state[stateKey].sort((a, b) => {
-                        const dateA = a.date ? a.date.toDate().getTime() : 0; // Змінено тут
-                        const dateB = b.date ? b.date.toDate().getTime() : 0; // і тут
-                        return dateB - dateA;
+                        const dateFieldA = a.date || a.timestamp;
+                        const dateFieldB = b.date || b.timestamp;
+                        const timeA = dateFieldA ? dateFieldA.toDate().getTime() : 0;
+                        const timeB = dateFieldB ? dateFieldB.toDate().getTime() : 0;
+                        return timeB - timeA;
                     });
                 }
 
@@ -2898,7 +2900,8 @@
             state.salonExpenses.forEach(expense => {
                 const salon = state.salons.find(s => s.id === expense.salonId);
                 const li = document.createElement('li');
-                const expenseDate = expense.date ? expense.date.toDate().toLocaleDateString('uk-UA') : 'Дата невідома';
+                const dateField = expense.date || expense.timestamp; // Шукаємо або 'date', або 'timestamp'
+                setupRealtimeListeners expense.date.toDate().toLocaleDateString('uk-UA') : 'Дата невідома';
                 li.innerHTML = `<div><strong>${expense.description}</strong><br><small>${expenseDate} (${salon ? salon.name : 'Невідомий салон'})</small></div><div class="actions"><strong>${expense.amount.toFixed(2)} zł</strong>${state.user.role === 'admin' ? `<button class="btn btn-delete" data-id="${expense.id}" data-description="${expense.description}">🗑️</button>` : ''}</div>`;
                 listEl.appendChild(li);
             });
@@ -2914,7 +2917,7 @@
         const salonId = document.getElementById('salon-expense-salon').value;
         if (!description || !amount || !date || !salonId) { return showNotification("Будь ласка, заповніть усі поля.", "error"); }
         const salon = state.salons.find(s => s.id === salonId);
-        const action = () => addDoc(collection(db, 'salonExpenses'), { description, amount, salonId, authorEmail: state.user.email, timestamp: Timestamp.fromDate(new Date(date)) });
+        const action = () => addDoc(collection(db, 'salonExpenses'), { description, amount, salonId, authorEmail: state.user.email, date: Timestamp.fromDate(new Date(date)) });
         try {
             await logAndExecute('Додано витрату салону', { description, amount, salon: salon.name }, action);
             event.target.reset();
