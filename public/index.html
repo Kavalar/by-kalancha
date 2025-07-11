@@ -515,13 +515,18 @@
 
                 if (stateKey === 'salonExpenses' || stateKey === 'notepadEntries') {
                     state[stateKey].sort((a, b) => {
-                        const dateFieldA = a.date || a.timestamp;
-                        const dateFieldB = b.date || b.timestamp;
-                        const timeA = dateFieldA ? dateFieldA.toDate().getTime() : 0;
-                        const timeB = dateFieldB ? dateFieldB.toDate().getTime() : 0;
-                        return timeB - timeA;
-                    });
-                }
+                    // Універсально шукаємо поле з датою (date або timestamp)
+                    const dateFieldA = a.date || a.timestamp;
+                    const dateFieldB = b.date || b.timestamp;
+
+                    // Для сортування отримуємо числове значення дати (мілісекунди)
+                    const timeA = dateFieldA ? dateFieldA.toDate().getTime() : 0;
+                    const timeB = dateFieldB ? dateFieldB.toDate().getTime() : 0;
+
+                    // Сортуємо від нової дати до старої
+                    return timeB - timeA;
+    });
+}
 
                 if (state.user) {
                     renderView(state.currentView);
