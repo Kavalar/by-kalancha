@@ -95,7 +95,124 @@
 </head>
 <body>
 <div id="app"></div>
+<div class="modal-overlay" id="confirm-modal">
+    <div class="modal-panel" style="width: 400px; text-align: center;">
+        <h2 id="confirm-modal-message">Ви впевнені?</h2>
+        <div class="actions" style="margin-top: 2rem; justify-content: center;">
+            <button id="confirm-modal-cancel-btn" class="btn btn-edit">Скасувати</button>
+            <button id="confirm-modal-confirm-btn" class="btn btn-delete">Підтвердити</button>
+        </div>
+    </div>
+</div>
 
+<div class="modal-overlay" id="confirm-reason-modal">
+    <div class="modal-panel" style="width: 450px;">
+        <h2 id="confirm-reason-modal-message">Вкажіть причину</h2>
+        <div class="form-group">
+            <label for="confirm-reason-input">Причина (необов'язково)</label>
+            <textarea id="confirm-reason-input" rows="3"></textarea>
+        </div>
+        <div class="actions" style="margin-top: 1rem; justify-content: flex-end;">
+            <button id="confirm-reason-modal-cancel-btn" class="btn btn-edit">Скасувати</button>
+            <button id="confirm-reason-modal-confirm-btn" class="btn btn-delete">Підтвердити</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="appointment-action-modal">
+    <div class="modal-panel" style="width: 480px;">
+        <div class="modal-header">
+            <h2>Деталі запису</h2>
+            <button class="close-btn">&times;</button>
+        </div>
+        <div id="action-modal-details"></div>
+        <div id="action-modal-buttons" class="actions" style="margin-top: 2rem; flex-wrap: wrap; justify-content: center;"></div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="payment-modal">
+    <div class="modal-panel" style="width: 400px;">
+        <div class="modal-header">
+            <h2>Внести оплату</h2>
+            <button class="close-btn">&times;</button>
+        </div>
+        <div class="payment-summary">
+            <p><span>Сума до сплати:</span> <span id="payment-total-price">0 zł</span></p>
+            <p><span>Вже сплачено:</span> <span id="payment-total-paid">0 zł</span></p>
+            <p class="remaining"><span>Залишилось:</span> <span id="payment-remaining">0 zł</span></p>
+        </div>
+        <hr style="margin: 1.5rem 0;">
+        <form id="payment-form">
+            <input type="hidden" id="payment-appointment-id">
+            <div class="form-row">
+                <div class="form-group" style="flex:2;">
+                    <label for="payment-amount">Сума</label>
+                    <input type="number" id="payment-amount" required step="0.01" min="0.01">
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label for="payment-modal-type">Тип</label>
+                    <select id="payment-modal-type">
+                        <option value="cash">Готівка</option>
+                        <option value="card">Картка</option>
+                        <option value="blik">Blik</option>
+                    </select>
+                </div>
+            </div>
+            <button type="submit" class="btn" style="width: 100%;">Підтвердити оплату</button>
+        </form>
+    </div>
+</div>
+
+<div class="modal-overlay" id="edit-payments-modal">
+    <div class="modal-panel" style="width: 500px;">
+        <div class="modal-header">
+            <h2>Редагувати оплати</h2>
+            <button class="close-btn">&times;</button>
+        </div>
+        <form id="edit-payments-form">
+            <input type="hidden" id="edit-payments-appointment-id">
+            <ul id="edit-payments-list" class="item-list"></ul>
+            <div class="actions" style="margin-top: 2rem; justify-content: flex-end;">
+                <button type="button" id="cancel-edit-payments-btn" class="btn btn-edit">Скасувати</button>
+                <button type="submit" class="btn">Зберегти зміни</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal-overlay" id="payout-history-modal">
+    <div class="modal-panel">
+        <div class="modal-header">
+            <h2 id="payout-history-modal-title">Історія виплат</h2>
+            <button class="close-btn">&times;</button>
+        </div>
+        <ul id="payout-history-list" class="item-list"></ul>
+    </div>
+</div>
+
+<div class="modal-overlay" id="salary-group-modal">
+    <div class="modal-panel">
+        <div class="modal-header">
+            <h2 id="salary-group-modal-title">Група зарплат</h2>
+            <button class="close-btn">&times;</button>
+        </div>
+        <form id="salary-group-form">
+            <input type="hidden" id="edit-salary-group-id">
+            <div class="form-group">
+                <label for="salary-group-name">Назва групи</label>
+                <input type="text" id="salary-group-name" required>
+            </div>
+            <h3>Рівні зарплат</h3>
+            <div id="salary-group-tiers-table"></div>
+            <button type="button" id="add-tier-to-group-btn" class="btn btn-edit" style="margin-bottom: 2rem;">+ Додати рівень</button>
+            <button type="submit" class="btn" style="width: 100%;">Зберегти групу</button>
+        </form>
+    </div>
+</div>
+
+<div id="notification-toast" style="position: fixed; bottom: 20px; right: 20px; background-color: #27ae60; color: white; padding: 15px 25px; border-radius: 8px; box-shadow: var(--shadow); z-index: 2000; display: none; opacity: 0; transition: opacity 0.5s ease-in-out;">
+    <p id="notification-message" style="margin: 0;"></p>
+</div>
 <script type="module">
    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, updatePassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
