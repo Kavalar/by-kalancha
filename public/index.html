@@ -1290,43 +1290,50 @@
 }
 
     async function handleAddStaffPayment(event) {
-        event.preventDefault();
-        const staffId = state.viewingStaffId;
-        const person = state.staff.find(p => p.id === staffId);
-        const type = document.getElementById('payment-type').value;
-        const amount = parseFloat(document.getElementById('payment-amount').value);
-        const description = document.getElementById('payment-description').value.trim();
-        const period = document.getElementById('payout-period').value;
+    event.preventDefault();
+    const staffId = state.viewingStaffId;
+    const person = state.staff.find(p => p.id === staffId);
+    const type = document.getElementById('payment-type').value;
+    const amount = parseFloat(document.getElementById('payment-amount').value);
+    const description = document.getElementById('payment-description').value.trim();
+    const period = document.getElementById('payout-period').value;
 
-        if (isNaN(amount) || amount <= 0) return showNotification('Введіть коректну суму.', "error");
+    if (isNaN(amount) || amount <= 0) return showNotification('Введіть коректну суму.', "error");
 
-        let subcollectionName = `${type}s`;
-        let data = { amount, date: Timestamp.now() };
-        let logAction = '';
-        let logDetails = { staffId, name: person.name, amount };
-
-        if (type === 'payout') {
-            if (!period) return showNotification('Будь ласка, оберіть період для нарахування ЗП.', 'error');
-            data.period = period;
-            logAction = 'Нараховано ЗП';
-            logDetails.period = period;
-        } else {
-            if (description) data.description = description;
-            logAction = type === 'bonus' ? 'Нараховано премію' : 'Видано аванс';
-            if (description) logDetails.description = description;
-        }
-        
-        const action = () => addDoc(collection(db, 'staff', staffId, subcollectionName), data);
-
-        try {
-            await logAndExecute(logAction, logDetails, action);
-            event.target.reset();
-            document.getElementById('payment-type').dispatchEvent(new Event('change'));
-            showNotification('Операцію успішно проведено!');
-        } catch (e) {
-            showNotification(`Не вдалося провести операцію.`, "error");
-        }
+    // [ВИПРАВЛЕННЯ] Правильно формуємо назву колекції
+    let subcollectionName;
+    if (type === 'bonus') {
+        subcollectionName = 'bonuses'; // Правильна назва для бонусів
+    } else {
+        subcollectionName = `${type}s`; // Для payout -> payouts, advance -> advances
     }
+
+    let data = { amount, date: Timestamp.now() };
+    let logAction = '';
+    let logDetails = { staffId, name: person.name, amount };
+
+    if (type === 'payout') {
+        if (!period) return showNotification('Будь ласка, оберіть період для нарахування ЗП.', 'error');
+        data.period = period;
+        logAction = 'Нараховано ЗП';
+        logDetails.period = period;
+    } else {
+        if (description) data.description = description;
+        logAction = type === 'bonus' ? 'Нараховано премію' : 'Видано аванс';
+        if (description) logDetails.description = description;
+    }
+    
+    const action = () => addDoc(collection(db, 'staff', staffId, subcollectionName), data);
+
+    try {
+        await logAndExecute(logAction, logDetails, action);
+        event.target.reset();
+        document.getElementById('payment-type').dispatchEvent(new Event('change'));
+        showNotification('Операцію успішно проведено!');
+    } catch (e) {
+        showNotification(`Не вдалося провести операцію.`, "error");
+    }
+}
     // #endregion
 
     // #region Audit Log View
