@@ -500,27 +500,37 @@
 
     Object.entries(collections).forEach(([stateKey, colName]) => {
         let q;
-        
-        // Початковий запит до колекції
         let baseQuery = collection(db, colName);
 
-        // Фільтруємо по салону для salon_admin
         if (userRole === 'salon_admin' && collectionsToFilter.includes(colName)) {
             q = query(baseQuery, where("salonId", "==", userSalonId));
         } else {
             q = query(baseQuery);
         }
-
-        // Додаємо сортування
-        if (['auditLog', 'expenses', 'productSales', 'salonExpenses', 'notepadEntries'].includes(colName)) {
-             q = query(q, orderBy("timestamp", "desc"));
-        } else if (colName === 'appointments') {
+        
+        // ВАЖЛИВА ЗМІНА: Ми сортуємо тільки appointments на рівні запиту,
+        // бо в них стабільне поле dateTime. Решту будемо сортувати в браузері.
+        if (colName === 'appointments') {
              q = query(q, orderBy("dateTime", "desc"));
         }
 
         onSnapshot(q, snapshot => {
-            state[stateKey] = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
+            // Спочатку отримуємо всі документи
+            let docs = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
             
+            // НОВА ЛОГІКА: Сортуємо дані в браузері, а не в базі
+            if (['auditLog', 'expenses', 'productSales', 'salonExpenses', 'notepadEntries'].includes(colName)) {
+                docs.sort((a, b) => {
+                    // Ця логіка знайде дату, як би вона не називалася (date або timestamp)
+                    const timeA = (a.timestamp || a.date)?.toDate().getTime() || 0;
+                    const timeB = (b.timestamp || b.date)?.toDate().getTime() || 0;
+                    return timeB - timeA;
+                });
+            }
+            
+            state[stateKey] = docs;
+            
+            // Сортування за іменем для довідників залишається
             if (['categories', 'masters', 'clients', 'staff', 'salons'].includes(stateKey)) {
                 state[stateKey].sort((a,b) => a.name.localeCompare(b.name));
             }
@@ -533,7 +543,6 @@
         });
     });
 
-    // Слухачі для глобальних даних, які потрібні salon_admin (але не фільтруються)
     const isAdminOrSalonAdmin = userRole === 'admin' || userRole === 'salon_admin';
     if (isAdminOrSalonAdmin) {
         onSnapshot(query(collectionGroup(db, 'advances')), snapshot => {
