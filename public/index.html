@@ -1175,32 +1175,45 @@
 }
 
     function renderPayoutHistoryList(elementId, items) {
-        const listEl = document.getElementById(elementId);
-        if (!listEl) return;
+    const listEl = document.getElementById(elementId);
+    if (!listEl) return;
 
-        const allItems = [
-            ...(state.staffPayouts || []).map(p => ({...p, type: 'Нарахування ЗП'})),
-            ...(state.viewingStaffAdvances || []).map(p => ({...p, type: 'Аванс', amount: -p.amount})),
-            ...(state.viewingStaffBonuses || []).map(p => ({...p, type: 'Премія'}))
-        ].sort((a,b) => b.date.toDate() - a.date.toDate());
+    // Додаємо тип операції для кожної групи елементів, щоб знати, з якої колекції видаляти
+    const allItems = [
+        ...(state.staffPayouts || []).map(p => ({...p, itemType: 'payouts', displayType: 'Нарахування ЗП'})),
+        ...(state.viewingStaffAdvances || []).map(a => ({...a, itemType: 'advances', displayType: 'Аванс', amount: -a.amount})),
+        ...(state.viewingStaffBonuses || []).map(b => ({...b, itemType: 'bonuses', displayType: 'Премія'}))
+    ].sort((a,b) => b.date.toDate() - a.date.toDate());
+    
+    if (allItems.length === 0) {
+        listEl.innerHTML = `<li>Історія порожня.</li>`;
+        return;
+    }
 
-        if (allItems.length === 0) {
-            listEl.innerHTML = `<li>Історія порожня.</li>`;
-            return;
-        }
+    listEl.innerHTML = allItems.map(item => {
+        // Формуємо кнопку видалення тільки для адміна
+        const deleteButtonHtml = state.user.role === 'admin' 
+            ? `<button class="btn btn-delete btn-delete-staff-payment" 
+                        data-id="${item.id}" 
+                        data-subcollection="${item.itemType}"
+                        style="margin-left: 1rem;">
+                        Видалити
+                 </button>`
+            : '';
 
-        listEl.innerHTML = allItems.map(item => `
+        return `
             <li style="color: ${item.amount < 0 ? 'var(--danger-color)' : 'var(--text-color)'}">
                 <div>
-                    <strong>${item.type} ${item.period ? `(${item.period})` : ''}</strong><br>
+                    <strong>${item.displayType} ${item.period ? `(${item.period})` : ''}</strong><br>
                     <small>${item.date.toDate().toLocaleDateString('uk-UA')} ${item.description ? ` - ${item.description}` : ''}</small>
                 </div>
                 <div class="actions">
                     <strong>${item.amount.toFixed(2)} zł</strong>
+                    ${deleteButtonHtml}
                 </div>
-            </li>
-        `).join('');
-    }
+            </li>`;
+    }).join('');
+}
 
     async function handleUpdateStaff(event) {
         event.preventDefault();
