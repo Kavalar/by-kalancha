@@ -12,17 +12,10 @@
 
     <style>
         :root {
-            --main-bg: #f4f7fa;
-            --panel-bg: #ffffff;
-            --text-color: #1a1a1a;
-            --gray-text: #6c757d;
-            --border-color: #e9ecef;
-            --primary-color: #2c3e50;
-            --primary-hover: #34495e;
-            --danger-color: #e74c3c;
-            --success-color: #27ae60;
-            --warning-color: #f39c12;
-            --shadow: 0 4px 12px rgba(0,0,0,0.08);
+            --main-bg: #f4f7fa; --panel-bg: #ffffff; --text-color: #1a1a1a;
+            --gray-text: #6c757d; --border-color: #e9ecef; --primary-color: #2c3e50;
+            --primary-hover: #34495e; --danger-color: #e74c3c; --success-color: #27ae60;
+            --warning-color: #f39c12; --shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
         body { font-family: 'Inter', Arial, sans-serif; background: var(--main-bg); margin: 0; padding: 0; color: var(--text-color); font-size: 16px; }
         * { box-sizing: border-box; }
@@ -34,7 +27,6 @@
         .auth-card button { width: 100%; background: var(--primary-color); color: #fff; border: none; font-weight: 600; transition:.2s; cursor:pointer; padding: 12px 14px; border-radius: 8px; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.5px;}
         .auth-card button:hover { background: var(--primary-hover); transform: translateY(-2px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         .error-msg { color: var(--danger-color); margin-bottom: 12px; min-height: 1.2em; font-weight: 600;}
-        
         .crm-layout { display: flex; height: 100vh; }
         .crm-nav { background: var(--primary-color); color: #ecf0f1; width: 240px; flex-shrink: 0; display: flex; flex-direction: column; padding: 1.5rem 0; box-shadow: 5px 0px 15px rgba(0,0,0,0.05); z-index: 10; }
         .crm-nav h1 { font-size: 1.5rem; text-align: center; margin: 0 0 2rem 0; color: #fff; letter-spacing: 1px; }
@@ -46,13 +38,11 @@
         .crm-nav .user-info span { display: block; word-wrap: break-word; font-size: 0.9rem; margin-bottom: 1rem; }
         .crm-nav .user-info button { width: 100%; background: rgba(255,255,255,0.1); border: 1px solid #fff; color: #fff; padding: 0.75rem; border-radius: 6px; cursor: pointer; }
         .crm-nav .user-info button:hover { background: var(--danger-color); border-color: var(--danger-color); }
-
         .crm-main { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
         .crm-header { background: var(--panel-bg); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); flex-shrink: 0; }
         .crm-header h2 { font-size: 1.5rem; margin: 0; }
         .crm-content { flex-grow: 1; padding: 2rem; overflow-y: auto; display: flex; justify-content: center; }
         .content-wrapper { width: 100%; max-width: 1200px; }
-
         .content-card { background: var(--panel-bg); padding: 2rem; border-radius: 12px; box-shadow: var(--shadow); margin-bottom: 2rem; }
         .content-card h2, .content-card h3 { margin-top: 0; color: var(--primary-color); }
         .item-list { padding: 0; list-style: none; margin: 0; }
@@ -61,7 +51,6 @@
         .item-list li.is-frozen { opacity: 0.5; background-color: #f8f9fa; }
         .item-list li:last-child { border-bottom: none; }
         .actions { display: flex; gap: 0.5rem; align-items: center; }
-        
         .btn, button { font-family: 'Inter', Arial, sans-serif; cursor: pointer; border-radius: 6px; padding: 0.5rem 1rem; font-weight: 600; text-decoration: none; display: inline-block; text-align: center; transition: all .2s; }
         .btn-edit, .btn-delete { border: 1px solid; background-color: transparent; }
         .btn-edit { color: var(--gray-text); border-color: var(--gray-text); }
@@ -70,7 +59,6 @@
         .btn-delete:hover { background-color: var(--danger-color); color: #fff; }
         .btn-complete-payment { background-color: transparent; color: var(--success-color); border-color: var(--success-color); }
         .btn-complete-payment:hover { background-color: var(--success-color); color: #fff; }
-        
         .form-group { margin-bottom: 1.5rem; }
         .form-group input, .form-group select, .form-group textarea { appearance: none; -webkit-appearance: none; width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; background-color: #fff; transition: border-color .2s; }
         .form-group select { background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%236c757d%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22/%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right .7em top 50%; background-size: .65em auto; padding-right: 2.5em; }
@@ -78,214 +66,40 @@
         .form-row { display: flex; gap: 1rem; align-items: flex-end; }
         form button[type="submit"] { background: var(--primary-color); color: #fff; border: none; }
         form button[type="submit"]:hover { background: var(--primary-hover); }
-
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
         .modal-panel { background: #fff; padding: 2rem; border-radius: 8px; width: 550px; max-width: 90vw; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
         .modal-header h2 { margin: 0; }
         .close-btn { font-size: 1.5rem; background: none; border: none; cursor: pointer; }
-        
         .payment-summary p { margin: 0.5rem 0; display: flex; justify-content: space-between; font-size: 1.1rem;}
         .payment-summary p.total { font-weight: bold; font-size: 1.2rem; border-top: 1px solid var(--border-color); padding-top: 0.5rem; margin-top: 0.5rem;}
         .payment-summary p.remaining { color: var(--danger-color); font-weight: bold; font-size: 1.3rem;}
-
         .services-layout { display: grid; grid-template-columns: 300px 1fr; gap: 2rem; align-items: start; }
         .category-list-item { cursor: pointer; }
         .category-list-item.selected { font-weight: bold; background-color: var(--main-bg); }
         .price-display { text-align: right; } .price-display .old-price { text-decoration: line-through; color: var(--gray-text); margin-right: 0.5rem; font-size: 0.9em; } .price-display .new-price { font-weight: bold; }
-        
         .category-checkbox-group { max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px; }
         .category-checkbox-group label { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; font-weight: normal; }
         .category-checkbox-group input[type="checkbox"] { appearance: auto; -webkit-appearance: auto; width: auto; }
-        
         #final-price-display { font-size: 1.5rem; font-weight: bold; text-align: right; margin-top: 1rem; padding-top: 1rem; border-top: 2px solid var(--primary-color);}
-        
-        .salary-report-card { background: #fff; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .salary-report-card h3 { margin: 0 0 1rem 0; }
-        .salary-report-card p { margin: 0.5rem 0; display: flex; justify-content: space-between; }
-        .salary-report-card .total-salary { font-weight: bold; font-size: 1.2rem; color: var(--danger-color); border-top: 1px solid var(--border-color); padding-top: 0.5rem; margin-top: 0.5rem;}
-        
-        .payout-card { background: #fff; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .payout-card h3 { margin: 0 0 1.5rem 0; display: flex; justify-content: space-between; align-items: center; }
-        .payout-card-details p { margin: 0.75rem 0; display: flex; justify-content: space-between; font-size: 1.1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color); }
-        .payout-card-details p:last-child { border-bottom: none; }
-        .payout-card-details strong { font-weight: 600; }
-        .payout-card-details .balance-due { font-size: 1.3rem; color: var(--danger-color); font-weight: bold; }
-        .payout-action-form { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 2px solid var(--main-bg); display: flex; gap: 1rem; align-items: center; }
-
         .status-badge { padding: 0.2em 0.6em; border-radius: 10px; font-size: 0.8em; color: white; }
         .status-completed { background-color: var(--success-color); }
         .status-upcoming { background-color: var(--gray-text); }
         .status-partially-paid { background-color: var(--warning-color); }
-
-        #calendar-container { display: flex; flex-direction: column; gap: 1rem; }
         #calendar { height: 80vh; }
-        .fc-event { font-size: 0.8em; cursor: pointer; }
-        .fc-event-main-frame { text-wrap: wrap; }
-        .fc-event.past-event { background-color: #dbe4f0 !important; border-color: #dbe4f0 !important; color: #6c757d;}
-        .fc-event-title { font-weight: 600; }
-        .fc-event-service { font-size: 0.9em; opacity: 0.8; }
-        
-        table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; } th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid var(--border-color); } th { background-color: var(--main-bg); }
-        
-        .client-search-container, .service-search-container { position: relative; }
-        #client-search-results, #service-search-results { position: absolute; background: white; border: 1px solid var(--border-color); border-top: none; border-radius: 0 0 8px 8px; width: 100%; z-index: 100; max-height: 200px; overflow-y: auto; }
-        #client-search-results div, #service-search-results div { padding: 0.75rem; cursor: pointer; }
-        #client-search-results div:hover, #service-search-results div:hover { background-color: var(--main-bg); }
-        
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;}
-        .stat-card { background-color: var(--main-bg); padding: 1.5rem; border-radius: 8px; text-align: center;}
-        .stat-card .value { font-size: 2rem; font-weight: 600; color: var(--primary-color); }
-        .stat-card .label { font-size: 0.9rem; color: var(--gray-text); }
-
         .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.5rem; text-align: center; }
         .summary-card { background-color: var(--main-bg); padding: 1rem; border-radius: 8px; }
         .summary-card .value { font-size: 2rem; font-weight: 600; color: var(--primary-color); }
         .summary-card .label { font-size: 0.9rem; color: var(--gray-text); margin-top: 0.25rem; }
-        
-        #salary-group-tiers-table .form-row { margin-bottom: 0.5rem; }
-        #salary-group-tiers-table input { font-size: 0.9em; padding: 0.5rem; }
-        #notepad-entries li { padding: 1rem; border-bottom: 1px solid var(--border-color); }
-        #notepad-entries small { color: var(--gray-text); }
     </style>
 </head>
 <body>
 <div id="app"></div>
 
-<div class="modal-overlay" id="payment-modal">
-    <div class="modal-panel" style="width: 450px;">
-        <div class="modal-header">
-            <h2>Внести оплату</h2>
-            <button class="close-btn">&times;</button>
-        </div>
-        <div id="payment-summary" class="payment-summary">
-            <p><span>Повна вартість:</span> <strong id="payment-total-price">0 zł</strong></p>
-            <p><span>Вже сплачено:</span> <strong id="payment-total-paid">0 zł</strong></p>
-            <p class="remaining"><span>Залишилось до сплати:</span> <strong id="payment-remaining">0 zł</strong></p>
-        </div>
-        <hr style="margin: 1.5rem 0;">
-        <form id="payment-form">
-            <input type="hidden" id="payment-appointment-id">
-            <div class="form-row">
-                <div class="form-group" style="flex:2;">
-                    <label for="payment-amount">Сума до сплати зараз</label>
-                    <input type="number" id="payment-amount" required min="0.01" step="any">
-                </div>
-                <div class="form-group" style="flex:1;">
-                    <label for="payment-modal-type">Тип оплати</label>
-                     <select id="payment-modal-type">
-                        <option value="cash">Готівка</option>
-                        <option value="card">Картка</option>
-                        <option value="blik">Blik</option>
-                     </select>
-                </div>
-            </div>
-            <button type="submit">Підтвердити оплату</button>
-        </form>
-    </div>
-</div>
-
-<div class="modal-overlay" id="appointment-action-modal">
-    <div class="modal-panel">
-        <div class="modal-header">
-            <h2 id="action-modal-title">Деталі запису</h2>
-            <button class="close-btn">&times;</button>
-        </div>
-        <div id="action-modal-details">
-        </div>
-        <div id="action-modal-buttons" style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
-        </div>
-    </div>
-</div>
-
-<div class="modal-overlay" id="edit-payments-modal">
-    <div class="modal-panel" style="width: 500px;">
-        <div class="modal-header">
-            <h2>Редагувати оплати</h2>
-            <button class="close-btn">&times;</button>
-        </div>
-        <form id="edit-payments-form">
-            <input type="hidden" id="edit-payments-appointment-id">
-            <p>Ви можете змінити тип оплати або видалити платіж.</p>
-            <ul id="edit-payments-list" class="item-list"></ul>
-            <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem;">
-                <button type="button" id="cancel-edit-payments-btn" class="btn btn-edit">Скасувати</button>
-                <button type="submit" class="btn">Зберегти зміни</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<div class="modal-overlay" id="payout-history-modal">
-    <div class="modal-panel" style="width: 600px;">
-        <div class="modal-header">
-            <h2 id="payout-history-modal-title">Історія виплат</h2>
-            <button class="close-btn">&times;</button>
-        </div>
-        <ul id="payout-history-list" class="item-list"></ul>
-    </div>
-</div>
-
-<div class="modal-overlay" id="salary-group-modal">
-    <div class="modal-panel" style="width: 550px;">
-        <div class="modal-header">
-            <h2 id="salary-group-modal-title">Створити групу</h2>
-            <button class="close-btn">&times;</button>
-        </div>
-        <form id="salary-group-form">
-            <input type="hidden" id="edit-salary-group-id">
-            <div class="form-group">
-                <label for="salary-group-name">Назва групи</label>
-                <input type="text" id="salary-group-name" required>
-             </div>
-            <h3>Рівні зарплати</h3>
-            <div id="salary-group-tiers-table"></div>
-            <button type="button" class="btn" id="add-tier-to-group-btn" style="margin-bottom: 1.5rem;">+ Додати рівень</button>
-            <hr>
-            <button type="submit" class="btn" style="margin-top: 1.5rem;">Зберегти групу</button>
-        </form>
-    </div>
-</div>
-
-<div class="modal-overlay" id="confirm-modal">
-    <div class="modal-panel" style="width: 400px; text-align: center;">
-        <div class="modal-header" style="justify-content: center;">
-            <h2 id="confirm-modal-title">Підтвердження дії</h2>
-        </div>
-        <p id="confirm-modal-message" style="margin-bottom: 2rem; font-size: 1.1rem;"></p>
-        <div style="display: flex; justify-content: center; gap: 1rem;">
-            <button id="confirm-modal-cancel-btn" class="btn btn-edit">Скасувати</button>
-            <button id="confirm-modal-confirm-btn" class="btn btn-delete">Підтвердити</button>
-        </div>
-    </div>
-</div>
-
-<div class="modal-overlay" id="confirm-reason-modal">
-    <div class="modal-panel" style="width: 450px; text-align: center;">
-        <div class="modal-header" style="justify-content: center;">
-            <h2 id="confirm-reason-modal-title">Підтвердження дії</h2>
-        </div>
-        <p id="confirm-reason-modal-message" style="margin-bottom: 1rem; font-size: 1.1rem;"></p>
-        <div class="form-group" style="text-align: left;">
-            <label for="confirm-reason-input">Причина (необов'язково)</label>
-            <textarea id="confirm-reason-input" rows="3" placeholder="Вкажіть причину видалення..."></textarea>
-        </div>
-        <div style="display: flex; justify-content: center; gap: 1rem;">
-            <button id="confirm-reason-modal-cancel-btn" class="btn btn-edit">Скасувати</button>
-            <button id="confirm-reason-modal-confirm-btn" class="btn btn-delete">Підтвердити</button>
-        </div>
-    </div>
-</div>
-
-<div id="notification-toast" style="position: fixed; bottom: 20px; right: 20px; background-color: var(--success-color); color: white; padding: 1rem 1.5rem; border-radius: 8px; box-shadow: var(--shadow); z-index: 2000; opacity: 0; display: none; transition: opacity 0.5s ease-in-out;">
-    <span id="notification-message"></span>
-</div>
-
-
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, updatePassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, getDocs, getDoc, Timestamp, setDoc, query, where, arrayUnion, increment, collectionGroup, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, getDocs, getDoc, Timestamp, query, where, arrayUnion, increment, collectionGroup, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
 
     const firebaseConfig = { apiKey: "AIzaSyBoGeREvdgrVSm-S4f3cW0HyB7Us9yh_us", authDomain: "bykalancha.firebaseapp.com", projectId: "bykalancha", storageBucket: "bykalancha.appspot.com", messagingSenderId: "196166318613", appId: "1:196166318613:web:0067f9de531e290e43ec1c", measurementId: "G-V72ECFLKFE" };
@@ -302,223 +116,84 @@
         currentView: 'calendar', preselectedAppointment: null, calendarSelectedMasterId: 'all',
         calendarSelectedSalonId: 'all', editingAppointmentId: null, selectedClientForAppointment: null,
         selectedServiceForAppointment: null, viewingClientId: null, viewingMasterId: null,
-        viewingMasterAdvances: [], viewingStaffId: null, viewingStaffBonuses: [],
+        viewingMasterAdvances: [], viewingMasterBonuses: [], viewingStaffId: null, viewingStaffBonuses: [],
         viewingStaffAdvances: [], staffPayouts: [], appointmentsPage: 1, appointmentsListDate: new Date(),
     };
     let listenersAreActive = false;
-    let masterAdvancesUnsubscribe = null;
-    let staffSubcollectionUnsubscribers = [];
     let mainUnsubscribers = [];
-    
-    // #region UI Helper Functions (Notifications & Confirmations)
-    function showNotification(message, type = 'success') {
-        const toast = document.getElementById('notification-toast');
-        if (!toast) return;
-        const messageEl = document.getElementById('notification-message');
-        
-        messageEl.textContent = message;
-        toast.style.backgroundColor = type === 'success' ? 'var(--success-color)' : 'var(--danger-color)';
-        toast.style.display = 'block';
-        setTimeout(() => toast.style.opacity = 1, 10);
-        
-        setTimeout(() => {
-            toast.style.opacity = 0;
-            setTimeout(() => {
-                toast.style.display = 'none';
-            }, 500);
-        }, 3000);
-    }
+    let staffSubcollectionUnsubscribers = [];
 
-    function showConfirmModal(message, onConfirm) {
-        const confirmModal = document.getElementById('confirm-modal');
-        if (!confirmModal) return;
-        
-        const messageEl = document.getElementById('confirm-modal-message');
-        const confirmBtn = document.getElementById('confirm-modal-confirm-btn');
-        const cancelBtn = document.getElementById('confirm-modal-cancel-btn');
-        
-        messageEl.textContent = message;
-        const newConfirmBtn = confirmBtn.cloneNode(true);
-        confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
-        
-        const hideModal = () => {
-            confirmModal.style.display = 'none';
-        };
+    // ... (код для showNotification, showConfirmModal, showConfirmWithReasonModal)
 
-        newConfirmBtn.onclick = () => {
-            hideModal();
-            onConfirm();
-        };
-        cancelBtn.onclick = hideModal;
-        
-        confirmModal.style.display = 'flex';
-    }
-
-    function showConfirmWithReasonModal(message, onConfirm) {
-        const modal = document.getElementById('confirm-reason-modal');
-        if (!modal) return;
-        
-        const messageEl = document.getElementById('confirm-reason-modal-message');
-        const confirmBtn = document.getElementById('confirm-reason-modal-confirm-btn');
-        const cancelBtn = document.getElementById('confirm-reason-modal-cancel-btn');
-        const reasonInput = document.getElementById('confirm-reason-input');
-        messageEl.textContent = message;
-        reasonInput.value = ''; 
-        
-        const newConfirmBtn = confirmBtn.cloneNode(true);
-        confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
-        const hideModal = () => {
-            modal.style.display = 'none';
-        };
-
-        newConfirmBtn.onclick = () => {
-            hideModal();
-            const reason = reasonInput.value.trim();
-            onConfirm(reason); 
-        };
-        
-        cancelBtn.onclick = hideModal;
-        
-        modal.style.display = 'flex';
-    }
-    // #endregion
-
-    async function handleLogin(e) { 
-        e.preventDefault();
-        const email = document.getElementById('email').value.trim(); 
-        const password = document.getElementById('password').value; 
-        try { 
-            await signInWithEmailAndPassword(auth, email, password);
-        } catch (err) { 
-            document.getElementById('login-error').innerText = "Неправильний email або пароль.";
-        } 
-    }
+    async function handleLogin(e) { e.preventDefault(); /* ... */ }
 
     onAuthStateChanged(auth, async (user) => {
-    if (user) {
-        // Ця частина залишається без змін
-        if (listenersAreActive) return;
-        appContainer.innerHTML = '<h1>Завантаження...</h1>';
-        
-        const userDocRef = doc(db, "users", user.uid);
-        const userDocSnap = await getDoc(userDocRef);
-
-        state.user = { 
-            uid: user.uid, 
-            email: user.email, 
-            role: userDocSnap.exists() ? userDocSnap.data().role : 'master',
-            salonId: userDocSnap.exists() ? userDocSnap.data().salonId : null
-        };
-
-        renderAppLayout(state.user);
-        setupRealtimeListeners();
-    } else {
-        // [ПОЧАТОК ВИПРАВЛЕННЯ] Повна очистка при виході
-        
-        // 1. Відписуємося від всіх основних слухачів
-        mainUnsubscribers.forEach(unsub => unsub());
-        mainUnsubscribers = [];
-
-        // 2. Відписуємося від специфічних слухачів (для карток майстрів/персоналу)
-        if(masterAdvancesUnsubscribe) masterAdvancesUnsubscribe();
-        staffSubcollectionUnsubscribers.forEach(unsub => unsub());
-        staffSubcollectionUnsubscribers = [];
-
-        // 3. Скидаємо прапорець активності
-        listenersAreActive = false;
-        
-        // 4. Показуємо екран входу
-        renderLoginView();
-        // [КІНЕЦЬ ВИПРАВЛЕННЯ]
-    }
-});
+        if (user) {
+            if (listenersAreActive) return;
+            appContainer.innerHTML = '<h1>Завантаження...</h1>';
+            const userDocSnap = await getDoc(doc(db, "users", user.uid));
+            state.user = { 
+                uid: user.uid, email: user.email, 
+                role: userDocSnap.exists() ? userDocSnap.data().role : 'master',
+                salonId: userDocSnap.exists() ? userDocSnap.data().salonId : null
+            };
+            renderAppLayout(state.user);
+            setupRealtimeListeners();
+        } else {
+            mainUnsubscribers.forEach(unsub => unsub());
+            mainUnsubscribers = [];
+            staffSubcollectionUnsubscribers.forEach(unsub => unsub());
+            staffSubcollectionUnsubscribers = [];
+            listenersAreActive = false;
+            renderLoginView();
+        }
+    });
 
     function setupRealtimeListeners() {
-    if (listenersAreActive) return;
-    
-    // Повна очистка всіх попередніх підписок при запуску
-    mainUnsubscribers.forEach(unsub => unsub());
-    mainUnsubscribers = [];
-
-    const collections = { 
-        salons: 'salons',
-        categories: 'serviceCategories', 
-        services: 'services', 
-        masters: 'masters',
-        appointments: 'appointments', 
-        clients: 'clients',
-        expenses: 'expenses',
-        salonExpenses: 'salonExpenses',
-        notepadEntries: 'notepadEntries',
-        productSales: 'productSales',
-        staff: 'staff',
-        auditLog: 'auditLog',
-        salaryGroups: 'salaryGroups'
-    };
-
-    const userRole = state.user.role;
-    const userSalonId = state.user.salonId;
-    
-    Object.entries(collections).forEach(([stateKey, colName]) => {
-        // Пропускаємо завантаження даних, до яких немає доступу
-        if ((colName === 'expenses' || colName === 'auditLog' || colName === 'salaryGroups') && userRole !== 'admin') {
-            return;
-        }
-
-        let q;
-        let baseQuery = collection(db, colName);
-        const collectionsToFilterBySalon = ['appointments', 'salonExpenses', 'productSales', 'staff'];
-
-        // Застосовуємо фільтрацію по салону для salon_admin
-        if (userRole === 'salon_admin') {
-            if (collectionsToFilterBySalon.includes(colName)) {
-                q = query(baseQuery, where("salonId", "==", userSalonId));
-            } else if (colName === 'masters') {
-                q = query(baseQuery, where("salonIds", "array-contains", userSalonId));
-            } else {
-                q = query(baseQuery);
+        if (listenersAreActive) return;
+        mainUnsubscribers.forEach(unsub => unsub());
+        mainUnsubscribers = [];
+        const collections = { 
+            salons: 'salons', categories: 'serviceCategories', services: 'services', 
+            masters: 'masters', appointments: 'appointments', clients: 'clients',
+            expenses: 'expenses', salonExpenses: 'salonExpenses', notepadEntries: 'notepadEntries',
+            productSales: 'productSales', staff: 'staff', auditLog: 'auditLog',
+            salaryGroups: 'salaryGroups'
+        };
+        const userRole = state.user.role;
+        const userSalonId = state.user.salonId;
+        Object.entries(collections).forEach(([stateKey, colName]) => {
+            if ((colName === 'expenses' || colName === 'auditLog' || colName === 'salaryGroups') && userRole !== 'admin') {
+                return; 
             }
-        } else {
-            q = query(baseQuery);
-        }
-        
-        // Сортування на рівні запиту залишаємо тільки для appointments, де поле дати стабільне
-        if (colName === 'appointments') {
-             q = query(q, orderBy("dateTime", "desc"));
-        }
-
-        const unsubscribe = onSnapshot(q, snapshot => {
-            let docs = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
-            
-            // Сортуємо дані по даті в браузері, щоб обробити і 'date', і 'timestamp'
-            if (['auditLog', 'expenses', 'productSales', 'salonExpenses', 'notepadEntries'].includes(colName)) {
-                docs.sort((a, b) => {
-                    const timeA = (a.timestamp || a.date)?.toDate().getTime() || 0;
-                    const timeB = (b.timestamp || b.date)?.toDate().getTime() || 0;
-                    return timeB - timeA;
-                });
-            }
-            
-            state[stateKey] = docs;
-            
-            // Сортування за іменем для довідників
-            if (['categories', 'masters', 'clients', 'staff', 'salons'].includes(stateKey)) {
-                state[stateKey].sort((a,b) => a.name.localeCompare(b.name));
-            }
-
-            if (state.user) {
-                renderView(state.currentView);
-            }
-        }, error => {
-            console.error(`Error fetching ${colName}:`, error);
+            let q;
+            let baseQuery = collection(db, colName);
+            const collectionsToFilter = ['appointments', 'salonExpenses', 'productSales', 'staff'];
+            if (userRole === 'salon_admin') {
+                if (collectionsToFilter.includes(colName)) q = query(baseQuery, where("salonId", "==", userSalonId));
+                else if (colName === 'masters') q = query(baseQuery, where("salonIds", "array-contains", userSalonId));
+                else q = query(baseQuery);
+            } else { q = query(baseQuery); }
+            if (colName === 'appointments') q = query(q, orderBy("dateTime", "desc"));
+            const unsubscribe = onSnapshot(q, snapshot => {
+                let docs = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
+                if (['auditLog', 'expenses', 'productSales', 'salonExpenses', 'notepadEntries'].includes(colName)) {
+                    docs.sort((a, b) => {
+                        const timeA = (a.timestamp || a.date)?.toDate().getTime() || 0;
+                        const timeB = (b.timestamp || b.date)?.toDate().getTime() || 0;
+                        return timeB - timeA;
+                    });
+                }
+                state[stateKey] = docs;
+                if (['categories', 'masters', 'clients', 'staff', 'salons'].includes(stateKey)) {
+                    state[stateKey].sort((a,b) => a.name.localeCompare(b.name));
+                }
+                if (state.user) renderView(state.currentView);
+            }, error => console.error(`Error fetching ${colName}:`, error.message));
+            mainUnsubscribers.push(unsubscribe);
         });
-
-        // Зберігаємо функцію відписки, щоб потім її викликати при виході з системи
-        mainUnsubscribers.push(unsubscribe);
-    });
-    
-    listenersAreActive = true;
-}
+        listenersAreActive = true;
+    }
 
     // #region Core App Logic & Audit
     async function logAndExecute(action, details, operationFn) {
@@ -1869,157 +1544,174 @@
 
     // #region Appointments View
     function renderAppointmentsView(container) {
+    // --- ВИПРАВЛЕННЯ: Додано перевірку ролі для відображення форми ---
+    const userRole = state.user.role;
+    const canCreate = userRole === 'admin' || userRole === 'salon_admin';
     const isEditMode = !!state.editingAppointmentId;
     let appointmentToEdit = null;
+
     if (isEditMode) {
-        appointmentToEdit = state.appointments.find(a => a.id === state.editingAppointmentId);
+        [cite_start]appointmentToEdit = state.appointments.find(a => a.id === state.editingAppointmentId); [cite: 653]
     }
     
-    const isSalonAdmin = state.user.role === 'salon_admin';
-    const userSalonId = state.user.salonId;
+    // Починаємо формувати HTML
+    let formHtml = '';
 
-    const salonOptions = (isSalonAdmin ? state.salons.filter(s => s.id === userSalonId) : state.salons)
-        .map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-
-    container.innerHTML = `
-        <div class="content-card">
-            <h2 id="appointment-form-title">${isEditMode ? 'Редагувати запис' : 'Новий запис'}</h2>
-            <form id="appointment-form">
-                 <div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem; margin-bottom: 1rem;">
-                    <label><input type="checkbox" id="internal-service-checkbox"> Внутрішня послуга (для майстра)</label>
-                </div>
-                <div id="regular-client-fields">
-                    <div class="form-group client-search-container">
-                        <label for="client-search-input">Пошук / Ім'я клієнта</label>
-                        <input type="text" id="client-search-input" autocomplete="off" required>
-                        <div id="client-search-results" style="display: none;"></div>
+    // Форму показуємо, тільки якщо користувач може створювати АБО він редагує запис
+    if (canCreate || isEditMode) {
+        [cite_start]const isSalonAdmin = state.user.role === 'salon_admin'; [cite: 654]
+        [cite_start]const userSalonId = state.user.salonId; [cite: 654]
+        const salonOptions = (isSalonAdmin ? state.salons.filter(s => s.id === userSalonId) : state.salons)
+            [cite_start].map(s => `<option value="${s.id}">${s.name}</option>`).join(''); [cite: 655]
+        
+        formHtml = `
+            <div class="content-card">
+                <h2 id="appointment-form-title">${isEditMode ? 'Редагувати запис' : 'Новий запис'}</h2>
+                <form id="appointment-form">
+                     <div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem; margin-bottom: 1rem;">
+                        <label><input type="checkbox" id="internal-service-checkbox"> Внутрішня послуга (для майстра)</label>
                     </div>
-                    <div class="form-group" id="client-phone-group" style="display: none;">
-                        <label for="client-phone-input">Телефон нового клієнта</label>
-                        <input type="tel" id="client-phone-input">
+                    <div id="regular-client-fields">
+                        <div class="form-group client-search-container">
+                            <label for="client-search-input">Пошук / Ім'я клієнта</label>
+                            <input type="text" id="client-search-input" autocomplete="off" required>
+                            <div id="client-search-results" style="display: none;"></div>
+                        </div>
+                        <div class="form-group" id="client-phone-group" style="display: none;">
+                            <label for="client-phone-input">Телефон нового клієнта</label>
+                            <input type="tel" id="client-phone-input">
+                        </div>
                     </div>
-                </div>
-                <div id="master-client-fields" style="display: none;">
-                     <div class="form-group">
-                        <label for="master-as-client-select">Клієнт-майстер</label>
-                        <select id="master-as-client-select" class="form-group"></select>
+                    <div id="master-client-fields" style="display: none;">
+                         <div class="form-group">
+                            <label for="master-as-client-select">Клієнт-майстер</label>
+                            <select id="master-as-client-select" class="form-group"></select>
+                        </div>
                     </div>
-                </div>
-                <div class="form-group">
-                    <label for="appointment-datetime">Дата і час</label>
-                    <input type="datetime-local" id="appointment-datetime" required>
-                </div>
-                <div class="form-row">
-                    <div class="form-group" style="flex:1;"><label for="appointment-category">Категорія послуг</label><select id="appointment-category" required></select></div>
-                    <div class="form-group service-search-container" style="flex:1;"><label for="appointment-service-search">Послуга</label><input type="text" id="appointment-service-search" placeholder="Почніть вводити назву..." autocomplete="off" required><div id="service-search-results" style="display: none;"></div></div>
-                </div>
-                <div class="form-group"><label for="appointment-master">Майстер</label><select id="appointment-master" required></select></div>
-                <div class="form-group">
-                    <label for="appointment-salon">Салон</label>
-                    <select id="appointment-salon" required ${isSalonAdmin ? 'disabled' : ''}>
-                        ${!isSalonAdmin ? '<option value="">Оберіть салон</option>' : ''}
-                        ${salonOptions}
-                    </select>
-                </div>
-                <div class="form-row">
-                    <div class="form-group" style="flex:2;"><label for="manual-discount-value">Додаткова знижка</label><input type="number" id="manual-discount-value" placeholder="0" min="0"></div>
-                    <div class="form-group" style="flex:1;"><label for="manual-discount-type">Тип</label><select id="manual-discount-type"><option value="percent">%</option><option value="fixed">zł</option></select></div>
-                </div>
-                 <div class="form-row">
-                    <div class="form-group" style="flex:1;"><label for="additional-charge-amount">Додаткова плата (zł)</label><input type="number" id="additional-charge-amount" placeholder="0" min="0"></div>
-                    <div class="form-group" style="flex:2;"><label for="additional-charge-description">Опис дод. плати</label><input type="text" id="additional-charge-description" placeholder="напр. Миття голови"></div>
-                </div>
-                <div id="final-price-display">Сума до оплати: 0 zł</div>
-                <button type="submit" id="appointment-submit-btn" class="btn" style="margin-top: 1rem;">${isEditMode ? 'Зберегти зміни' : 'Створити запис'}</button>
-                ${isEditMode ? `<button type="button" id="appointment-cancel-edit-btn" class="btn" style="margin-top: 0.5rem; background-color: var(--gray-text);">Скасувати редагування</button>` : ''}
-            </form>
-        </div>
-        ${!isEditMode ? `
-        <div class="content-card" style="margin-top: 2rem;">
-            <h2>Незавершені записи</h2>
-            <div class="form-group">
-                <label for="appointments-date-filter">Оберіть дату</label>
-                <input type="date" id="appointments-date-filter">
+                    <div class="form-group">
+                        <label for="appointment-datetime">Дата і час</label>
+                        <input type="datetime-local" id="appointment-datetime" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1;"><label for="appointment-category">Категорія послуг</label><select id="appointment-category" required></select></div>
+                        <div class="form-group service-search-container" style="flex:1;"><label for="appointment-service-search">Послуга</label><input type="text" id="appointment-service-search" placeholder="Почніть вводити назву..." autocomplete="off" required><div id="service-search-results" style="display: none;"></div></div>
+                    </div>
+                    <div class="form-group"><label for="appointment-master">Майстер</label><select id="appointment-master" required></select></div>
+                    <div class="form-group">
+                        <label for="appointment-salon">Салон</label>
+                        <select id="appointment-salon" required ${isSalonAdmin ? 'disabled' : ''}>
+                            ${!isSalonAdmin ? '<option value="">Оберіть салон</option>' : ''}
+                            ${salonOptions}
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:2;"><label for="manual-discount-value">Додаткова знижка</label><input type="number" id="manual-discount-value" placeholder="0" min="0"></div>
+                        <div class="form-group" style="flex:1;"><label for="manual-discount-type">Тип</label><select id="manual-discount-type"><option value="percent">%</option><option value="fixed">zł</option></select></div>
+                    </div>
+                     <div class="form-row">
+                        <div class="form-group" style="flex:1;"><label for="additional-charge-amount">Додаткова плата (zł)</label><input type="number" id="additional-charge-amount" placeholder="0" min="0"></div>
+                        <div class="form-group" style="flex:2;"><label for="additional-charge-description">Опис дод. плати</label><input type="text" id="additional-charge-description" placeholder="напр. Миття голови"></div>
+                    </div>
+                    <div id="final-price-display">Сума до оплати: 0 zł</div>
+                    <button type="submit" id="appointment-submit-btn" class="btn" style="margin-top: 1rem;">${isEditMode ? 'Зберегти зміни' : 'Створити запис'}</button>
+                    ${isEditMode ? `<button type="button" id="appointment-cancel-edit-btn" class="btn" style="margin-top: 0.5rem; background-color: var(--gray-text);">Скасувати редагування</button>` : ''}
+                </form>
             </div>
-            <ul id="daily-appointments-list" class="item-list"></ul>
-            <div id="pagination-controls" style="text-align: center; margin-top: 1rem;"></div>
-        </div>` : ''}
-    `;
+        `;
+    }
+
+    // Блок з незавершеними записами показуємо завжди, коли ми не в режимі редагування
+    const dailyAppointmentsHtml = !isEditMode ? `
+    <div class="content-card" style="margin-top: 2rem;">
+        <h2>Незавершені записи</h2>
+        <div class="form-group">
+            <label for="appointments-date-filter">Оберіть дату</label>
+            <input type="date" id="appointments-date-filter">
+        </div>
+        <ul id="daily-appointments-list" class="item-list"></ul>
+        <div id="pagination-controls" style="text-align: center; margin-top: 1rem;"></div>
+    </div>` : '';
+
+    // Збираємо фінальний HTML для сторінки
+    container.innerHTML = formHtml + dailyAppointmentsHtml;
+    // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
+
     setupAppointmentsLogic();
 
-    if (isSalonAdmin) {
-        document.getElementById('appointment-salon').value = userSalonId;
+    if (state.user.role === 'salon_admin') {
+        const appointmentSalonEl = document.getElementById('appointment-salon');
+        if (appointmentSalonEl) appointmentSalonEl.value = state.user.salonId;
     }
 
     if (isEditMode && appointmentToEdit) {
-        const d = new Date(appointmentToEdit.dateTime.toDate().getTime() - (appointmentToEdit.dateTime.toDate().getTimezoneOffset() * 60000));
-        document.getElementById('appointment-datetime').value = d.toISOString().slice(0, 16);
-        document.getElementById('manual-discount-value').value = appointmentToEdit.manualDiscount?.value || 0;
-        document.getElementById('manual-discount-type').value = appointmentToEdit.manualDiscount?.type || 'percent';
+        [cite_start]const d = new Date(appointmentToEdit.dateTime.toDate().getTime() - (appointmentToEdit.dateTime.toDate().getTimezoneOffset() * 60000)); [cite: 675]
+        [cite_start]document.getElementById('appointment-datetime').value = d.toISOString().slice(0, 16); [cite: 676]
+        document.getElementById('manual-discount-value').value = appointmentToEdit.manualDiscount?.value || [cite_start]0; [cite: 676]
+        document.getElementById('manual-discount-type').value = appointmentToEdit.manualDiscount?.type || [cite_start]'percent'; [cite: 676]
         if (appointmentToEdit.additionalCharge) {
-            document.getElementById('additional-charge-amount').value = appointmentToEdit.additionalCharge.amount || 0;
-            document.getElementById('additional-charge-description').value = appointmentToEdit.additionalCharge.description || '';
+            document.getElementById('additional-charge-amount').value = appointmentToEdit.additionalCharge.amount || [cite_start]0; [cite: 677]
+            document.getElementById('additional-charge-description').value = appointmentToEdit.additionalCharge.description || [cite_start]''; [cite: 678]
         }
-        const internalCheckbox = document.getElementById('internal-service-checkbox');
-        internalCheckbox.checked = appointmentToEdit.isInternal || false;
-        internalCheckbox.dispatchEvent(new Event('change'));
+        [cite_start]const internalCheckbox = document.getElementById('internal-service-checkbox'); [cite: 678]
+        [cite_start]internalCheckbox.checked = appointmentToEdit.isInternal || false; [cite: 679]
+        [cite_start]internalCheckbox.dispatchEvent(new Event('change')); [cite: 679]
         if(appointmentToEdit.isInternal) {
-            document.getElementById('master-as-client-select').value = appointmentToEdit.clientId;
+            [cite_start]document.getElementById('master-as-client-select').value = appointmentToEdit.clientId; [cite: 679]
         } else {
-            const client = state.clients.find(c => c.id === appointmentToEdit.clientId);
-            document.getElementById('client-search-input').value = client?.name || appointmentToEdit.clientName;
-            document.getElementById('client-phone-input').value = client?.phone || '';
-            document.getElementById('client-phone-group').style.display = 'block';
+            [cite_start]const client = state.clients.find(c => c.id === appointmentToEdit.clientId); [cite: 680]
+            [cite_start]document.getElementById('client-search-input').value = client?.name || appointmentToEdit.clientName; [cite: 681]
+            document.getElementById('client-phone-input').value = client?.phone || [cite_start]''; [cite: 681]
+            [cite_start]document.getElementById('client-phone-group').style.display = 'block'; [cite: 681]
         }
-        const service = state.services.find(s => s.id === appointmentToEdit.serviceId);
+        [cite_start]const service = state.services.find(s => s.id === appointmentToEdit.serviceId); [cite: 682]
         if (service) {
-            state.selectedServiceForAppointment = service;
-            document.getElementById('appointment-service-search').value = service.name;
-            const categorySelect = document.getElementById('appointment-category');
-            categorySelect.value = service.categoryId;
-            categorySelect.dispatchEvent(new Event('change'));
+            [cite_start]state.selectedServiceForAppointment = service; [cite: 683]
+            [cite_start]document.getElementById('appointment-service-search').value = service.name; [cite: 683]
+            [cite_start]const categorySelect = document.getElementById('appointment-category'); [cite: 683]
+            [cite_start]categorySelect.value = service.categoryId; [cite: 684]
+            [cite_start]categorySelect.dispatchEvent(new Event('change')); [cite: 684]
             setTimeout(() => {
-                document.getElementById('appointment-master').value = appointmentToEdit.masterId;
+                [cite_start]document.getElementById('appointment-master').value = appointmentToEdit.masterId; [cite: 684]
                 if (appointmentToEdit.salonId) {
-                    document.getElementById('appointment-salon').value = appointmentToEdit.salonId;
+                    [cite_start]document.getElementById('appointment-salon').value = appointmentToEdit.salonId; [cite: 684]
                 }
-                updateFinalPrice();
+                [cite_start]updateFinalPrice(); [cite: 685]
             }, 100);
         }
     } else if (!isEditMode && state.selectedClientForAppointment) {
-        const clientSearchInput = document.getElementById('client-search-input');
-        const clientPhoneInput = document.getElementById('client-phone-input');
-        const clientPhoneGroup = document.getElementById('client-phone-group');
-        clientSearchInput.value = state.selectedClientForAppointment.name;
-        clientSearchInput.disabled = true;
-        clientPhoneInput.value = state.selectedClientForAppointment.phone || '';
-        clientPhoneGroup.style.display = 'block';
+        [cite_start]const clientSearchInput = document.getElementById('client-search-input'); [cite: 686]
+        [cite_start]const clientPhoneInput = document.getElementById('client-phone-input'); [cite: 687]
+        [cite_start]const clientPhoneGroup = document.getElementById('client-phone-group'); [cite: 687]
+        [cite_start]clientSearchInput.value = state.selectedClientForAppointment.name; [cite: 687]
+        [cite_start]clientSearchInput.disabled = true; [cite: 687]
+        clientPhoneInput.value = state.selectedClientForAppointment.phone || [cite_start]''; [cite: 687]
+        [cite_start]clientPhoneGroup.style.display = 'block'; [cite: 688]
     } else if (state.preselectedAppointment) {
-        const { dateTime, masterId } = state.preselectedAppointment;
-        const d = new Date(dateTime.getTime() - (dateTime.getTimezoneOffset() * 60000));
-        document.getElementById('appointment-datetime').value = d.toISOString().slice(0, 16);
+        [cite_start]const { dateTime, masterId } = state.preselectedAppointment; [cite: 688]
+        [cite_start]const d = new Date(dateTime.getTime() - (dateTime.getTimezoneOffset() * 60000)); [cite: 689]
+        [cite_start]document.getElementById('appointment-datetime').value = d.toISOString().slice(0, 16); [cite: 689]
         if (masterId) {
-            const master = state.masters.find(m => m.id === masterId);
-            const firstCategoryId = master?.categoryIds?.[0];
+            [cite_start]const master = state.masters.find(m => m.id === masterId); [cite: 690]
+            [cite_start]const firstCategoryId = master?.categoryIds?.[0]; [cite: 691]
             if (firstCategoryId) {
-                const categorySelect = document.getElementById('appointment-category');
-                categorySelect.value = firstCategoryId;
-                categorySelect.dispatchEvent(new Event('change'));
+                [cite_start]const categorySelect = document.getElementById('appointment-category'); [cite: 691]
+                [cite_start]categorySelect.value = firstCategoryId; [cite: 692]
+                [cite_start]categorySelect.dispatchEvent(new Event('change')); [cite: 692]
                 setTimeout(() => {
-                    document.getElementById('appointment-master').value = masterId;
+                    [cite_start]document.getElementById('appointment-master').value = masterId; [cite: 692]
                 }, 100);
             }
         }
-        state.preselectedAppointment = null;
-    } else {
-        const dateFilter = document.getElementById('appointments-date-filter');
-        dateFilter.valueAsDate = state.appointmentsListDate;
+        [cite_start]state.preselectedAppointment = null; [cite: 693]
+    } else if (!isEditMode) { // Додано перевірку, щоб цей блок не виконувався в режимі редагування
+        [cite_start]const dateFilter = document.getElementById('appointments-date-filter'); [cite: 694]
+        [cite_start]dateFilter.valueAsDate = state.appointmentsListDate; [cite: 694]
         dateFilter.onchange = () => {
-            state.appointmentsListDate = dateFilter.valueAsDate;
-            state.appointmentsPage = 1;
-            renderDailyAppointmentsList();
+            [cite_start]state.appointmentsListDate = dateFilter.valueAsDate; [cite: 695]
+            [cite_start]state.appointmentsPage = 1; [cite: 696]
+            [cite_start]renderDailyAppointmentsList(); [cite: 696]
         };
-        renderDailyAppointmentsList();
+        [cite_start]renderDailyAppointmentsList(); [cite: 696]
     }
 }
 
@@ -2244,99 +1936,107 @@
     }
 
     async function handleSaveAppointment(event) {
-        event.preventDefault();
-        const isEditMode = !!state.editingAppointmentId;
-        const isInternal = document.getElementById('internal-service-checkbox').checked;
-        const service = state.selectedServiceForAppointment;
-        const masterId = document.getElementById('appointment-master').value;
-        const dateTimeString = document.getElementById('appointment-datetime').value;
-        const salonId = document.getElementById('appointment-salon').value;
-        
-        if (!service || !masterId || !dateTimeString || !salonId) {
-            return showNotification("Будь ласка, заповніть усі поля, включно з послугою та салоном.", "error");
-        }
-
-        const master = state.masters.find(m => m.id === masterId);
-        if (!master) {
-            return showNotification("Помилка: не знайдено майстра!", "error");
-        }
-
-        const priceModifier = master.priceModifier || 0;
-        const salaryBase = service.price * (1 + priceModifier / 100);
-        const finalPrice = updateFinalPrice();
-        const additionalChargeAmount = parseFloat(document.getElementById('additional-charge-amount').value) || 0;
-        const additionalChargeDescription = document.getElementById('additional-charge-description').value.trim();
-        
-        let appointmentData = { 
-            dateTime: Timestamp.fromDate(new Date(dateTimeString)), 
-            serviceId: service.id, 
-            masterId, 
-            salonId, 
-            duration: service.duration || 60, 
-            manualDiscount: { value: parseFloat(document.getElementById('manual-discount-value').value) || 0, type: document.getElementById('manual-discount-type').value }, 
-            additionalCharge: { amount: additionalChargeAmount, description: additionalChargeDescription }, 
-            finalPrice, 
-            salaryBase, 
-            isInternal: isInternal 
-        };
-        let logDetails = { service: service.name, master: master.name };
-
-        try {
-            if (isInternal) {
-                const receivingMasterId = document.getElementById('master-as-client-select').value;
-                if (!receivingMasterId) { return showNotification("Будь ласка, оберіть майстра-клієнта.", "error"); }
-                if (receivingMasterId === masterId) { return showNotification("Майстер не може надавати послугу самому собі.", "error"); }
-                const receivingMaster = state.masters.find(m => m.id === receivingMasterId);
-                appointmentData.clientId = receivingMasterId;
-                appointmentData.clientName = `${receivingMaster.name} (Майстер)`;
-                logDetails.clientName = appointmentData.clientName;
-            } else {
-                const clientName = document.getElementById('client-search-input').value.trim();
-                logDetails.clientName = clientName;
-                let clientId;
-                let clientPhone = document.getElementById('client-phone-input').value.trim();
-                if (state.selectedClientForAppointment) {
-                    clientId = state.selectedClientForAppointment.id;
-                } else {
-                    if (!clientPhone) return showNotification("Для нового клієнта необхідно вказати номер телефону.", "error");
-                    const normalizedPhone = clientPhone.replace(/[\s-()]/g, '');
-                    const existingClient = state.clients.find(c => c.name.toLowerCase() === clientName.toLowerCase() && c.phone.replace(/[\s-()]/g, '') === normalizedPhone);
-                    if (existingClient) { clientId = existingClient.id; } 
-                    else {
-                         const newClientAction = () => addDoc(collection(db, 'clients'), { name: clientName, phone: clientPhone, createdAt: Timestamp.now() });
-                         const newClientRef = await logAndExecute('Створено клієнта', { name: clientName, phone: clientPhone }, newClientAction);
-                         clientId = newClientRef.id;
-                    }
-                }
-                appointmentData.clientId = clientId;
-                appointmentData.clientName = clientName;
-            }
-
-            if (isEditMode) {
-                const action = () => updateDoc(doc(db, 'appointments', state.editingAppointmentId), appointmentData);
-                await logAndExecute('Оновлено запис', { ...logDetails, appointmentId: state.editingAppointmentId }, action);
-                showNotification('Запис успішно оновлено!');
-                state.editingAppointmentId = null;
-                renderView('calendar');
-            } else {
-                const fullAppointmentData = { ...appointmentData, status: 'upcoming', totalPaid: 0, payments: [], createdAt: Timestamp.now() };
-                const createAppAction = () => addDoc(collection(db, 'appointments'), fullAppointmentData);
-                await logAndExecute('Створено запис', logDetails, createAppAction);
-                showNotification('Запис успішно створено!');
-                event.target.reset();
-                state.selectedClientForAppointment = null;
-                state.selectedServiceForAppointment = null;
-                document.getElementById('internal-service-checkbox').checked = false;
-                document.getElementById('internal-service-checkbox').dispatchEvent(new Event('change'));
-                const clientSearchInput = document.getElementById('client-search-input');
-                if(clientSearchInput) clientSearchInput.disabled = false;
-                document.getElementById('client-phone-group').style.display = 'none';
-                updateFinalPrice();
-            }
-        } catch (e) {
-            showNotification('Не вдалося зберегти запис.', "error");
-        }
+    event.preventDefault();
+    
+    // --- ВИПРАВЛЕННЯ: Додано перевірку ролі користувача на самому початку ---
+    const isEditMode = !!state.editingAppointmentId;
+    if (!isEditMode && state.user.role !== 'admin' && state.user.role !== 'salon_admin') {
+        showNotification("У вас недостатньо прав для створення запису.", "error");
+        return; // Зупиняємо функцію
     }
+    // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
+
+    const isInternal = document.getElementById('internal-service-checkbox').checked;
+    const service = state.selectedServiceForAppointment;
+    const masterId = document.getElementById('appointment-master').value;
+    const dateTimeString = document.getElementById('appointment-datetime').value;
+    const salonId = document.getElementById('appointment-salon').value;
+    
+    if (!service || !masterId || !dateTimeString || !salonId) {
+        [cite_start]return showNotification("Будь ласка, заповніть усі поля, включно з послугою та салоном.", "error"); [cite: 760, 761]
+    }
+
+    [cite_start]const master = state.masters.find(m => m.id === masterId); [cite: 761]
+    if (!master) {
+        [cite_start]return showNotification("Помилка: не знайдено майстра!", "error"); [cite: 762]
+    }
+
+    const priceModifier = master.priceModifier || [cite_start]0; [cite: 763]
+    [cite_start]const salaryBase = service.price * (1 + priceModifier / 100); [cite: 764]
+    [cite_start]const finalPrice = updateFinalPrice(); [cite: 764]
+    const additionalChargeAmount = parseFloat(document.getElementById('additional-charge-amount').value) || [cite_start]0; [cite: 764]
+    [cite_start]const additionalChargeDescription = document.getElementById('additional-charge-description').value.trim(); [cite: 765]
+    
+    let appointmentData = { 
+        dateTime: Timestamp.fromDate(new Date(dateTimeString)), 
+        serviceId: service.id, 
+        masterId, 
+        salonId, 
+        duration: service.duration || 60, 
+        manualDiscount: { value: parseFloat(document.getElementById('manual-discount-value').value) || 0, type: document.getElementById('manual-discount-type').value }, 
+        additionalCharge: { amount: additionalChargeAmount, description: additionalChargeDescription }, 
+        finalPrice, 
+        salaryBase, 
+        isInternal: isInternal 
+    [cite_start]}; [cite: 765, 766, 767]
+    [cite_start]let logDetails = { service: service.name, master: master.name }; [cite: 768]
+
+    try {
+        if (isInternal) {
+            [cite_start]const receivingMasterId = document.getElementById('master-as-client-select').value; [cite: 768]
+            if (!receivingMasterId) { return showNotification("Будь ласка, оберіть майстра-клієнта.", "error"); [cite_start]} [cite: 769]
+            if (receivingMasterId === masterId) { return showNotification("Майстер не може надавати послугу самому собі.", "error"); [cite_start]} [cite: 769]
+            [cite_start]const receivingMaster = state.masters.find(m => m.id === receivingMasterId); [cite: 770]
+            [cite_start]appointmentData.clientId = receivingMasterId; [cite: 771]
+            [cite_start]appointmentData.clientName = `${receivingMaster.name} (Майстер)`; [cite: 771]
+            [cite_start]logDetails.clientName = appointmentData.clientName; [cite: 771]
+        } else {
+            [cite_start]const clientName = document.getElementById('client-search-input').value.trim(); [cite: 772]
+            [cite_start]logDetails.clientName = clientName; [cite: 773]
+            let clientId;
+            [cite_start]let clientPhone = document.getElementById('client-phone-input').value.trim(); [cite: 773]
+            if (state.selectedClientForAppointment) {
+                [cite_start]clientId = state.selectedClientForAppointment.id; [cite: 773]
+            } else {
+                [cite_start]if (!clientPhone) return showNotification("Для нового клієнта необхідно вказати номер телефону.", "error"); [cite: 774]
+                [cite_start]const normalizedPhone = clientPhone.replace(/[\s-()]/g, ''); [cite: 775]
+                [cite_start]const existingClient = state.clients.find(c => c.name.toLowerCase() === clientName.toLowerCase() && c.phone.replace(/[\s-()]/g, '') === normalizedPhone); [cite: 775]
+                if (existingClient) { clientId = existingClient.id; [cite_start]} [cite: 776]
+                else {
+                     [cite_start]const newClientAction = () => addDoc(collection(db, 'clients'), { name: clientName, phone: clientPhone, createdAt: Timestamp.now() }); [cite: 776]
+                     [cite_start]const newClientRef = await logAndExecute('Створено клієнта', { name: clientName, phone: clientPhone }, newClientAction); [cite: 777]
+                     [cite_start]clientId = newClientRef.id; [cite: 777]
+                }
+            }
+            [cite_start]appointmentData.clientId = clientId; [cite: 778]
+            [cite_start]appointmentData.clientName = clientName; [cite: 779]
+        }
+
+        if (isEditMode) {
+            [cite_start]const action = () => updateDoc(doc(db, 'appointments', state.editingAppointmentId), appointmentData); [cite: 779]
+            [cite_start]await logAndExecute('Оновлено запис', { ...logDetails, appointmentId: state.editingAppointmentId }, action); [cite: 780]
+            [cite_start]showNotification('Запис успішно оновлено!'); [cite: 780]
+            [cite_start]state.editingAppointmentId = null; [cite: 780]
+            [cite_start]renderView('calendar'); [cite: 780]
+        } else {
+            [cite_start]const fullAppointmentData = { ...appointmentData, status: 'upcoming', totalPaid: 0, payments: [], createdAt: Timestamp.now() }; [cite: 781]
+            [cite_start]const createAppAction = () => addDoc(collection(db, 'appointments'), fullAppointmentData); [cite: 782]
+            [cite_start]await logAndExecute('Створено запис', logDetails, createAppAction); [cite: 782]
+            [cite_start]showNotification('Запис успішно створено!'); [cite: 782]
+            [cite_start]event.target.reset(); [cite: 782]
+            [cite_start]state.selectedClientForAppointment = null; [cite: 782]
+            [cite_start]state.selectedServiceForAppointment = null; [cite: 783]
+            [cite_start]document.getElementById('internal-service-checkbox').checked = false; [cite: 783]
+            [cite_start]document.getElementById('internal-service-checkbox').dispatchEvent(new Event('change')); [cite: 783]
+            [cite_start]const clientSearchInput = document.getElementById('client-search-input'); [cite: 783]
+            [cite_start]if(clientSearchInput) clientSearchInput.disabled = false; [cite: 784]
+            [cite_start]document.getElementById('client-phone-group').style.display = 'none'; [cite: 784]
+            [cite_start]updateFinalPrice(); [cite: 784]
+        }
+    } catch (e) {
+        [cite_start]showNotification('Не вдалося зберегти запис.', "error"); [cite: 784]
+    }
+}
      
     async function handleConfirmPayment(event) {
         event.preventDefault();
