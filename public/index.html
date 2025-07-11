@@ -515,8 +515,8 @@
 
                 if (stateKey === 'salonExpenses' || stateKey === 'notepadEntries') {
                     state[stateKey].sort((a, b) => {
-                        const dateA = a.timestamp ? a.timestamp.toDate().getTime() : 0;
-                        const dateB = b.timestamp ? b.timestamp.toDate().getTime() : 0;
+                        const dateA = a.date ? a.date.toDate().getTime() : 0; // Змінено тут
+                        const dateB = b.date ? b.date.toDate().getTime() : 0; // і тут
                         return dateB - dateA;
                     });
                 }
