@@ -97,9 +97,9 @@
 <div id="app"></div>
 
 <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, updatePassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, getDocs, getDoc, Timestamp, query, where, arrayUnion, increment, collectionGroup, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, getDocs, getDoc, Timestamp, setDoc, query, where, arrayUnion, increment, collectionGroup, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
 
     const firebaseConfig = { apiKey: "AIzaSyBoGeREvdgrVSm-S4f3cW0HyB7Us9yh_us", authDomain: "bykalancha.firebaseapp.com", projectId: "bykalancha", storageBucket: "bykalancha.appspot.com", messagingSenderId: "196166318613", appId: "1:196166318613:web:0067f9de531e290e43ec1c", measurementId: "G-V72ECFLKFE" };
@@ -109,163 +109,362 @@
     const functions = getFunctions(app, 'europe-central2');
     const appContainer = document.getElementById('app');
 
-let state = {
-    user: null, salons: [], expenses: [], salonExpenses: [], productSales: [], 
-    salaryGroups: [], notepadEntries: [], staff: [], auditLog: [], selectedCategoryId: null,
-    categories: [], services: [], masters: [], appointments: [], clients: [],
-    currentView: 'calendar', preselectedAppointment: null, calendarSelectedMasterId: 'all',
-    calendarSelectedSalonId: 'all', editingAppointmentId: null, selectedClientForAppointment: null,
-    selectedServiceForAppointment: null, viewingClientId: null, viewingMasterId: null,
-    viewingMasterAdvances: [], viewingStaffId: null, viewingStaffBonuses: [],
-    viewingStaffAdvances: [], staffPayouts: [], appointmentsPage: 1, appointmentsListDate: new Date(),
-};
+    let state = {
+        user: null, salons: [], expenses: [], salonExpenses: [], productSales: [], 
+        salaryGroups: [], notepadEntries: [], staff: [], auditLog: [], selectedCategoryId: null,
+        categories: [], services: [], masters: [], appointments: [], clients: [],
+        currentView: 'calendar', preselectedAppointment: null, calendarSelectedMasterId: 'all',
+        calendarSelectedSalonId: 'all', editingAppointmentId: null, selectedClientForAppointment: null,
+        selectedServiceForAppointment: null, viewingClientId: null, viewingMasterId: null,
+        viewingMasterAdvances: [], viewingStaffId: null, viewingStaffBonuses: [],
+        viewingStaffAdvances: [], staffPayouts: [], appointmentsPage: 1, appointmentsListDate: new Date(),
+    };
 
-// --- ПОЧАТОК ВИПРАВЛЕННЯ: Відновлюємо всі потрібні змінні ---
     let listenersAreActive = false;
     let masterAdvancesUnsubscribe = null;
     let staffSubcollectionUnsubscribers = [];
     let mainUnsubscribers = [];
-// --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
+    
+    // #region UI Helper Functions (Notifications & Confirmations)
+    function showNotification(message, type = 'success') {
+        const toast = document.getElementById('notification-toast');
+        if (!toast) return;
+        const messageEl = document.getElementById('notification-message');
+        
+        messageEl.textContent = message;
+        toast.style.backgroundColor = type === 'success' ? 'var(--success-color)' : 'var(--danger-color)';
+        toast.style.display = 'block';
+        setTimeout(() => toast.style.opacity = 1, 10);
+        
+        setTimeout(() => {
+            toast.style.opacity = 0;
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 500);
+        }, 3000);
+    }
 
-    // ... (код для showNotification, showConfirmModal, showConfirmWithReasonModal)
+    function showConfirmModal(message, onConfirm) {
+        const confirmModal = document.getElementById('confirm-modal');
+        if (!confirmModal) return;
+        
+        const messageEl = document.getElementById('confirm-modal-message');
+        const confirmBtn = document.getElementById('confirm-modal-confirm-btn');
+        const cancelBtn = document.getElementById('confirm-modal-cancel-btn');
+        
+        messageEl.textContent = message;
+        const newConfirmBtn = confirmBtn.cloneNode(true);
+        confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+        
+        const hideModal = () => {
+            confirmModal.style.display = 'none';
+        };
 
-    async function handleLogin(e) { e.preventDefault(); /* ... */ }
+        newConfirmBtn.onclick = () => {
+            hideModal();
+            onConfirm();
+        };
+        cancelBtn.onclick = hideModal;
+        
+        confirmModal.style.display = 'flex';
+    }
+
+    function showConfirmWithReasonModal(message, onConfirm) {
+        const modal = document.getElementById('confirm-reason-modal');
+        if (!modal) return;
+        
+        const messageEl = document.getElementById('confirm-reason-modal-message');
+        const confirmBtn = document.getElementById('confirm-reason-modal-confirm-btn');
+        const cancelBtn = document.getElementById('confirm-reason-modal-cancel-btn');
+        const reasonInput = document.getElementById('confirm-reason-input');
+        messageEl.textContent = message;
+        reasonInput.value = ''; 
+        
+        const newConfirmBtn = confirmBtn.cloneNode(true);
+        confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+        const hideModal = () => {
+            modal.style.display = 'none';
+        };
+
+        newConfirmBtn.onclick = () => {
+            hideModal();
+            const reason = reasonInput.value.trim();
+            onConfirm(reason); 
+        };
+        
+        cancelBtn.onclick = hideModal;
+        
+        modal.style.display = 'flex';
+    }
+    // #endregion
+
+    async function handleLogin(e) { 
+        e.preventDefault();
+        const email = document.getElementById('email').value.trim(); 
+        const password = document.getElementById('password').value; 
+        try { 
+            await signInWithEmailAndPassword(auth, email, password);
+        } catch (err) { 
+            document.getElementById('login-error').innerText = "Неправильний email або пароль.";
+        } 
+    }
 
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             if (listenersAreActive) return;
             appContainer.innerHTML = '<h1>Завантаження...</h1>';
-            const userDocSnap = await getDoc(doc(db, "users", user.uid));
+            
+            const userDocRef = doc(db, "users", user.uid);
+            const userDocSnap = await getDoc(userDocRef);
+
             state.user = { 
-                uid: user.uid, email: user.email, 
+                uid: user.uid, 
+                email: user.email, 
                 role: userDocSnap.exists() ? userDocSnap.data().role : 'master',
                 salonId: userDocSnap.exists() ? userDocSnap.data().salonId : null
             };
-            function renderAppLayout(user) {
-    let adminTabs = '';
-    if (user.role === 'admin') {
-        adminTabs = `
-            <li data-view="salary">Звіт по ЗП</li>
-            <li data-view="payouts">Видача ЗП</li> <li data-view="expenses">Загальні витрати</li>
-            <li data-view="settings">Налаштування</li>
-            <li data-view="staff">Персонал</li>
-            <li data-view="auditLog">Журнал дій</li>
-        `;
-    }
 
-    let shopTab = '';
-    if (user.role === 'admin' || user.role === 'salon_admin') {
-        const payoutTabForSalonAdmin = user.role === 'salon_admin' ? '<li data-view="payouts">Видача ЗП</li>' : '';
-        shopTab = `
-            <li data-view="shop">Магазин</li>
-            ${payoutTabForSalonAdmin}
-        `;
-    }
-    
-    const allUserTabs = `
-        <li data-view="salonExpenses">Витрати в салоні</li>
-        <li data-view="notepad">Блокнот</li>
-    `;
-    appContainer.innerHTML = `
-    <div class="crm-layout">
-        <nav class="crm-nav" id="main-nav">
-            <h1>Lashroom CRM</h1>
-            <ul>
-                <li data-view="calendar">Календар</li>
-                <li data-view="appointments">Запис</li>
-                <li data-view="clients">Клієнти</li>
-                <li data-view="services">Послуги</li>
-                <li data-view="masters">Майстри</li>
-                ${shopTab}
-                ${allUserTabs}
-                ${adminTabs}
-            </ul>
-            <div class="user-info">
-                <span>${user.email} (${user.role})</span>
-                <button id="logout-btn" class="btn">Вийти</button>
-            </div>
-        </nav>
-        <main class="crm-main">
-            <header class="crm-header">
-                <h2 id="header-title"></h2>
-            </header>
-            <div class="crm-content">
-                <div class="content-wrapper" id="content-wrapper"></div>
-            </div>
-        </main>
-    </div>`;
+            renderAppLayout(state.user);
+            setupRealtimeListeners();
 
-    document.getElementById('logout-btn').onclick = () => {
-        listenersAreActive = false;
-        if(masterAdvancesUnsubscribe) masterAdvancesUnsubscribe();
-        staffSubcollectionUnsubscribers.forEach(unsub => unsub());
-        staffSubcollectionUnsubscribers = [];
-        signOut(auth);
-    };
+        } else {
+            mainUnsubscribers.forEach(unsub => unsub());
+            mainUnsubscribers = [];
 
-    document.getElementById('main-nav').onclick = (event) => {
-        const target = event.target.closest('li');
-        if (target) {
-            renderView(target.dataset.view);
+            if(masterAdvancesUnsubscribe) masterAdvancesUnsubscribe();
+            staffSubcollectionUnsubscribers.forEach(unsub => unsub());
+            staffSubcollectionUnsubscribers = [];
+
+            listenersAreActive = false;
+            renderLoginView();
         }
-    };
+    });
 
-    const paymentModal = document.getElementById('payment-modal');
-    if (paymentModal) {
-        paymentModal.querySelector('.close-btn').onclick = () => {
-            paymentModal.style.display = 'none';
+    function setupRealtimeListeners() {
+        if (listenersAreActive) return;
+        
+        mainUnsubscribers.forEach(unsub => unsub());
+        mainUnsubscribers = [];
+
+        const collections = { 
+            salons: 'salons',
+            categories: 'serviceCategories', 
+            services: 'services', 
+            masters: 'masters',
+            appointments: 'appointments', 
+            clients: 'clients',
+            expenses: 'expenses',
+            salonExpenses: 'salonExpenses',
+            notepadEntries: 'notepadEntries',
+            productSales: 'productSales',
+            staff: 'staff',
+            auditLog: 'auditLog',
+            salaryGroups: 'salaryGroups'
         };
+        const userRole = state.user.role;
+        const userSalonId = state.user.salonId;
+        
+        Object.entries(collections).forEach(([stateKey, colName]) => {
+            if ((colName === 'expenses' || colName === 'auditLog' || colName === 'salaryGroups') && userRole !== 'admin') {
+                return;
+            }
+
+            let q;
+            let baseQuery = collection(db, colName);
+            const collectionsToFilterBySalon = ['appointments', 'salonExpenses', 'productSales', 'staff'];
+
+            if (userRole === 'salon_admin') {
+                if (collectionsToFilterBySalon.includes(colName)) {
+                    q = query(baseQuery, where("salonId", "==", userSalonId));
+                } else if (colName === 'masters') {
+                    q = query(baseQuery, where("salonIds", "array-contains", userSalonId));
+                } else {
+                    q = query(baseQuery);
+                }
+            } else {
+                q = query(baseQuery);
+            }
+            
+            if (colName === 'appointments') {
+                 q = query(q, orderBy("dateTime", "desc"));
+            }
+
+            const unsubscribe = onSnapshot(q, snapshot => {
+                let docs = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
+                
+                if (['auditLog', 'expenses', 'productSales', 'salonExpenses', 'notepadEntries'].includes(colName)) {
+                   docs.sort((a, b) => {
+                        const timeA = (a.timestamp || a.date)?.toDate().getTime() || 0;
+                        const timeB = (b.timestamp || b.date)?.toDate().getTime() || 0;
+                        return timeB - timeA;
+                    });
+                }
+                
+                state[stateKey] = docs;
+                
+                if (['categories', 'masters', 'clients', 'staff', 'salons'].includes(stateKey)) {
+                    state[stateKey].sort((a,b) => a.name.localeCompare(b.name));
+                }
+
+                if (state.user) {
+                    renderView(state.currentView);
+                }
+            }, error => {
+                console.error(`Error fetching ${colName}:`, error);
+            });
+
+            mainUnsubscribers.push(unsubscribe);
+        });
+        
+        listenersAreActive = true;
     }
 
-    const paymentForm = document.getElementById('payment-form');
-    if (paymentForm) {
-        paymentForm.onsubmit = handleConfirmPayment;
+    // #region Core App Logic & Audit
+    async function logAndExecute(action, details, operationFn) {
+        try {
+            const operationResult = await operationFn();
+            await addDoc(collection(db, 'auditLog'), {
+                action: action,
+                details: details,
+                userEmail: state.user.email,
+                timestamp: Timestamp.now()
+            });
+            return operationResult;
+        } catch (error) {
+            console.error(`Error during logged action "${action}":`, error);
+            throw error;
+        }
     }
 
-    const payoutHistoryModal = document.getElementById('payout-history-modal');
-    if (payoutHistoryModal) {
-        payoutHistoryModal.querySelector('.close-btn').onclick = () => {
-            payoutHistoryModal.style.display = 'none';
-        };
+    function renderLoginView() {
+        appContainer.innerHTML = `<div class="auth-bg"><div class="auth-card"><h1>Вхід у CRM</h1><div id="login-error" class="error-msg"></div><input id="email" type="email" placeholder="Email" autocomplete="username" autofocus><input id="password" type="password" placeholder="Пароль" autocomplete="current-password"><button id="login-btn">Увійти</button></div></div>`;
+        document.getElementById('login-btn').onclick = handleLogin;
     }
 
-    const salaryGroupModal = document.getElementById('salary-group-modal');
-    if (salaryGroupModal) {
-        salaryGroupModal.querySelector('.close-btn').onclick = () => {
-            salaryGroupModal.style.display = 'none';
+    function renderAppLayout(user) {
+        let adminTabs = '';
+        if (user.role === 'admin') {
+            adminTabs = `
+                <li data-view="salary">Звіт по ЗП</li>
+                <li data-view="payouts">Видача ЗП</li> <li data-view="expenses">Загальні витрати</li>
+                <li data-view="settings">Налаштування</li>
+                <li data-view="staff">Персонал</li>
+                <li data-view="auditLog">Журнал дій</li>
+            `;
+        }
+
+        let shopTab = '';
+        if (user.role === 'admin' || user.role === 'salon_admin') {
+            const payoutTabForSalonAdmin = user.role === 'salon_admin' ? '<li data-view="payouts">Видача ЗП</li>' : '';
+            shopTab = `
+                <li data-view="shop">Магазин</li>
+                ${payoutTabForSalonAdmin}
+            `;
+        }
+        
+        const allUserTabs = `
+            <li data-view="salonExpenses">Витрати в салоні</li>
+            <li data-view="notepad">Блокнот</li>
+        `;
+        appContainer.innerHTML = `
+        <div class="crm-layout">
+            <nav class="crm-nav" id="main-nav">
+                <h1>Lashroom CRM</h1>
+                <ul>
+                    <li data-view="calendar">Календар</li>
+                    <li data-view="appointments">Запис</li>
+                    <li data-view="clients">Клієнти</li>
+                    <li data-view="services">Послуги</li>
+                    <li data-view="masters">Майстри</li>
+                    ${shopTab}
+                    ${allUserTabs}
+                    ${adminTabs}
+                </ul>
+                <div class="user-info">
+                    <span>${user.email} (${user.role})</span>
+                    <button id="logout-btn" class="btn">Вийти</button>
+                </div>
+            </nav>
+            <main class="crm-main">
+                <header class="crm-header">
+                    <h2 id="header-title"></h2>
+                </header>
+                <div class="crm-content">
+                    <div class="content-wrapper" id="content-wrapper"></div>
+                </div>
+            </main>
+        </div>`;
+
+        document.getElementById('logout-btn').onclick = () => {
+            listenersAreActive = false;
+            if(masterAdvancesUnsubscribe) masterAdvancesUnsubscribe();
+            staffSubcollectionUnsubscribers.forEach(unsub => unsub());
+            staffSubcollectionUnsubscribers = [];
+            signOut(auth);
         };
-    }
-    
-    const actionModal = document.getElementById('appointment-action-modal');
-    if (actionModal) {
-        actionModal.querySelector('.close-btn').onclick = () => {
-            actionModal.style.display = 'none';
+
+        document.getElementById('main-nav').onclick = (event) => {
+            const target = event.target.closest('li');
+            if (target) {
+                renderView(target.dataset.view);
+            }
         };
-    }
-    
-    const editPaymentsModal = document.getElementById('edit-payments-modal');
-    if (editPaymentsModal) {
-        editPaymentsModal.querySelector('.close-btn').onclick = () => {
-            editPaymentsModal.style.display = 'none';
-        };
-        const cancelBtn = document.getElementById('cancel-edit-payments-btn');
-        if(cancelBtn) {
-            cancelBtn.onclick = () => {
-                editPaymentsModal.style.display = 'none';
+
+        const paymentModal = document.getElementById('payment-modal');
+        if (paymentModal) {
+            paymentModal.querySelector('.close-btn').onclick = () => {
+                paymentModal.style.display = 'none';
             };
         }
-        const editForm = document.getElementById('edit-payments-form');
-        if(editForm) {
-            editForm.onsubmit = handleUpdatePayments;
-        }
-    }
 
-    renderView(state.currentView);
-}
+        const paymentForm = document.getElementById('payment-form');
+        if (paymentForm) {
+            paymentForm.onsubmit = handleConfirmPayment;
+        }
+
+        const payoutHistoryModal = document.getElementById('payout-history-modal');
+        if (payoutHistoryModal) {
+            payoutHistoryModal.querySelector('.close-btn').onclick = () => {
+                payoutHistoryModal.style.display = 'none';
+            };
+        }
+
+        const salaryGroupModal = document.getElementById('salary-group-modal');
+        if (salaryGroupModal) {
+            salaryGroupModal.querySelector('.close-btn').onclick = () => {
+                salaryGroupModal.style.display = 'none';
+            };
+        }
+        
+        const actionModal = document.getElementById('appointment-action-modal');
+        if (actionModal) {
+            actionModal.querySelector('.close-btn').onclick = () => {
+                actionModal.style.display = 'none';
+            };
+        }
+        
+        const editPaymentsModal = document.getElementById('edit-payments-modal');
+        if (editPaymentsModal) {
+            editPaymentsModal.querySelector('.close-btn').onclick = () => {
+                editPaymentsModal.style.display = 'none';
+            };
+            const cancelBtn = document.getElementById('cancel-edit-payments-btn');
+            if(cancelBtn) {
+                cancelBtn.onclick = () => {
+                    editPaymentsModal.style.display = 'none';
+                };
+            }
+            const editForm = document.getElementById('edit-payments-form');
+            if(editForm) {
+                editForm.onsubmit = handleUpdatePayments;
+            }
+        }
+
+        renderView(state.currentView);
+    }
 
     function renderView(viewName) {
         if (!state.user) return;
-        
         const masterViews = ['calendar', 'appointments', 'notepad', 'salonExpenses'];
         if (state.user.role === 'master' && !masterViews.includes(viewName)) {
              viewName = 'calendar';
@@ -273,10 +472,9 @@ let state = {
         
         const salonAdminForbiddenViews = ['settings', 'salary', 'expenses', 'staff', 'auditLog'];
         if (state.user.role === 'salon_admin' && salonAdminForbiddenViews.includes(viewName)) {
-             // salon_admin може бачити 'payouts'
              if(viewName !== 'payouts') {
                 viewName = 'calendar';
-             }
+            }
         }
 
         if (state.currentView === 'appointments' && viewName !== 'appointments') {
@@ -315,7 +513,6 @@ let state = {
         
         const contentWrapper = document.getElementById('content-wrapper');
         if(!contentWrapper) return;
-
         switch (viewName) {
             case 'calendar': renderCalendarView(contentWrapper); break;
             case 'appointments': renderAppointmentsView(contentWrapper); break;
@@ -325,7 +522,7 @@ let state = {
             case 'masters': renderMastersView(contentWrapper); break;
             case 'masterDetail': renderMasterDetailView(contentWrapper); break;
             case 'salary': renderSalaryView(contentWrapper); break;
-            case 'payouts': renderPayoutsView(contentWrapper); break; // [НОВА ФІШКА: Видача ЗП]
+            case 'payouts': renderPayoutsView(contentWrapper); break;
             case 'expenses': renderExpensesView(contentWrapper); break;
             case 'salonExpenses': renderSalonExpensesView(contentWrapper); break;
             case 'notepad': renderNotepadView(contentWrapper); break;
@@ -340,13 +537,11 @@ let state = {
     }
     // #endregion
 
-    // [НОВА ФІШКА: Видача ЗП] - Весь новий блок логіки для видачі зарплати
     // #region Payouts View
     function renderPayoutsView(container) {
         const today = new Date();
         const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
         const todayStr = today.toISOString().split('T')[0];
-
         container.innerHTML = `
             <div class="content-card">
                 <h2>Керування видачею зарплати</h2>
@@ -381,15 +576,11 @@ let state = {
         container.innerHTML = '<p>Розрахунок... Це може зайняти деякий час.</p>';
         const startDate = document.getElementById('payout-start-date').value;
         const endDate = document.getElementById('payout-end-date').value;
-        
         if (!startDate || !endDate) {
             return showNotification("Будь ласка, оберіть період.", "error");
         }
 
         try {
-            // Крок 1: Отримуємо нараховані суми, використовуючи існуючу хмарну функцію.
-            // Примітка: Це не ідеально, тому що ми парсимо текст. В майбутньому краще створити
-            // окрему функцію, яка повертатиме JSON.
             const generateReport = httpsCallable(functions, 'generateAndSendReport');
             const result = await generateReport({ startDate, endDate, salonId: 'all', isManualCalculation: true });
             const reportText = result.data.reportBody;
@@ -410,8 +601,6 @@ let state = {
                     masterAccruals[name] = salaryFromBase + bonus;
                 }
             });
-
-            // Крок 2: Отримуємо дані про вже здійснені виплати для кожного майстра
             let html = '';
             const activeMasters = state.masters.filter(m => !m.isFrozen);
 
@@ -428,7 +617,6 @@ let state = {
                 querySnapshot.forEach(doc => {
                     alreadyPaid += doc.data().amount;
                 });
-                
                 const balance = accruedTotal - alreadyPaid;
 
                 html += `
@@ -476,11 +664,10 @@ let state = {
         const cardElement = document.querySelector(`.btn-issue-payout[data-master-id="${masterId}"]`).closest('.payout-card');
         const amountInput = cardElement.querySelector('.payout-amount-input');
         const amount = parseFloat(amountInput.value);
-
         if (isNaN(amount) || amount <= 0) {
             return showNotification("Введіть коректну суму.", "error");
         }
-        if (amount > parseFloat(balance) + 0.01) { // 0.01 для врахування похибки float
+        if (amount > parseFloat(balance) + 0.01) { 
             return showNotification("Сума видачі не може перевищувати залишок.", "error");
         }
 
@@ -491,14 +678,10 @@ let state = {
             periodEnd: periodEnd,
             authorEmail: state.user.email
         };
-
-        // Використовуємо транзакцію для надійності, хоча в даному випадку це просто додавання
-        // одного документа. Це стає критично, якщо потрібно оновлювати інші документи одночасно.
         const action = () => addDoc(collection(db, 'masters', masterId, 'payouts'), payoutData);
         try {
             await logAndExecute('Видача зарплати', { masterName: masterName, amount: amount, period: `${periodStart} - ${periodEnd}` }, action);
             showNotification(`Суму ${amount.toFixed(2)} zł видано майстру ${masterName}.`, 'success');
-            // Оновлюємо дані, повторно викликавши розрахунок
             document.getElementById('calculate-payouts-form').dispatchEvent(new Event('submit', { cancelable: true }));
         } catch (e) {
             showNotification('Не вдалося провести виплату.', 'error');
@@ -568,7 +751,6 @@ let state = {
                     </div>
                 </li>`;
         }).join('');
-
         container.innerHTML = `
             <div class="content-card">
                 <h2>Додати співробітника</h2>
@@ -600,7 +782,6 @@ let state = {
                 </ul>
             </div>
         `;
-
         document.getElementById('add-staff-form').onsubmit = handleAddStaff;
         document.getElementById('staff-list').onclick = (e) => {
             const item = e.target.closest('.staff-member-item');
@@ -627,7 +808,6 @@ let state = {
             salonId,
             isFrozen: false
         });
-
         try {
             await logAndExecute('Створено співробітника', { name, salary: fixedSalary }, action);
             event.target.reset();
@@ -637,174 +817,162 @@ let state = {
     }
 
     function renderStaffDetailView(container) {
-    const staffId = state.viewingStaffId;
-    const person = state.staff.find(p => p.id === staffId);
+        const staffId = state.viewingStaffId;
+        const person = state.staff.find(p => p.id === staffId);
 
-    if (!person) {
-        container.innerHTML = `<div class="content-card"><h2>Співробітника не знайдено</h2></div>`;
-        return;
-    }
+        if (!person) {
+            container.innerHTML = `<div class="content-card"><h2>Співробітника не знайдено</h2></div>`;
+            return;
+        }
 
-    const salonOptions = state.salons.map(s => `<option value="${s.id}" ${person.salonId === s.id ? 'selected' : ''}>${s.name}</option>`).join('');
-
-    container.innerHTML = `
-        <div class="content-card">
-            <button id="back-to-staff-list" class="btn" style="margin-bottom: 1rem;">&larr; Назад до списку</button>
-            <h2>Редагувати: ${person.name}</h2>
-            <form id="edit-staff-form">
-                <input type="hidden" id="edit-staff-id" value="${person.id}">
-                <div class="form-group">
-                    <label for="edit-staff-name">Ім'я</label>
-                    <input type="text" id="edit-staff-name" value="${person.name}" required>
-                </div>
-                <div class="form-row">
-                    <div class="form-group" style="flex:1;">
-                        <label for="edit-staff-salary">Фіксована ставка (zł/міс)</label>
-                        <input type="number" id="edit-staff-salary" value="${person.fixedSalary || 0}" required min="0">
-                    </div>
-                    <div class="form-group" style="flex:1;">
-                        <label for="edit-staff-salon">Салон</label>
-                        <select id="edit-staff-salon" required>${salonOptions}</select>
-                    </div>
-                </div>
-                <div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem;">
-                    <label><input type="checkbox" id="edit-staff-frozen" ${person.isFrozen ? 'checked' : ''}> Заморозити співробітника</label>
-                </div>
-                <button type="submit" class="btn">Зберегти зміни</button>
-                <button type="button" id="delete-staff-btn" class="btn btn-delete" style="margin-left: 1rem;">Видалити</button>
-            </form>
-        </div>
-        <div class="services-layout" style="margin-top: 2rem; grid-template-columns: 350px 1fr; ">
+        const salonOptions = state.salons.map(s => `<option value="${s.id}" ${person.salonId === s.id ? 'selected' : ''}>${s.name}</option>`).join('');
+        container.innerHTML = `
             <div class="content-card">
-                <h3>Операції з зарплатою</h3>
-                <form id="add-payment-form" class="form-group">
+                <button id="back-to-staff-list" class="btn" style="margin-bottom: 1rem;">&larr; Назад до списку</button>
+                <h2>Редагувати: ${person.name}</h2>
+                <form id="edit-staff-form">
+                    <input type="hidden" id="edit-staff-id" value="${person.id}">
                     <div class="form-group">
-                        <label for="payment-type">Тип</label>
-                        <select id="payment-type">
-                            <option value="payout">Нарахувати ЗП</option>
-                            <option value="advance">Аванс</option>
-                            <option value="bonus">Премія</option>
-                        </select>
+                        <label for="edit-staff-name">Ім'я</label>
+                        <input type="text" id="edit-staff-name" value="${person.name}" required>
                     </div>
-                    <div class="form-group" id="payout-period-group">
-                        <label for="payout-period">Період (Місяць та Рік)</label>
-                        <input type="month" id="payout-period">
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1;">
+                            <label for="edit-staff-salary">Фіксована ставка (zł/міс)</label>
+                            <input type="number" id="edit-staff-salary" value="${person.fixedSalary || 0}" required min="0">
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label for="edit-staff-salon">Салон</label>
+                            <select id="edit-staff-salon" required>${salonOptions}</select>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="payment-amount">Сума (zł)</label>
-                        <input type="number" id="payment-amount" required min="1">
+                    <div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem;">
+                        <label><input type="checkbox" id="edit-staff-frozen" ${person.isFrozen ? 'checked' : ''}> Заморозити співробітника</label>
                     </div>
-                    <div class="form-group" id="payment-description-group" style="display:none;">
-                        <label for="payment-description">Опис</label>
-                        <textarea id="payment-description" rows="2"></textarea>
-                    </div>
-                    <button type="submit" class="btn">Провести операцію</button>
+                    <button type="submit" class="btn">Зберегти зміни</button>
+                    <button type="button" id="delete-staff-btn" class="btn btn-delete" style="margin-left: 1rem;">Видалити</button>
                 </form>
             </div>
-            <div id="history-container">
+            <div class="services-layout" style="margin-top: 2rem; grid-template-columns: 350px 1fr; ">
                 <div class="content-card">
-                    <h3>Історія нарахувань та виплат</h3>
-                    <ul id="payouts-history-list" class="item-list"><li>Завантаження...</li></ul>
+                    <h3>Операції з зарплатою</h3>
+                    <form id="add-payment-form" class="form-group">
+                        <div class="form-group">
+                            <label for="payment-type">Тип</label>
+                            <select id="payment-type">
+                                <option value="payout">Нарахувати ЗП</option>
+                                <option value="advance">Аванс</option>
+                                <option value="bonus">Премія</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="payout-period-group">
+                            <label for="payout-period">Період (Місяць та Рік)</label>
+                            <input type="month" id="payout-period">
+                        </div>
+                        <div class="form-group">
+                            <label for="payment-amount">Сума (zł)</label>
+                            <input type="number" id="payment-amount" required min="1">
+                        </div>
+                        <div class="form-group" id="payment-description-group" style="display:none;">
+                            <label for="payment-description">Опис</label>
+                            <textarea id="payment-description" rows="2"></textarea>
+                        </div>
+                        <button type="submit" class="btn">Провести операцію</button>
+                    </form>
+                </div>
+                <div id="history-container">
+                    <div class="content-card">
+                        <h3>Історія нарахувань та виплат</h3>
+                        <ul id="payouts-history-list" class="item-list"><li>Завантаження...</li></ul>
+                    </div>
                 </div>
             </div>
-        </div>
-    `;
+        `;
 
-    document.getElementById('back-to-staff-list').onclick = () => renderView('staff');
-    document.getElementById('edit-staff-form').onsubmit = handleUpdateStaff;
-    document.getElementById('delete-staff-btn').onclick = () => handleDeleteStaff(person.id, person.name);
-    const paymentTypeSelect = document.getElementById('payment-type');
-    const payoutPeriodGroup = document.getElementById('payout-period-group');
-    const paymentDescriptionGroup = document.getElementById('payment-description-group');
-    const paymentAmountInput = document.getElementById('payment-amount');
+        document.getElementById('back-to-staff-list').onclick = () => renderView('staff');
+        document.getElementById('edit-staff-form').onsubmit = handleUpdateStaff;
+        document.getElementById('delete-staff-btn').onclick = () => handleDeleteStaff(person.id, person.name);
+        const paymentTypeSelect = document.getElementById('payment-type');
+        const payoutPeriodGroup = document.getElementById('payout-period-group');
+        const paymentDescriptionGroup = document.getElementById('payment-description-group');
+        const paymentAmountInput = document.getElementById('payment-amount');
 
-    paymentTypeSelect.onchange = (e) => {
-        const isPayout = e.target.value === 'payout';
-        payoutPeriodGroup.style.display = isPayout ? 'block' : 'none';
-        paymentDescriptionGroup.style.display = isPayout ? 'none' : 'block';
-        paymentAmountInput.readOnly = isPayout;
-        if (isPayout) {
-            paymentAmountInput.value = person.fixedSalary || 0;
-        } else {
-            paymentAmountInput.value = '';
-        }
-    };
-    paymentTypeSelect.dispatchEvent(new Event('change'));
+        paymentTypeSelect.onchange = (e) => {
+            const isPayout = e.target.value === 'payout';
+            payoutPeriodGroup.style.display = isPayout ? 'block' : 'none';
+            paymentDescriptionGroup.style.display = isPayout ? 'none' : 'block';
+            paymentAmountInput.readOnly = isPayout;
+            if (isPayout) {
+                paymentAmountInput.value = person.fixedSalary || 0;
+            } else {
+                paymentAmountInput.value = '';
+            }
+        };
+        paymentTypeSelect.dispatchEvent(new Event('change'));
 
-    document.getElementById('add-payment-form').onsubmit = handleAddStaffPayment;
-    
-    // Очищуємо старі слухачі перед тим, як встановити нові
-    staffSubcollectionUnsubscribers.forEach(unsub => unsub());
-    staffSubcollectionUnsubscribers = [];
-
-    // Встановлюємо слухачі для ВСІХ типів історії
-    setupSubcollectionListener('payouts', 'payouts-history-list', 'staffPayouts', renderPayoutHistoryList);
-    setupSubcollectionListener('advances', 'payouts-history-list', 'viewingStaffAdvances', renderPayoutHistoryList);
-    setupSubcollectionListener('bonuses', 'payouts-history-list', 'viewingStaffBonuses', renderPayoutHistoryList);
-    
-    // ВІДСУТНІЙ ЕЛЕМЕНТ: ОБРОБНИК КЛІКІВ ДЛЯ КНОПКИ ВИДАЛЕННЯ
-    document.getElementById('payouts-history-list').onclick = (e) => {
-        const deleteBtn = e.target.closest('.btn-delete-staff-payment');
-        if (deleteBtn) {
-            handleDeleteStaffPayment(deleteBtn.dataset);
-        }
-    };
-}
-
-    function setupSubcollectionListener(subcollectionName, listElementId, stateKey, renderer) {
-    const staffId = state.viewingStaffId;
-    if (!staffId) return;
-
-    // Помилка була тут - ми видалили рядки, що все очищували
-
-    const collectionRef = collection(db, 'staff', staffId, subcollectionName);
-    const unsubscribe = onSnapshot(query(collectionRef, orderBy("date", "desc")), (snapshot) => {
-        state[stateKey] = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-        renderer(listElementId, state[stateKey]);
-    });
-    staffSubcollectionUnsubscribers.push(unsubscribe);
-}
-
-    function renderPayoutHistoryList(elementId, items) {
-    const listEl = document.getElementById(elementId);
-    if (!listEl) return;
-
-    // Додаємо тип операції для кожної групи елементів, щоб знати, з якої колекції видаляти
-    const allItems = [
-        ...(state.staffPayouts || []).map(p => ({...p, itemType: 'payouts', displayType: 'Нарахування ЗП'})),
-        ...(state.viewingStaffAdvances || []).map(a => ({...a, itemType: 'advances', displayType: 'Аванс', amount: -a.amount})),
-        ...(state.viewingStaffBonuses || []).map(b => ({...b, itemType: 'bonuses', displayType: 'Премія'}))
-    ].sort((a,b) => b.date.toDate() - a.date.toDate());
-    
-    if (allItems.length === 0) {
-        listEl.innerHTML = `<li>Історія порожня.</li>`;
-        return;
+        document.getElementById('add-payment-form').onsubmit = handleAddStaffPayment;
+        staffSubcollectionUnsubscribers.forEach(unsub => unsub());
+        staffSubcollectionUnsubscribers = [];
+        setupSubcollectionListener('payouts', 'payouts-history-list', 'staffPayouts', renderPayoutHistoryList);
+        setupSubcollectionListener('advances', 'payouts-history-list', 'viewingStaffAdvances', renderPayoutHistoryList);
+        setupSubcollectionListener('bonuses', 'payouts-history-list', 'viewingStaffBonuses', renderPayoutHistoryList);
+        
+        document.getElementById('payouts-history-list').onclick = (e) => {
+            const deleteBtn = e.target.closest('.btn-delete-staff-payment');
+            if (deleteBtn) {
+                handleDeleteStaffPayment(deleteBtn.dataset);
+            }
+        };
     }
 
-    listEl.innerHTML = allItems.map(item => {
-        // Формуємо кнопку видалення тільки для адміна
-        const deleteButtonHtml = state.user.role === 'admin' 
-            ? `<button class="btn btn-delete btn-delete-staff-payment" 
-                        data-id="${item.id}" 
-                        data-subcollection="${item.itemType}"
-                        style="margin-left: 1rem;">
-                        Видалити
-                 </button>`
-            : '';
+    function setupSubcollectionListener(subcollectionName, listElementId, stateKey, renderer) {
+        const staffId = state.viewingStaffId;
+        if (!staffId) return;
 
-        return `
-            <li style="color: ${item.amount < 0 ? 'var(--danger-color)' : 'var(--text-color)'}">
-                <div>
-                    <strong>${item.displayType} ${item.period ? `(${item.period})` : ''}</strong><br>
-                    <small>${item.date.toDate().toLocaleDateString('uk-UA')} ${item.description ? ` - ${item.description}` : ''}</small>
-                </div>
-                <div class="actions">
-                    <strong>${item.amount.toFixed(2)} zł</strong>
-                    ${deleteButtonHtml}
-                </div>
-            </li>`;
-    }).join('');
-}
+        const collectionRef = collection(db, 'staff', staffId, subcollectionName);
+        const unsubscribe = onSnapshot(query(collectionRef, orderBy("date", "desc")), (snapshot) => {
+            state[stateKey] = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            renderer(listElementId, state[stateKey]);
+        });
+        staffSubcollectionUnsubscribers.push(unsubscribe);
+    }
+
+    function renderPayoutHistoryList(elementId, items) {
+        const listEl = document.getElementById(elementId);
+        if (!listEl) return;
+        const allItems = [
+            ...(state.staffPayouts || []).map(p => ({...p, itemType: 'payouts', displayType: 'Нарахування ЗП'})),
+            ...(state.viewingStaffAdvances || []).map(a => ({...a, itemType: 'advances', displayType: 'Аванс', amount: -a.amount})),
+            ...(state.viewingStaffBonuses || []).map(b => ({...b, itemType: 'bonuses', displayType: 'Премія'}))
+        ].sort((a,b) => b.date.toDate() - a.date.toDate());
+        if (allItems.length === 0) {
+            listEl.innerHTML = `<li>Історія порожня.</li>`;
+            return;
+        }
+
+        listEl.innerHTML = allItems.map(item => {
+            const deleteButtonHtml = state.user.role === 'admin' 
+                ? `<button class="btn btn-delete btn-delete-staff-payment" 
+                            data-id="${item.id}" 
+                            data-subcollection="${item.itemType}"
+                            style="margin-left: 1rem;">
+                            Видалити
+                     </button>`
+                : '';
+
+            return `
+                <li style="color: ${item.amount < 0 ? 'var(--danger-color)' : 'var(--text-color)'}">
+                    <div>
+                        <strong>${item.displayType} ${item.period ? `(${item.period})` : ''}</strong><br>
+                        <small>${item.date.toDate().toLocaleDateString('uk-UA')} ${item.description ? ` - ${item.description}` : ''}</small>
+                    </div>
+                    <div class="actions">
+                        <strong>${item.amount.toFixed(2)} zł</strong>
+                        ${deleteButtonHtml}
+                    </div>
+                </li>`;
+        }).join('');
+    }
 
     async function handleUpdateStaff(event) {
         event.preventDefault();
@@ -826,79 +994,73 @@ let state = {
     }
 
     async function handleDeleteStaffPayment(dataset) {
-    console.log('Функцію handleDeleteStaffPayment викликано з даними:', dataset); // ДІАГНОСТИКА
-    
-    const { id, subcollection } = dataset;
-    const staffId = state.viewingStaffId;
-
-    console.log(`Намагаюся видалити документ за шляхом: staff/${staffId}/${subcollection}/${id}`); // ДІАГНОСТИКА
-
-    if (!id || !subcollection || !staffId) {
-        console.error('Помилка: не вистачає даних для видалення (id, subcollection або staffId)!');
-        return;
-    }
-
-    showConfirmWithReasonModal(`Ви впевнені, що хочете видалити цей запис з історії? Цю дію не можна скасувати.`, async (reason) => {
-        const action = () => deleteDoc(doc(db, 'staff', staffId, subcollection, id));
-        const logDetails = { staffId, subcollection, docId: id };
-        if (reason) logDetails.reason = reason;
+        console.log('Функцію handleDeleteStaffPayment викликано з даними:', dataset);
         
-        try {
-            await logAndExecute('Видалено запис історії персоналу', logDetails, action);
-            showNotification('Запис видалено.');
-        } catch (e) {
-            // Цей блок покаже нам помилку, якщо вона є
-            console.error("!!! ПОМИЛКА ПРИ ВИДАЛЕННІ !!!", e); 
-            showNotification('Не вдалося видалити запис. Помилка: ' + e.message, "error");
+        const { id, subcollection } = dataset;
+        const staffId = state.viewingStaffId;
+        console.log(`Намагаюся видалити документ за шляхом: staff/${staffId}/${subcollection}/${id}`); 
+
+        if (!id || !subcollection || !staffId) {
+            console.error('Помилка: не вистачає даних для видалення (id, subcollection або staffId)!');
+            return;
         }
-    });
-}
+
+        showConfirmWithReasonModal(`Ви впевнені, що хочете видалити цей запис з історії? Цю дію не можна скасувати.`, async (reason) => {
+            const action = () => deleteDoc(doc(db, 'staff', staffId, subcollection, id));
+            const logDetails = { staffId, subcollection, docId: id };
+            if (reason) logDetails.reason = reason;
+            
+            try {
+                await logAndExecute('Видалено запис історії персоналу', logDetails, action);
+                showNotification('Запис видалено.');
+            } catch (e) {
+                console.error("!!! ПОМИЛКА ПРИ ВИДАЛЕННІ !!!", e); 
+                showNotification('Не вдалося видалити запис. Помилка: ' + e.message, "error");
+            }
+        });
+    }
 
     async function handleAddStaffPayment(event) {
-    event.preventDefault();
-    const staffId = state.viewingStaffId;
-    const person = state.staff.find(p => p.id === staffId);
-    const type = document.getElementById('payment-type').value;
-    const amount = parseFloat(document.getElementById('payment-amount').value);
-    const description = document.getElementById('payment-description').value.trim();
-    const period = document.getElementById('payout-period').value;
+        event.preventDefault();
+        const staffId = state.viewingStaffId;
+        const person = state.staff.find(p => p.id === staffId);
+        const type = document.getElementById('payment-type').value;
+        const amount = parseFloat(document.getElementById('payment-amount').value);
+        const description = document.getElementById('payment-description').value.trim();
+        const period = document.getElementById('payout-period').value;
 
-    if (isNaN(amount) || amount <= 0) return showNotification('Введіть коректну суму.', "error");
+        if (isNaN(amount) || amount <= 0) return showNotification('Введіть коректну суму.', "error");
+        let subcollectionName;
+        if (type === 'bonus') {
+            subcollectionName = 'bonuses';
+        } else {
+            subcollectionName = `${type}s`;
+        }
 
-    // [ВИПРАВЛЕННЯ] Правильно формуємо назву колекції
-    let subcollectionName;
-    if (type === 'bonus') {
-        subcollectionName = 'bonuses'; // Правильна назва для бонусів
-    } else {
-        subcollectionName = `${type}s`; // Для payout -> payouts, advance -> advances
+        let data = { amount, date: Timestamp.now() };
+        let logAction = '';
+        let logDetails = { staffId, name: person.name, amount };
+        if (type === 'payout') {
+            if (!period) return showNotification('Будь ласка, оберіть період для нарахування ЗП.', 'error');
+            data.period = period;
+            logAction = 'Нараховано ЗП';
+            logDetails.period = period;
+        } else {
+            if (description) data.description = description;
+            logAction = type === 'bonus' ? 'Нараховано премію' : 'Видано аванс';
+            if (description) logDetails.description = description;
+        }
+        
+        const action = () => addDoc(collection(db, 'staff', staffId, subcollectionName), data);
+        try {
+            await logAndExecute(logAction, logDetails, action);
+            event.target.reset();
+            document.getElementById('payment-type').dispatchEvent(new Event('change'));
+            showNotification('Операцію успішно проведено!');
+        } catch (e) {
+            showNotification(`Не вдалося провести операцію.`, "error");
+        }
     }
-
-    let data = { amount, date: Timestamp.now() };
-    let logAction = '';
-    let logDetails = { staffId, name: person.name, amount };
-
-    if (type === 'payout') {
-        if (!period) return showNotification('Будь ласка, оберіть період для нарахування ЗП.', 'error');
-        data.period = period;
-        logAction = 'Нараховано ЗП';
-        logDetails.period = period;
-    } else {
-        if (description) data.description = description;
-        logAction = type === 'bonus' ? 'Нараховано премію' : 'Видано аванс';
-        if (description) logDetails.description = description;
-    }
-    
-    const action = () => addDoc(collection(db, 'staff', staffId, subcollectionName), data);
-
-    try {
-        await logAndExecute(logAction, logDetails, action);
-        event.target.reset();
-        document.getElementById('payment-type').dispatchEvent(new Event('change'));
-        showNotification('Операцію успішно проведено!');
-    } catch (e) {
-        showNotification(`Не вдалося провести операцію.`, "error");
-    }
-}
     // #endregion
 
     // #region Audit Log View
@@ -918,14 +1080,14 @@ let state = {
                     case 'reason': displayKey = 'Причина'; break;
                 }
                 return `${displayKey}: ${value}`;
-            });
+            }).join('; ');
 
             return `
                 <li>
                     <div style="flex-grow: 1; word-break: break-word;">
                         <strong>${log.action}</strong><br>
                         <small>${log.userEmail} - ${log.timestamp ? log.timestamp.toDate().toLocaleString('uk-UA') : 'Дата невідома'}</small>
-                        ${detailsArray.length > 0 ? `<br><small style="color: var(--gray-text);">${detailsArray.join('; ')}</small>` : ''}
+                        ${detailsArray.length > 0 ? `<br><small style="color: var(--gray-text);">${detailsArray}</small>` : ''}
                     </div>
                 </li>
             `;
@@ -945,127 +1107,118 @@ let state = {
 
     // #region Daily Summary
     async function renderDailySummary() {
-    const dateInput = document.getElementById('summary-date-picker');
-    const salonInput = document.getElementById('summary-salon-filter');
-    const advancesEl = document.getElementById('summary-advances');
-    const salonExpensesEl = document.getElementById('summary-salon-expenses');
-    const productSalesEl = document.getElementById('summary-product-sales');
-    if (!dateInput || !salonInput || !advancesEl || !salonExpensesEl || !productSalesEl) return;
+        const dateInput = document.getElementById('summary-date-picker');
+        const salonInput = document.getElementById('summary-salon-filter');
+        const advancesEl = document.getElementById('summary-advances');
+        const salonExpensesEl = document.getElementById('summary-salon-expenses');
+        const productSalesEl = document.getElementById('summary-product-sales');
+        if (!dateInput || !salonInput || !advancesEl || !salonExpensesEl || !productSalesEl) return;
 
-    const selectedDate = new Date(dateInput.value);
-    const selectedSalonId = salonInput.value;
-    const startOfDay = new Date(selectedDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    
-    const endOfDay = new Date(selectedDate);
-    endOfDay.setHours(23, 59, 59, 999);
-    
-    let relevantAppointments = state.appointments.filter(app => {
-        if (!app.dateTime) return false;
-        const appointmentDate = app.dateTime.toDate();
-        return appointmentDate >= startOfDay && appointmentDate <= endOfDay;
-    });
-
-    if (selectedSalonId !== 'all') {
-        relevantAppointments = relevantAppointments.filter(app => app.salonId === selectedSalonId);
-    }
-
-    let total = 0, cash = 0, card = 0, blik = 0;
-    let servicesWithPayment = 0;
-
-    relevantAppointments.forEach(app => {
-        if (app.payments && app.payments.length > 0) {
-            servicesWithPayment++;
-            app.payments.forEach(p => {
-                if (p.type !== 'settlement') {
-                    total += p.amount;
-                    if(p.type === 'cash') cash += p.amount;
-                    else if(p.type === 'card') card += p.amount;
-                    else if(p.type === 'blik') blik += p.amount;
-                }
-            });
+        const selectedDate = new Date(dateInput.value);
+        const selectedSalonId = salonInput.value;
+        const startOfDay = new Date(selectedDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        
+        const endOfDay = new Date(selectedDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        let relevantAppointments = state.appointments.filter(app => {
+            if (!app.dateTime) return false;
+            const appointmentDate = app.dateTime.toDate();
+            return appointmentDate >= startOfDay && appointmentDate <= endOfDay;
+        });
+        if (selectedSalonId !== 'all') {
+            relevantAppointments = relevantAppointments.filter(app => app.salonId === selectedSalonId);
         }
-    });
-    
-    let productSalesCash = 0, productSalesCard = 0, productSalesBlik = 0;
-    let filteredProductSales = state.productSales.filter(s => {
-        if (!s.timestamp && !s.date) return false;
-        const saleDate = (s.timestamp || s.date).toDate();
-        return saleDate >= startOfDay && saleDate <= endOfDay;
-    });
-    if (selectedSalonId !== 'all') {
-        filteredProductSales = filteredProductSales.filter(s => s.salonId === selectedSalonId);
-    }
-    filteredProductSales.forEach(sale => {
-        if (sale.paymentType === 'cash') productSalesCash += sale.amount;
-        else if (sale.paymentType === 'card') productSalesCard += sale.amount;
-        else if (sale.paymentType === 'blik') productSalesBlik += sale.amount;
-    });
 
-    const totalProductSales = productSalesCash + productSalesCard + productSalesBlik;
-    total += totalProductSales;
-    cash += productSalesCash;
-    card += productSalesCard;
-    blik += productSalesBlik;
+        let total = 0, cash = 0, card = 0, blik = 0;
+        let servicesWithPayment = 0;
 
-    // --- НОВА ЛОГІКА ДЛЯ ЗАВАНТАЖЕННЯ АВАНСІВ ---
-    let totalAdvances = 0;
-    try {
-        const advancePromises = [];
-        const mastersForSalon = state.masters.filter(m => selectedSalonId === 'all' || (m.salonIds && m.salonIds.includes(selectedSalonId)));
-        const staffForSalon = state.staff.filter(p => selectedSalonId === 'all' || p.salonId === selectedSalonId);
-
-        mastersForSalon.forEach(master => {
-            const q = query(collection(db, 'masters', master.id, 'advances'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
-            advancePromises.push(getDocs(q));
+        relevantAppointments.forEach(app => {
+            if (app.payments && app.payments.length > 0) {
+                servicesWithPayment++;
+                app.payments.forEach(p => {
+                    if (p.type !== 'settlement') {
+                        total += p.amount;
+                        if(p.type === 'cash') cash += p.amount;
+                        else if(p.type === 'card') card += p.amount;
+                        else if(p.type === 'blik') blik += p.amount;
+                    }
+                });
+            }
         });
-        staffForSalon.forEach(person => {
-            const q = query(collection(db, 'staff', person.id, 'advances'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
-            advancePromises.push(getDocs(q));
+        
+        let productSalesCash = 0, productSalesCard = 0, productSalesBlik = 0;
+        let filteredProductSales = state.productSales.filter(s => {
+            if (!s.timestamp && !s.date) return false;
+            const saleDate = (s.timestamp || s.date).toDate();
+            return saleDate >= startOfDay && saleDate <= endOfDay;
         });
-
-        const querySnapshots = await Promise.all(advancePromises);
-        querySnapshots.forEach(snap => {
-            snap.forEach(doc => {
-                totalAdvances += doc.data().amount;
+        if (selectedSalonId !== 'all') {
+            filteredProductSales = filteredProductSales.filter(s => s.salonId === selectedSalonId);
+        }
+        filteredProductSales.forEach(sale => {
+            if (sale.paymentType === 'cash') productSalesCash += sale.amount;
+            else if (sale.paymentType === 'card') productSalesCard += sale.amount;
+            else if (sale.paymentType === 'blik') productSalesBlik += sale.amount;
+        });
+        const totalProductSales = productSalesCash + productSalesCard + productSalesBlik;
+        total += totalProductSales;
+        cash += productSalesCash;
+        card += productSalesCard;
+        blik += productSalesBlik;
+        
+        let totalAdvances = 0;
+        try {
+            const advancePromises = [];
+            const mastersForSalon = state.masters.filter(m => selectedSalonId === 'all' || (m.salonIds && m.salonIds.includes(selectedSalonId)));
+            const staffForSalon = state.staff.filter(p => selectedSalonId === 'all' || p.salonId === selectedSalonId);
+            mastersForSalon.forEach(master => {
+                const q = query(collection(db, 'masters', master.id, 'advances'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
+                advancePromises.push(getDocs(q));
             });
+            staffForSalon.forEach(person => {
+                const q = query(collection(db, 'staff', person.id, 'advances'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
+                advancePromises.push(getDocs(q));
+            });
+            const querySnapshots = await Promise.all(advancePromises);
+            querySnapshots.forEach(snap => {
+                snap.forEach(doc => {
+                    totalAdvances += doc.data().amount;
+                });
+            });
+        } catch (e) {
+            console.error("Помилка завантаження авансів для підсумку:", e);
+        }
+
+        let totalSalonExpenses = 0;
+        let filteredSalonExpenses = state.salonExpenses.filter(e => {
+            if (!e.timestamp && !e.date) return false;
+            const expenseDate = (e.timestamp || e.date).toDate();
+            return expenseDate >= startOfDay && expenseDate <= endOfDay;
         });
-    } catch (e) {
-        console.error("Помилка завантаження авансів для підсумку:", e);
-    }
-    // --- КІНЕЦЬ НОВОЇ ЛОГІКИ ---
+        if (selectedSalonId !== 'all') {
+            filteredSalonExpenses = filteredSalonExpenses.filter(e => e.salonId === selectedSalonId);
+        }
+        filteredSalonExpenses.forEach(expense => {
+            totalSalonExpenses += expense.amount;
+        });
 
-    let totalSalonExpenses = 0;
-    let filteredSalonExpenses = state.salonExpenses.filter(e => {
-        if (!e.timestamp && !e.date) return false;
-        const expenseDate = (e.timestamp || e.date).toDate();
-        return expenseDate >= startOfDay && expenseDate <= endOfDay;
-    });
-    if (selectedSalonId !== 'all') {
-        filteredSalonExpenses = filteredSalonExpenses.filter(e => e.salonId === selectedSalonId);
+        document.getElementById('summary-total').textContent = `${total.toFixed(0)} zł`;
+        document.getElementById('summary-cash').textContent = `${cash.toFixed(0)} zł`;
+        document.getElementById('summary-card').textContent = `${card.toFixed(0)} zł`;
+        document.getElementById('summary-blik').textContent = `${blik.toFixed(0)} zł`;
+        advancesEl.textContent = `-${totalAdvances.toFixed(0)} zł`;
+        salonExpensesEl.textContent = `-${totalSalonExpenses.toFixed(0)} zł`;
+        productSalesEl.textContent = `${totalProductSales.toFixed(0)} zł`;
+        document.getElementById('summary-services-count').textContent = servicesWithPayment;
     }
-    filteredSalonExpenses.forEach(expense => {
-        totalSalonExpenses += expense.amount;
-    });
-
-    document.getElementById('summary-total').textContent = `${total.toFixed(0)} zł`;
-    document.getElementById('summary-cash').textContent = `${cash.toFixed(0)} zł`;
-    document.getElementById('summary-card').textContent = `${card.toFixed(0)} zł`;
-    document.getElementById('summary-blik').textContent = `${blik.toFixed(0)} zł`;
-    advancesEl.textContent = `-${totalAdvances.toFixed(0)} zł`;
-    salonExpensesEl.textContent = `-${totalSalonExpenses.toFixed(0)} zł`;
-    productSalesEl.textContent = `${totalProductSales.toFixed(0)} zł`;
-    document.getElementById('summary-services-count').textContent = servicesWithPayment;
-}
     // #endregion
 
     // #region Calendar View & Modals
     function renderCalendarView(container) {
-        // [ДОДАЙТЕ ЦЕЙ БЛОК НА ПОЧАТКУ ФУНКЦІЇ]
         const userRole = state.user.role;
         const userSalonId = state.user.salonId;
         const isSalonAdmin = userRole === 'salon_admin';
-        // [КІНЕЦЬ БЛОКУ]
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
         container.innerHTML = `
             <div class="content-card">
@@ -1112,7 +1265,6 @@ let state = {
                     <div class="summary-card"><div class="value" id="summary-services-count">0</div><div class="label">Кількість оплат</div></div>
                 </div>
             </div>`;
-        
         const calendarEl = document.getElementById('calendar');
         const masterFilter = document.getElementById('calendar-master-filter');
         const salonFilter = document.getElementById('calendar-salon-filter');
@@ -1126,7 +1278,6 @@ let state = {
             document.getElementById('summary-salon-filter').value = userSalonId;
         }
         if (!calendarEl || !masterFilter || !salonFilter) return;
-
         const colorPalette = ['#3788d8', '#e25141', '#4caf50', '#ff9800', '#9c27b0', '#795548', '#607d8b'];
         const calendar = new FullCalendar.Calendar(calendarEl, {
             locale: 'uk', initialView: 'timeGridWeek',
@@ -1230,7 +1381,6 @@ let state = {
             <p><strong>Сума:</strong> ${appointment.finalPrice.toFixed(0)} zł</p>
             <p><strong>Статус:</strong> ${statusText}</p>
         `;
-        
         if (appointment.additionalCharge && appointment.additionalCharge.amount > 0) {
             detailsEl.innerHTML += `<p><strong>Додаткова плата:</strong> ${appointment.additionalCharge.amount.toFixed(0)} zł (${appointment.additionalCharge.description || 'без опису'})</p>`;
         }
@@ -1248,7 +1398,6 @@ let state = {
         
         let buttonsHtml = '';
         const remainingToPay = (appointment.finalPrice || 0) - (appointment.totalPaid || 0);
-        
         if (appointment.isInternal && appointment.status !== 'completed') {
             buttonsHtml += `<button class="btn btn-complete-payment" data-action="settle">Провести по взаєморозрахунку</button>`;
         } else if (!appointment.isInternal && appointment.status !== 'completed' && remainingToPay > 0.001) {
@@ -1262,7 +1411,6 @@ let state = {
         buttonsHtml += `<button class="btn btn-edit" data-action="edit">Редагувати / Перенести</button>`;
         buttonsHtml += `<button class="btn btn-delete" data-action="cancel">Скасувати запис</button>`;
         buttonsEl.innerHTML = buttonsHtml;
-
         buttonsEl.onclick = function(event) {
             const button = event.target.closest('button');
             if (!button) return;
@@ -1352,10 +1500,8 @@ let state = {
             newPayments.push({ ...originalPayment, type: newType });
             newTotalPaid += originalPayment.amount;
         });
-        
         const finalPrice = appointment.finalPrice || 0;
         let newStatus = (newTotalPaid > 0) ? 'partially_paid' : 'upcoming';
-        
         if (appointment.isInternal) {
             if (newTotalPaid > 0) newStatus = 'completed';
         } else {
@@ -1363,7 +1509,6 @@ let state = {
         }
         
         const action = () => updateDoc(doc(db, 'appointments', appointmentId), { payments: newPayments, totalPaid: newTotalPaid, status: newStatus });
-        
         try {
             await logAndExecute('Оновлено оплати запису', { appointmentId, clientName: appointment.clientName }, action);
             showNotification('Оплати успішно оновлено!');
@@ -1409,7 +1554,6 @@ let state = {
         const filteredClients = searchTerm ? state.clients.filter(client => client.name.toLowerCase().includes(normalizedSearch) || (client.phone && client.phone.includes(normalizedSearch))) : state.clients;
         
         listEl.innerHTML = filteredClients.length > 0 ? '' : '<li>Клієнтів не знайдено.</li>';
-        
         filteredClients.forEach(client => {
             const li = document.createElement('li');
             li.innerHTML = `
@@ -1420,7 +1564,6 @@ let state = {
                 </div>`;
             listEl.appendChild(li);
         });
-        
         listEl.onclick = (e) => {
             if(e.target.classList.contains('btn-view-history')) {
                 state.viewingClientId = e.target.dataset.id;
@@ -1446,7 +1589,6 @@ let state = {
         const totalVisits = clientAppointments.length;
         const totalSpent = clientAppointments.reduce((sum, app) => sum + (app.totalPaid || 0), 0);
         const firstVisit = totalVisits > 0 ? clientAppointments[clientAppointments.length - 1].dateTime.toDate().toLocaleDateString('uk-UA') : 'Немає візитів';
-        
         let historyHtml = clientAppointments.map(app => {
             const service = state.services.find(s => s.id === app.serviceId);
             const master = state.masters.find(m => m.id === app.masterId);
@@ -1481,234 +1623,240 @@ let state = {
                     <tbody>${historyHtml.length > 0 ? historyHtml : `<tr><td colspan="6" style="text-align:center;">Історія відвідувань порожня.</td></tr>`}</tbody>
                 </table>
             </div>`;
-
         document.getElementById('back-to-clients-btn').onclick = () => renderView('clients');
     }
     // #endregion
 
     // #region Appointments View
     function renderAppointmentsView(container) {
-    const isEditMode = !!state.editingAppointmentId;
-    let appointmentToEdit = null;
-    if (isEditMode) {
-        appointmentToEdit = state.appointments.find(a => a.id === state.editingAppointmentId);
-    }
+        const isEditMode = !!state.editingAppointmentId;
+        let appointmentToEdit = null;
+        if (isEditMode) {
+            appointmentToEdit = state.appointments.find(a => a.id === state.editingAppointmentId);
+        }
 
-    // --- ВИПРАВЛЕННЯ ПОЧИНАЄТЬСЯ ТУТ ---
-    const userRole = state.user.role;
-    const canCreate = userRole === 'admin' || userRole === 'salon_admin';
+        const userRole = state.user.role;
+        const canCreate = userRole === 'admin' || userRole === 'salon_admin';
 
-    let formHtml = '';
-    // Показуємо форму, тільки якщо користувач може створювати АБО він редагує існуючий запис
-    if (isEditMode || canCreate) {
+        let formHtml = '';
+        if (isEditMode || canCreate) {
+            const isSalonAdmin = state.user.role === 'salon_admin';
+            const userSalonId = state.user.salonId;
+            const salonOptions = (isSalonAdmin ? state.salons.filter(s => s.id === userSalonId) : state.salons)
+                .map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+
+            formHtml = `
+            <div class="content-card">
+                <h2 id="appointment-form-title">${isEditMode ? 'Редагувати запис' : 'Новий запис'}</h2>
+                <form id="appointment-form">
+                     <div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem; margin-bottom: 1rem;">
+                        <label><input type="checkbox" id="internal-service-checkbox"> Внутрішня послуга (для майстра)</label>
+                    </div>
+                    <div id="regular-client-fields">
+                        <div class="form-group client-search-container">
+                            <label for="client-search-input">Пошук / Ім'я клієнта</label>
+                            <input type="text" id="client-search-input" autocomplete="off" required>
+                            <div id="client-search-results" style="display: none;"></div>
+                        </div>
+                        <div class="form-group" id="client-phone-group" style="display: none;">
+                            <label for="client-phone-input">Телефон нового клієнта</label>
+                            <input type="tel" id="client-phone-input">
+                        </div>
+                    </div>
+                    <div id="master-client-fields" style="display: none;">
+                         <div class="form-group">
+                            <label for="master-as-client-select">Клієнт-майстер</label>
+                            <select id="master-as-client-select" class="form-group"></select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="appointment-datetime">Дата і час</label>
+                        <input type="datetime-local" id="appointment-datetime" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1;"><label for="appointment-category">Категорія послуг</label><select id="appointment-category" required></select></div>
+                        <div class="form-group service-search-container" style="flex:1;"><label for="appointment-service-search">Послуга</label><input type="text" id="appointment-service-search" placeholder="Почніть вводити назву..." autocomplete="off" required><div id="service-search-results" style="display: none;"></div></div>
+                    </div>
+                    <div class="form-group"><label for="appointment-master">Майстер</label><select id="appointment-master" required></select></div>
+                    <div class="form-group">
+                        <label for="appointment-salon">Салон</label>
+                        <select id="appointment-salon" required ${isSalonAdmin ? 'disabled' : ''}>
+                            ${!isSalonAdmin ? '<option value="">Оберіть салон</option>' : ''}
+                            ${salonOptions}
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:2;"><label for="manual-discount-value">Додаткова знижка</label><input type="number" id="manual-discount-value" placeholder="0" min="0"></div>
+                        <div class="form-group" style="flex:1;"><label for="manual-discount-type">Тип</label><select id="manual-discount-type"><option value="percent">%</option><option value="fixed">zł</option></select></div>
+                    </div>
+                     <div class="form-row">
+                        <div class="form-group" style="flex:1;"><label for="additional-charge-amount">Додаткова плата (zł)</label><input type="number" id="additional-charge-amount" placeholder="0" min="0"></div>
+                        <div class="form-group" style="flex:2;"><label for="additional-charge-description">Опис дод. плати</label><input type="text" id="additional-charge-description" placeholder="напр. Миття голови"></div>
+                    </div>
+                    <div id="final-price-display">Сума до оплати: 0 zł</div>
+                    <button type="submit" id="appointment-submit-btn" class="btn" style="margin-top: 1rem;">${isEditMode ? 'Зберегти зміни' : 'Створити запис'}</button>
+                    ${isEditMode ? `<button type="button" id="appointment-cancel-edit-btn" class="btn" style="margin-top: 0.5rem; background-color: var(--gray-text);">Скасувати редагування</button>` : ''}
+                </form>
+            </div>
+            `;
+        }
+        
+        const dailyAppointmentsHtml = !isEditMode ? `
+        <div class="content-card" style="margin-top: 2rem;">
+            <h2>Незавершені записи</h2>
+            <div class="form-group">
+                <label for="appointments-date-filter">Оберіть дату</label>
+                <input type="date" id="appointments-date-filter">
+            </div>
+            <ul id="daily-appointments-list" class="item-list"></ul>
+            <div id="pagination-controls" style="text-align: center; margin-top: 1rem;"></div>
+        </div>` : '';
+
+        container.innerHTML = formHtml + dailyAppointmentsHtml;
+        
+        setupAppointmentsLogic();
+
         const isSalonAdmin = state.user.role === 'salon_admin';
-        const userSalonId = state.user.salonId;
-        const salonOptions = (isSalonAdmin ? state.salons.filter(s => s.id === userSalonId) : state.salons)
-            .map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-
-        formHtml = `
-        <div class="content-card">
-            <h2 id="appointment-form-title">${isEditMode ? 'Редагувати запис' : 'Новий запис'}</h2>
-            <form id="appointment-form">
-                 <div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem; margin-bottom: 1rem;">
-                    <label><input type="checkbox" id="internal-service-checkbox"> Внутрішня послуга (для майстра)</label>
-                </div>
-                <div id="regular-client-fields">
-                    <div class="form-group client-search-container">
-                        <label for="client-search-input">Пошук / Ім'я клієнта</label>
-                        <input type="text" id="client-search-input" autocomplete="off" required>
-                        <div id="client-search-results" style="display: none;"></div>
-                    </div>
-                    <div class="form-group" id="client-phone-group" style="display: none;">
-                        <label for="client-phone-input">Телефон нового клієнта</label>
-                        <input type="tel" id="client-phone-input">
-                    </div>
-                </div>
-                <div id="master-client-fields" style="display: none;">
-                     <div class="form-group">
-                        <label for="master-as-client-select">Клієнт-майстер</label>
-                        <select id="master-as-client-select" class="form-group"></select>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="appointment-datetime">Дата і час</label>
-                    <input type="datetime-local" id="appointment-datetime" required>
-                </div>
-                <div class="form-row">
-                    <div class="form-group" style="flex:1;"><label for="appointment-category">Категорія послуг</label><select id="appointment-category" required></select></div>
-                    <div class="form-group service-search-container" style="flex:1;"><label for="appointment-service-search">Послуга</label><input type="text" id="appointment-service-search" placeholder="Почніть вводити назву..." autocomplete="off" required><div id="service-search-results" style="display: none;"></div></div>
-                </div>
-                <div class="form-group"><label for="appointment-master">Майстер</label><select id="appointment-master" required></select></div>
-                <div class="form-group">
-                    <label for="appointment-salon">Салон</label>
-                    <select id="appointment-salon" required ${isSalonAdmin ? 'disabled' : ''}>
-                        ${!isSalonAdmin ? '<option value="">Оберіть салон</option>' : ''}
-                        ${salonOptions}
-                    </select>
-                </div>
-                <div class="form-row">
-                    <div class="form-group" style="flex:2;"><label for="manual-discount-value">Додаткова знижка</label><input type="number" id="manual-discount-value" placeholder="0" min="0"></div>
-                    <div class="form-group" style="flex:1;"><label for="manual-discount-type">Тип</label><select id="manual-discount-type"><option value="percent">%</option><option value="fixed">zł</option></select></div>
-                </div>
-                 <div class="form-row">
-                    <div class="form-group" style="flex:1;"><label for="additional-charge-amount">Додаткова плата (zł)</label><input type="number" id="additional-charge-amount" placeholder="0" min="0"></div>
-                    <div class="form-group" style="flex:2;"><label for="additional-charge-description">Опис дод. плати</label><input type="text" id="additional-charge-description" placeholder="напр. Миття голови"></div>
-                </div>
-                <div id="final-price-display">Сума до оплати: 0 zł</div>
-                <button type="submit" id="appointment-submit-btn" class="btn" style="margin-top: 1rem;">${isEditMode ? 'Зберегти зміни' : 'Створити запис'}</button>
-                ${isEditMode ? `<button type="button" id="appointment-cancel-edit-btn" class="btn" style="margin-top: 0.5rem; background-color: var(--gray-text);">Скасувати редагування</button>` : ''}
-            </form>
-        </div>
-        `;
-    }
-    
-    // Блок з незавершеними записами
-    const dailyAppointmentsHtml = !isEditMode ? `
-    <div class="content-card" style="margin-top: 2rem;">
-        <h2>Незавершені записи</h2>
-        <div class="form-group">
-            <label for="appointments-date-filter">Оберіть дату</label>
-            <input type="date" id="appointments-date-filter">
-        </div>
-        <ul id="daily-appointments-list" class="item-list"></ul>
-        <div id="pagination-controls" style="text-align: center; margin-top: 1rem;"></div>
-    </div>` : '';
-
-    container.innerHTML = formHtml + dailyAppointmentsHtml;
-    
-    // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
-
-    setupAppointmentsLogic();
-
-    const isSalonAdmin = state.user.role === 'salon_admin';
-    if (isSalonAdmin) {
-        // Перевіряємо, чи існує форма перед тим, як щось робити
-        const appointmentSalonEl = document.getElementById('appointment-salon');
-        if (appointmentSalonEl) {
-            appointmentSalonEl.value = state.user.salonId;
-        }
-    }
-
-    if (isEditMode && appointmentToEdit) {
-        const d = new Date(appointmentToEdit.dateTime.toDate().getTime() - (appointmentToEdit.dateTime.toDate().getTimezoneOffset() * 60000));
-        document.getElementById('appointment-datetime').value = d.toISOString().slice(0, 16);
-        document.getElementById('manual-discount-value').value = appointmentToEdit.manualDiscount?.value || 0;
-        document.getElementById('manual-discount-type').value = appointmentToEdit.manualDiscount?.type || 'percent';
-        if (appointmentToEdit.additionalCharge) {
-            document.getElementById('additional-charge-amount').value = appointmentToEdit.additionalCharge.amount || 0;
-            document.getElementById('additional-charge-description').value = appointmentToEdit.additionalCharge.description || '';
-        }
-        const internalCheckbox = document.getElementById('internal-service-checkbox');
-        internalCheckbox.checked = appointmentToEdit.isInternal || false;
-        internalCheckbox.dispatchEvent(new Event('change'));
-        if(appointmentToEdit.isInternal) {
-            document.getElementById('master-as-client-select').value = appointmentToEdit.clientId;
-        } else {
-            const client = state.clients.find(c => c.id === appointmentToEdit.clientId);
-            document.getElementById('client-search-input').value = client?.name || appointmentToEdit.clientName;
-            document.getElementById('client-phone-input').value = client?.phone || '';
-            document.getElementById('client-phone-group').style.display = 'block';
-        }
-        const service = state.services.find(s => s.id === appointmentToEdit.serviceId);
-        if (service) {
-            state.selectedServiceForAppointment = service;
-            document.getElementById('appointment-service-search').value = service.name;
-            const categorySelect = document.getElementById('appointment-category');
-            categorySelect.value = service.categoryId;
-            categorySelect.dispatchEvent(new Event('change'));
-            setTimeout(() => {
-                document.getElementById('appointment-master').value = appointmentToEdit.masterId;
-                if (appointmentToEdit.salonId) {
-                    document.getElementById('appointment-salon').value = appointmentToEdit.salonId;
-                }
-                updateFinalPrice();
-            }, 100);
-        }
-    } else if (!isEditMode && state.selectedClientForAppointment) {
-        const clientSearchInput = document.getElementById('client-search-input');
-        const clientPhoneInput = document.getElementById('client-phone-input');
-        const clientPhoneGroup = document.getElementById('client-phone-group');
-        clientSearchInput.value = state.selectedClientForAppointment.name;
-        clientSearchInput.disabled = true;
-        clientPhoneInput.value = state.selectedClientForAppointment.phone || '';
-        clientPhoneGroup.style.display = 'block';
-    } else if (state.preselectedAppointment) {
-        const { dateTime, masterId } = state.preselectedAppointment;
-        const d = new Date(dateTime.getTime() - (dateTime.getTimezoneOffset() * 60000));
-        document.getElementById('appointment-datetime').value = d.toISOString().slice(0, 16);
-        if (masterId) {
-            const master = state.masters.find(m => m.id === masterId);
-            const firstCategoryId = master?.categoryIds?.[0];
-            if (firstCategoryId) {
-                const categorySelect = document.getElementById('appointment-category');
-                categorySelect.value = firstCategoryId;
-                categorySelect.dispatchEvent(new Event('change'));
-                setTimeout(() => {
-                    document.getElementById('appointment-master').value = masterId;
-                }, 100);
+        if (isSalonAdmin) {
+            const appointmentSalonEl = document.getElementById('appointment-salon');
+            if (appointmentSalonEl) {
+                appointmentSalonEl.value = state.user.salonId;
             }
         }
-        state.preselectedAppointment = null;
-    } else if (!isEditMode) {
-        const dateFilter = document.getElementById('appointments-date-filter');
-        if (dateFilter) { // Додано перевірку на існування елемента
-            dateFilter.valueAsDate = state.appointmentsListDate;
-            dateFilter.onchange = () => {
-                state.appointmentsListDate = dateFilter.valueAsDate;
-                state.appointmentsPage = 1;
+
+        if (isEditMode && appointmentToEdit) {
+            const d = new Date(appointmentToEdit.dateTime.toDate().getTime() - (appointmentToEdit.dateTime.toDate().getTimezoneOffset() * 60000));
+            document.getElementById('appointment-datetime').value = d.toISOString().slice(0, 16);
+            document.getElementById('manual-discount-value').value = appointmentToEdit.manualDiscount?.value || 0;
+            document.getElementById('manual-discount-type').value = appointmentToEdit.manualDiscount?.type || 'percent';
+            if (appointmentToEdit.additionalCharge) {
+                document.getElementById('additional-charge-amount').value = appointmentToEdit.additionalCharge.amount || 0;
+                document.getElementById('additional-charge-description').value = appointmentToEdit.additionalCharge.description || '';
+            }
+            const internalCheckbox = document.getElementById('internal-service-checkbox');
+            internalCheckbox.checked = appointmentToEdit.isInternal || false;
+            internalCheckbox.dispatchEvent(new Event('change'));
+            if(appointmentToEdit.isInternal) {
+                document.getElementById('master-as-client-select').value = appointmentToEdit.clientId;
+            } else {
+                const client = state.clients.find(c => c.id === appointmentToEdit.clientId);
+                document.getElementById('client-search-input').value = client?.name || appointmentToEdit.clientName;
+                document.getElementById('client-phone-input').value = client?.phone || '';
+                document.getElementById('client-phone-group').style.display = 'block';
+            }
+            const service = state.services.find(s => s.id === appointmentToEdit.serviceId);
+            if (service) {
+                state.selectedServiceForAppointment = service;
+                document.getElementById('appointment-service-search').value = service.name;
+                const categorySelect = document.getElementById('appointment-category');
+                categorySelect.value = service.categoryId;
+                categorySelect.dispatchEvent(new Event('change'));
+                setTimeout(() => {
+                    document.getElementById('appointment-master').value = appointmentToEdit.masterId;
+                    if (appointmentToEdit.salonId) {
+                        document.getElementById('appointment-salon').value = appointmentToEdit.salonId;
+                    }
+                    updateFinalPrice();
+                }, 100);
+            }
+        } else if (!isEditMode && state.selectedClientForAppointment) {
+            const clientSearchInput = document.getElementById('client-search-input');
+            const clientPhoneInput = document.getElementById('client-phone-input');
+            const clientPhoneGroup = document.getElementById('client-phone-group');
+            clientSearchInput.value = state.selectedClientForAppointment.name;
+            clientSearchInput.disabled = true;
+            clientPhoneInput.value = state.selectedClientForAppointment.phone || '';
+            clientPhoneGroup.style.display = 'block';
+        } else if (state.preselectedAppointment) {
+            const { dateTime, masterId } = state.preselectedAppointment;
+            const d = new Date(dateTime.getTime() - (dateTime.getTimezoneOffset() * 60000));
+            document.getElementById('appointment-datetime').value = d.toISOString().slice(0, 16);
+            if (masterId) {
+                const master = state.masters.find(m => m.id === masterId);
+                const firstCategoryId = master?.categoryIds?.[0];
+                if (firstCategoryId) {
+                    const categorySelect = document.getElementById('appointment-category');
+                    categorySelect.value = firstCategoryId;
+                    categorySelect.dispatchEvent(new Event('change'));
+                    setTimeout(() => {
+                        document.getElementById('appointment-master').value = masterId;
+                    }, 100);
+                }
+            }
+            state.preselectedAppointment = null;
+        } else if (!isEditMode) {
+            const dateFilter = document.getElementById('appointments-date-filter');
+            if (dateFilter) {
+                dateFilter.valueAsDate = state.appointmentsListDate;
+                dateFilter.onchange = () => {
+                    state.appointmentsListDate = dateFilter.valueAsDate;
+                    state.appointmentsPage = 1;
+                    renderDailyAppointmentsList();
+                };
                 renderDailyAppointmentsList();
-            };
-            renderDailyAppointmentsList();
+            }
         }
     }
-}
 
     function setupAppointmentsLogic() {
-        document.getElementById('appointment-form').onsubmit = handleSaveAppointment;
+        const appointmentForm = document.getElementById('appointment-form');
+        if (appointmentForm) {
+            appointmentForm.onsubmit = handleSaveAppointment;
+        }
+        
         if (state.editingAppointmentId) {
-            document.getElementById('appointment-cancel-edit-btn').onclick = () => {
-                state.editingAppointmentId = null;
-                renderView('calendar');
-            };
+            const cancelEditBtn = document.getElementById('appointment-cancel-edit-btn');
+            if (cancelEditBtn) {
+                cancelEditBtn.onclick = () => {
+                    state.editingAppointmentId = null;
+                    renderView('calendar');
+                };
+            }
         } 
+
         const internalCheckbox = document.getElementById('internal-service-checkbox');
         const regularClientFields = document.getElementById('regular-client-fields');
         const masterClientFields = document.getElementById('master-client-fields');
         const masterAsClientSelect = document.getElementById('master-as-client-select');
         const clientSearchInput = document.getElementById('client-search-input');
-        const masterOptions = state.masters.filter(m => !m.isFrozen).map(m => `<option value="${m.id}">${m.name}</option>`).join('');
-        masterAsClientSelect.innerHTML = `<option value="">Оберіть майстра-клієнта</option>${masterOptions}`;
-        internalCheckbox.onchange = () => {
-            const isInternal = internalCheckbox.checked;
-            regularClientFields.style.display = isInternal ? 'none' : 'block';
-            masterClientFields.style.display = isInternal ? 'block' : 'none';
-            clientSearchInput.required = !isInternal;
-            masterAsClientSelect.required = isInternal;
-        };
-        internalCheckbox.dispatchEvent(new Event('change'));
+
+        if(internalCheckbox && regularClientFields && masterClientFields && masterAsClientSelect && clientSearchInput) {
+            const masterOptions = state.masters.filter(m => !m.isFrozen).map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+            masterAsClientSelect.innerHTML = `<option value="">Оберіть майстра-клієнта</option>${masterOptions}`;
+            internalCheckbox.onchange = () => {
+                const isInternal = internalCheckbox.checked;
+                regularClientFields.style.display = isInternal ? 'none' : 'block';
+                masterClientFields.style.display = isInternal ? 'block' : 'none';
+                clientSearchInput.required = !isInternal;
+                masterAsClientSelect.required = isInternal;
+            };
+            internalCheckbox.dispatchEvent(new Event('change'));
+        }
 
         const searchResultsEl = document.getElementById('client-search-results');
         const phoneGroup = document.getElementById('client-phone-group');
         const phoneInput = document.getElementById('client-phone-input');
-
-        clientSearchInput.oninput = () => {
-            state.selectedClientForAppointment = null;
-            phoneGroup.style.display = 'block'; phoneInput.required = true;
-            const searchTerm = clientSearchInput.value.toLowerCase().trim();
-            if (searchTerm.length < 2) { searchResultsEl.style.display = 'none'; return; }
-            const results = state.clients.filter(c => c.name.toLowerCase().includes(searchTerm) || (c.phone && c.phone.includes(searchTerm)));
-            searchResultsEl.innerHTML = results.length > 0 ? results.map(c => `<div data-id="${c.id}" data-name="${c.name}" data-phone="${c.phone}">${c.name} - ${c.phone}</div>`).join('') : '';
-            searchResultsEl.style.display = results.length > 0 ? 'block' : 'none';
-        };
-        searchResultsEl.onclick = (e) => {
-            if(e.target.dataset.id) {
-                state.selectedClientForAppointment = { id: e.target.dataset.id, name: e.target.dataset.name, phone: e.target.dataset.phone };
-                clientSearchInput.value = state.selectedClientForAppointment.name;
-                phoneInput.value = state.selectedClientForAppointment.phone;
-                searchResultsEl.style.display = 'none'; phoneGroup.style.display = 'block';
-            }
-        };
-        clientSearchInput.onblur = () => { setTimeout(() => searchResultsEl.style.display = 'none', 200); };
+        
+        if(clientSearchInput && searchResultsEl && phoneGroup && phoneInput) {
+            clientSearchInput.oninput = () => {
+                state.selectedClientForAppointment = null;
+                phoneGroup.style.display = 'block'; phoneInput.required = true;
+                const searchTerm = clientSearchInput.value.toLowerCase().trim();
+                if (searchTerm.length < 2) { searchResultsEl.style.display = 'none'; return; }
+                const results = state.clients.filter(c => c.name.toLowerCase().includes(searchTerm) || (c.phone && c.phone.includes(searchTerm)));
+                searchResultsEl.innerHTML = results.length > 0 ? results.map(c => `<div data-id="${c.id}" data-name="${c.name}" data-phone="${c.phone}">${c.name} - ${c.phone}</div>`).join('') : '';
+                searchResultsEl.style.display = results.length > 0 ? 'block' : 'none';
+            };
+            searchResultsEl.onclick = (e) => {
+                if(e.target.dataset.id) {
+                    state.selectedClientForAppointment = { id: e.target.dataset.id, name: e.target.dataset.name, phone: e.target.dataset.phone };
+                    clientSearchInput.value = state.selectedClientForAppointment.name;
+                    phoneInput.value = state.selectedClientForAppointment.phone;
+                    searchResultsEl.style.display = 'none'; phoneGroup.style.display = 'block';
+                }
+            };
+            clientSearchInput.onblur = () => { setTimeout(() => searchResultsEl.style.display = 'none', 200); };
+        }
         
         populateAppointmentFormDropdowns();
 
@@ -1716,53 +1864,55 @@ let state = {
         const serviceSearchInput = document.getElementById('appointment-service-search');
         const serviceSearchResultsEl = document.getElementById('service-search-results');
         
-        categorySelect.onchange = () => {
-            state.selectedServiceForAppointment = null;
-            serviceSearchInput.value = '';
-            const categoryId = categorySelect.value;
-            const masterSelect = document.getElementById('appointment-master');
-            const activeMasters = state.masters.filter(m => !m.isFrozen);
-            const selectedCategoryName = state.categories.find(c => c.id === categoryId)?.name;
-            const mastersForCategory = activeMasters.filter(m => (m.categoryIds?.includes(categoryId)) || (m.specialization && selectedCategoryName && Array.isArray(m.specialization) && m.specialization.includes(selectedCategoryName)));
-            masterSelect.innerHTML = '<option value="">Оберіть майстра</option>' + mastersForCategory.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
-            updateFinalPrice();
-        };
-
-        const showServiceList = (searchTerm = '') => {
-            const categoryId = categorySelect.value;
-            if (!categoryId) { serviceSearchResultsEl.style.display = 'none'; return; }
-            const servicesForCategory = state.services.filter(s => s.categoryId === categoryId);
-            const normalizedSearch = searchTerm.toLowerCase().trim();
-            const results = servicesForCategory.filter(s => s.name.toLowerCase().includes(normalizedSearch));
-            serviceSearchResultsEl.innerHTML = results.length > 0 ? results.map(s => `<div data-id="${s.id}">${s.name}</div>`).join('') : '<li>Послуг не знайдено</li>';
-            serviceSearchResultsEl.style.display = 'block';
-        };
-
-        serviceSearchInput.onfocus = () => {
-            if (!categorySelect.value) { showNotification("Спочатку оберіть категорію", "error"); return; }
-            showServiceList(serviceSearchInput.value);
-        };
-        serviceSearchInput.oninput = () => {
-            state.selectedServiceForAppointment = null;
-            showServiceList(serviceSearchInput.value);
-        };
-        serviceSearchResultsEl.onclick = (e) => {
-            const serviceId = e.target.dataset.id;
-            if(serviceId) {
-                const selectedService = state.services.find(s => s.id === serviceId);
-                state.selectedServiceForAppointment = selectedService;
-                serviceSearchInput.value = selectedService.name;
-                serviceSearchResultsEl.style.display = 'none';
+        if(categorySelect && serviceSearchInput && serviceSearchResultsEl) {
+            categorySelect.onchange = () => {
+                state.selectedServiceForAppointment = null;
+                serviceSearchInput.value = '';
+                const categoryId = categorySelect.value;
+                const masterSelect = document.getElementById('appointment-master');
+                const activeMasters = state.masters.filter(m => !m.isFrozen);
+                const selectedCategoryName = state.categories.find(c => c.id === categoryId)?.name;
+                const mastersForCategory = activeMasters.filter(m => (m.categoryIds?.includes(categoryId)) || (m.specialization && selectedCategoryName && Array.isArray(m.specialization) && m.specialization.includes(selectedCategoryName)));
+                if(masterSelect) masterSelect.innerHTML = '<option value="">Оберіть майстра</option>' + mastersForCategory.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
                 updateFinalPrice();
-            }
-        };
-        serviceSearchInput.onblur = () => {
-            setTimeout(() => {
-                serviceSearchResultsEl.style.display = 'none';
-                if (!state.selectedServiceForAppointment) { serviceSearchInput.value = ''; } 
-                else { serviceSearchInput.value = state.selectedServiceForAppointment.name; }
-            }, 200);
-        };
+            };
+            
+            const showServiceList = (searchTerm = '') => {
+                const categoryId = categorySelect.value;
+                if (!categoryId) { serviceSearchResultsEl.style.display = 'none'; return; }
+                const servicesForCategory = state.services.filter(s => s.categoryId === categoryId);
+                const normalizedSearch = searchTerm.toLowerCase().trim();
+                const results = servicesForCategory.filter(s => s.name.toLowerCase().includes(normalizedSearch));
+                serviceSearchResultsEl.innerHTML = results.length > 0 ? results.map(s => `<div data-id="${s.id}">${s.name}</div>`).join('') : '<li>Послуг не знайдено</li>';
+                serviceSearchResultsEl.style.display = 'block';
+            };
+            
+            serviceSearchInput.onfocus = () => {
+                if (!categorySelect.value) { showNotification("Спочатку оберіть категорію", "error"); return; }
+                showServiceList(serviceSearchInput.value);
+            };
+            serviceSearchInput.oninput = () => {
+                state.selectedServiceForAppointment = null;
+                showServiceList(serviceSearchInput.value);
+            };
+            serviceSearchResultsEl.onclick = (e) => {
+                const serviceId = e.target.dataset.id;
+                if(serviceId) {
+                    const selectedService = state.services.find(s => s.id === serviceId);
+                    state.selectedServiceForAppointment = selectedService;
+                    serviceSearchInput.value = selectedService.name;
+                    serviceSearchResultsEl.style.display = 'none';
+                    updateFinalPrice();
+                }
+            };
+            serviceSearchInput.onblur = () => {
+                setTimeout(() => {
+                    serviceSearchResultsEl.style.display = 'none';
+                    if (!state.selectedServiceForAppointment) { serviceSearchInput.value = ''; } 
+                    else { serviceSearchInput.value = state.selectedServiceForAppointment.name; }
+                }, 200);
+            };
+        }
 
         ['appointment-master', 'appointment-salon', 'manual-discount-value', 'manual-discount-type', 'additional-charge-amount'].forEach(id => {
             const el = document.getElementById(id);
@@ -1778,7 +1928,6 @@ let state = {
         const selectedDate = state.appointmentsListDate;
         const startOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
         const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
-        
         const dailyUnpaidAppointments = state.appointments.filter(app => {
             if (!app.dateTime) return false;
             const appDate = app.dateTime.toDate();
@@ -1852,14 +2001,14 @@ let state = {
 
     function updateFinalPrice() { 
         const service = state.selectedServiceForAppointment;
-        const masterId = document.getElementById('appointment-master').value; 
-        const manualDiscountValue = parseFloat(document.getElementById('manual-discount-value').value) || 0; 
-        const manualDiscountType = document.getElementById('manual-discount-type').value; 
-        const additionalChargeAmount = parseFloat(document.getElementById('additional-charge-amount').value) || 0;
+        const masterId = document.getElementById('appointment-master')?.value; 
+        const manualDiscountValue = parseFloat(document.getElementById('manual-discount-value')?.value) || 0; 
+        const manualDiscountType = document.getElementById('manual-discount-type')?.value; 
+        const additionalChargeAmount = parseFloat(document.getElementById('additional-charge-amount')?.value) || 0;
         const priceDisplay = document.getElementById('final-price-display');
         
-        if (!service || !masterId) { 
-            priceDisplay.innerText = `Сума до оплати: 0 zł`;
+        if (!service || !masterId || !priceDisplay) { 
+            if(priceDisplay) priceDisplay.innerText = `Сума до оплати: 0 zł`;
             return 0; 
         } 
 
@@ -1884,116 +2033,114 @@ let state = {
     }
 
     async function handleSaveAppointment(event) {
-    event.preventDefault();
-    
-    const isEditMode = !!state.editingAppointmentId;
-    if (!isEditMode && state.user.role !== 'admin' && state.user.role !== 'salon_admin') {
-        showNotification("У вас недостатньо прав для створення запису.", "error");
-        return;
-    }
+        event.preventDefault();
+        
+        const isEditMode = !!state.editingAppointmentId;
+        if (!isEditMode && state.user.role !== 'admin' && state.user.role !== 'salon_admin') {
+            showNotification("У вас недостатньо прав для створення запису.", "error");
+            return;
+        }
 
-    const service = state.selectedServiceForAppointment;
-    const masterId = document.getElementById('appointment-master').value;
-    const dateTimeString = document.getElementById('appointment-datetime').value;
-    const salonId = document.getElementById('appointment-salon').value;
-    
-    // --- ПОКРАЩЕНА ПЕРЕВІРКА ПОЛІВ ---
-    if (!dateTimeString) {
-        return showNotification("Будь ласка, вкажіть дату і час.", "error");
-    }
-    if (!service) {
-        return showNotification("Будь ласка, оберіть послугу зі списку результатів пошуку.", "error");
-    }
-    if (!masterId) {
-        return showNotification("Будь ласка, оберіть майстра.", "error");
-    }
-    if (!salonId) {
-        return showNotification("Будь ласка, оберіть салон.", "error");
-    }
-    // --- КІНЕЦЬ ПОКРАЩЕНОЇ ПЕРЕВІРКИ ---
+        const dateTimeString = document.getElementById('appointment-datetime').value;
+        const service = state.selectedServiceForAppointment;
+        const masterId = document.getElementById('appointment-master').value;
+        const salonId = document.getElementById('appointment-salon').value;
 
-    const isInternal = document.getElementById('internal-service-checkbox').checked;
-    const master = state.masters.find(m => m.id === masterId);
-    if (!master) {
-        return showNotification("Помилка: не знайдено майстра!", "error");
-    }
+        if (!dateTimeString) {
+            return showNotification("Будь ласка, вкажіть дату і час.", "error");
+        }
+        if (!service) {
+            return showNotification("Будь ласка, оберіть послугу зі списку результатів пошуку.", "error");
+        }
+        if (!masterId) {
+            return showNotification("Будь ласка, оберіть майстра.", "error");
+        }
+        if (!salonId) {
+            return showNotification("Будь ласка, оберіть салон.", "error");
+        }
+        
+        const isInternal = document.getElementById('internal-service-checkbox').checked;
+        const master = state.masters.find(m => m.id === masterId);
+        if (!master) {
+            return showNotification("Помилка: не знайдено майстра!", "error");
+        }
 
-    const priceModifier = master.priceModifier || 0;
-    const salaryBase = service.price * (1 + priceModifier / 100);
-    const finalPrice = updateFinalPrice();
-    const additionalChargeAmount = parseFloat(document.getElementById('additional-charge-amount').value) || 0;
-    const additionalChargeDescription = document.getElementById('additional-charge-description').value.trim();
-    
-    let appointmentData = { 
-        dateTime: Timestamp.fromDate(new Date(dateTimeString)), 
-        serviceId: service.id, 
-        masterId, 
-        salonId, 
-        duration: service.duration || 60, 
-        manualDiscount: { value: parseFloat(document.getElementById('manual-discount-value').value) || 0, type: document.getElementById('manual-discount-type').value }, 
-        additionalCharge: { amount: additionalChargeAmount, description: additionalChargeDescription }, 
-        finalPrice, 
-        salaryBase, 
-        isInternal: isInternal 
-    };
-    let logDetails = { service: service.name, master: master.name };
+        const priceModifier = master.priceModifier || 0;
+        const salaryBase = service.price * (1 + priceModifier / 100);
+        const finalPrice = updateFinalPrice();
+        const additionalChargeAmount = parseFloat(document.getElementById('additional-charge-amount').value) || 0;
+        const additionalChargeDescription = document.getElementById('additional-charge-description').value.trim();
+        
+        let appointmentData = { 
+            dateTime: Timestamp.fromDate(new Date(dateTimeString)), 
+            serviceId: service.id, 
+            masterId, 
+            salonId, 
+            duration: service.duration || 60, 
+            manualDiscount: { value: parseFloat(document.getElementById('manual-discount-value').value) || 0, type: document.getElementById('manual-discount-type').value }, 
+            additionalCharge: { amount: additionalChargeAmount, description: additionalChargeDescription }, 
+            finalPrice, 
+            salaryBase, 
+            isInternal: isInternal 
+        };
+        let logDetails = { service: service.name, master: master.name };
 
-    try {
-        if (isInternal) {
-            const receivingMasterId = document.getElementById('master-as-client-select').value;
-            if (!receivingMasterId) { return showNotification("Будь ласка, оберіть майстра-клієнта.", "error"); }
-            if (receivingMasterId === masterId) { return showNotification("Майстер не може надавати послугу самому собі.", "error"); }
-            const receivingMaster = state.masters.find(m => m.id === receivingMasterId);
-            appointmentData.clientId = receivingMasterId;
-            appointmentData.clientName = `${receivingMaster.name} (Майстер)`;
-            logDetails.clientName = appointmentData.clientName;
-        } else {
-            const clientName = document.getElementById('client-search-input').value.trim();
-            logDetails.clientName = clientName;
-            let clientId;
-            let clientPhone = document.getElementById('client-phone-input').value.trim();
-            if (state.selectedClientForAppointment) {
-                clientId = state.selectedClientForAppointment.id;
+        try {
+            if (isInternal) {
+                const receivingMasterId = document.getElementById('master-as-client-select').value;
+                if (!receivingMasterId) { return showNotification("Будь ласка, оберіть майстра-клієнта.", "error"); }
+                if (receivingMasterId === masterId) { return showNotification("Майстер не може надавати послугу самому собі.", "error"); }
+                const receivingMaster = state.masters.find(m => m.id === receivingMasterId);
+                appointmentData.clientId = receivingMasterId;
+                appointmentData.clientName = `${receivingMaster.name} (Майстер)`;
+                logDetails.clientName = appointmentData.clientName;
             } else {
-                if (!clientPhone) return showNotification("Для нового клієнта необхідно вказати номер телефону.", "error");
-                const normalizedPhone = clientPhone.replace(/[\s-()]/g, '');
-                const existingClient = state.clients.find(c => c.name.toLowerCase() === clientName.toLowerCase() && c.phone.replace(/[\s-()]/g, '') === normalizedPhone);
-                if (existingClient) { clientId = existingClient.id; }
-                else {
-                     const newClientAction = () => addDoc(collection(db, 'clients'), { name: clientName, phone: clientPhone, createdAt: Timestamp.now() });
-                     const newClientRef = await logAndExecute('Створено клієнта', { name: clientName, phone: clientPhone }, newClientAction);
-                     clientId = newClientRef.id;
+                const clientName = document.getElementById('client-search-input').value.trim();
+                logDetails.clientName = clientName;
+                let clientId;
+                let clientPhone = document.getElementById('client-phone-input').value.trim();
+                if (state.selectedClientForAppointment) {
+                    clientId = state.selectedClientForAppointment.id;
+                } else {
+                    if (!clientPhone) return showNotification("Для нового клієнта необхідно вказати номер телефону.", "error");
+                    const normalizedPhone = clientPhone.replace(/[\s-()]/g, '');
+                    const existingClient = state.clients.find(c => c.name.toLowerCase() === clientName.toLowerCase() && c.phone.replace(/[\s-()]/g, '') === normalizedPhone);
+                    if (existingClient) { clientId = existingClient.id; }
+                    else {
+                         const newClientAction = () => addDoc(collection(db, 'clients'), { name: clientName, phone: clientPhone, createdAt: Timestamp.now() });
+                         const newClientRef = await logAndExecute('Створено клієнта', { name: clientName, phone: clientPhone }, newClientAction);
+                         clientId = newClientRef.id;
+                    }
                 }
+                appointmentData.clientId = clientId;
+                appointmentData.clientName = clientName;
             }
-            appointmentData.clientId = clientId;
-            appointmentData.clientName = clientName;
-        }
 
-        if (isEditMode) {
-            const action = () => updateDoc(doc(db, 'appointments', state.editingAppointmentId), appointmentData);
-            await logAndExecute('Оновлено запис', { ...logDetails, appointmentId: state.editingAppointmentId }, action);
-            showNotification('Запис успішно оновлено!');
-            state.editingAppointmentId = null;
-            renderView('calendar');
-        } else {
-            const fullAppointmentData = { ...appointmentData, status: 'upcoming', totalPaid: 0, payments: [], createdAt: Timestamp.now() };
-            const createAppAction = () => addDoc(collection(db, 'appointments'), fullAppointmentData);
-            await logAndExecute('Створено запис', logDetails, createAppAction);
-            showNotification('Запис успішно створено!');
-            event.target.reset();
-            state.selectedClientForAppointment = null;
-            state.selectedServiceForAppointment = null;
-            document.getElementById('internal-service-checkbox').checked = false;
-            document.getElementById('internal-service-checkbox').dispatchEvent(new Event('change'));
-            const clientSearchInput = document.getElementById('client-search-input');
-            if(clientSearchInput) clientSearchInput.disabled = false;
-            document.getElementById('client-phone-group').style.display = 'none';
-            updateFinalPrice();
+            if (isEditMode) {
+                const action = () => updateDoc(doc(db, 'appointments', state.editingAppointmentId), appointmentData);
+                await logAndExecute('Оновлено запис', { ...logDetails, appointmentId: state.editingAppointmentId }, action);
+                showNotification('Запис успішно оновлено!');
+                state.editingAppointmentId = null;
+                renderView('calendar');
+            } else {
+                const fullAppointmentData = { ...appointmentData, status: 'upcoming', totalPaid: 0, payments: [], createdAt: Timestamp.now() };
+                const createAppAction = () => addDoc(collection(db, 'appointments'), fullAppointmentData);
+                await logAndExecute('Створено запис', logDetails, createAppAction);
+                showNotification('Запис успішно створено!');
+                event.target.reset();
+                state.selectedClientForAppointment = null;
+                state.selectedServiceForAppointment = null;
+                document.getElementById('internal-service-checkbox').checked = false;
+                document.getElementById('internal-service-checkbox').dispatchEvent(new Event('change'));
+                const clientSearchInput = document.getElementById('client-search-input');
+                if(clientSearchInput) clientSearchInput.disabled = false;
+                document.getElementById('client-phone-group').style.display = 'none';
+                updateFinalPrice();
+            }
+        } catch (e) {
+            showNotification('Не вдалося зберегти запис.', "error");
         }
-    } catch (e) {
-        showNotification('Не вдалося зберегти запис.', "error");
     }
-}
      
     async function handleConfirmPayment(event) {
         event.preventDefault();
@@ -2011,7 +2158,6 @@ let state = {
             const appointmentData = appointmentSnap.data();
             const currentTotalPaid = appointmentData.totalPaid || 0;
             const finalPrice = appointmentData.finalPrice;
-            
             const processPayment = async () => {
                 const newPayment = { amount: amountToPay, type: paymentType, date: Timestamp.now() };
                 const newTotalPaid = currentTotalPaid + amountToPay;
@@ -2020,7 +2166,6 @@ let state = {
                 await logAndExecute('Проведено оплату', { appointmentId, clientName: appointmentData.clientName, amount: amountToPay, type: paymentType }, action);
                 document.getElementById('payment-modal').style.display = 'none';
             };
-
             if (amountToPay > (finalPrice - currentTotalPaid) + 0.01) { 
                 showConfirmModal(`Сума оплати (${amountToPay.toFixed(2)} zł) більша за залишок (${(finalPrice - currentTotalPaid).toFixed(2)} zł). Продовжити?`, processPayment);
             } else {
@@ -2034,103 +2179,105 @@ let state = {
 
     // #region Masters View
     function renderMastersView(container) {
-    const salonCheckboxes = state.salons.map(s => 
-        `<label><input type="checkbox" class="new-master-salon-cb" value="${s.id}"> ${s.name}</label>`
-    ).join('');
-    
-    const editSalonCheckboxes = state.salons.map(s => 
-        `<label><input type="checkbox" class="edit-master-salon-cb" value="${s.id}"> ${s.name}</label>`
-    ).join('');
-
-    container.innerHTML = `
-        <div class="content-card">
-            <h2>Додати нового майстра</h2>
-            <form id="add-master-form">
-                <div class="form-group"><label for="new-master-name">Ім'я та прізвище</label><input type="text" id="new-master-name" required></div>
-                
-                <div class="form-group">
-                    <label>Салони, де працює майстер</label>
-                    <div id="new-master-salons" class="category-checkbox-group">${salonCheckboxes}</div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group" style="flex:1;"><label for="new-master-tier">Ранг</label><input type="text" id="new-master-tier" placeholder="напр. Топ-майстер"></div>
-                    <div class="form-group" style="flex:1;"><label for="new-master-modifier">Націнка (%)</label><input type="number" id="new-master-modifier" value="0" min="0"></div>
-                </div>
-                <div class="form-group"><label>Спеціалізації</label><div id="new-master-categories" class="category-checkbox-group"></div></div>
-                <button class="btn" type="submit">Додати майстра</button>
-            </form>
-        </div>
-        <div class="content-card" style="margin-top: 2rem;">
-            <h2>Список майстрів</h2>
-            <ul id="masters-list" class="item-list"></ul>
-        </div>
-        <div class="modal-overlay" id="edit-master-modal">
-            <div class="modal-panel">
-                <div class="modal-header"><h2>Редагувати майстра</h2><button class="close-btn">&times;</button></div>
-                <form id="edit-master-form">
-                    <input type="hidden" id="edit-master-id">
-                    <div class="form-group"><label for="edit-master-name">Ім'я та прізвище</label><input type="text" id="edit-master-name" required></div>
+        const salonCheckboxes = state.salons.map(s => 
+            `<label><input type="checkbox" class="new-master-salon-cb" value="${s.id}"> ${s.name}</label>`
+        ).join('');
+        const editSalonCheckboxes = state.salons.map(s => 
+            `<label><input type="checkbox" class="edit-master-salon-cb" value="${s.id}"> ${s.name}</label>`
+        ).join('');
+        container.innerHTML = `
+            <div class="content-card">
+                <h2>Додати нового майстра</h2>
+                <form id="add-master-form">
+                    <div class="form-group"><label for="new-master-name">Ім'я та прізвище</label><input type="text" id="new-master-name" required></div>
                     
                     <div class="form-group">
                         <label>Салони, де працює майстер</label>
-                        <div id="edit-master-salons" class="category-checkbox-group">${editSalonCheckboxes}</div>
+                        <div id="new-master-salons" class="category-checkbox-group">${salonCheckboxes}</div>
                     </div>
 
                     <div class="form-row">
-                        <div class="form-group" style="flex:1;"><label for="edit-master-tier">Ранг</label><input type="text" id="edit-master-tier"></div>
-                        <div class="form-group" style="flex:1;"><label for="edit-master-modifier">Націнка (%)</label><input type="number" id="edit-master-modifier" min="0"></div>
+                        <div class="form-group" style="flex:1;"><label for="new-master-tier">Ранг</label><input type="text" id="new-master-tier" placeholder="напр. Топ-майстер"></div>
+                        <div class="form-group" style="flex:1;"><label for="new-master-modifier">Націнка (%)</label><input type="number" id="new-master-modifier" value="0" min="0"></div>
                     </div>
-                    <div class="form-group"><label>Спеціалізації</label><div id="edit-master-categories" class="category-checkbox-group"></div></div>
-                    <div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem;"><label><input type="checkbox" id="edit-master-frozen"> Заморозити майстра</label></div>
-                    <button type="submit" class="btn">Зберегти зміни</button>
+                    <div class="form-group"><label>Спеціалізації</label><div id="new-master-categories" class="category-checkbox-group"></div></div>
+                    <button class="btn" type="submit">Додати майстра</button>
                 </form>
             </div>
-        </div>`;
-        
-    document.getElementById('add-master-form').onsubmit = handleAddMaster; 
-    document.querySelector('#edit-master-modal .close-btn').onclick = () => document.getElementById('edit-master-modal').style.display = 'none'; 
-    document.getElementById('edit-master-form').onsubmit = handleUpdateMaster; 
-    populateCategoryCheckboxes('new-master-categories'); 
-    
-    const listEl = document.getElementById('masters-list'); 
-    listEl.innerHTML = state.masters.length > 0 ? '' : '<li>Немає майстрів.</li>'; 
-    state.masters.forEach(master => { 
-        const li = document.createElement('li');
-        li.className = master.isFrozen ? 'is-frozen' : '';
-        const masterSalons = (master.salonIds || []).map(id => state.salons.find(s => s.id === id)?.name || '').filter(Boolean).join(', ');
-        li.innerHTML = `
-            <div class="master-info-clickable" data-id="${master.id}" style="flex-grow: 1; cursor: pointer;">
-                <strong>${master.name}</strong> ${master.tier ? `(${master.tier})` : ''} <br>
-                <small>Салони: ${masterSalons || 'Не вказано'}</small>
+            <div class="content-card" style="margin-top: 2rem;">
+                <h2>Список майстрів</h2>
+                <ul id="masters-list" class="item-list"></ul>
             </div>
-            <div class="actions">
-                <button class="btn btn-edit" data-id="${master.id}" data-action="edit-profile">Ред.</button>
+            <div class="modal-overlay" id="edit-master-modal">
+                <div class="modal-panel">
+                    <div class="modal-header"><h2>Редагувати майстра</h2><button class="close-btn">&times;</button></div>
+                    <form id="edit-master-form">
+                        <input type="hidden" id="edit-master-id">
+                        <div class="form-group"><label for="edit-master-name">Ім'я та прізвище</label><input type="text" id="edit-master-name" required></div>
+                        
+                        <div class="form-group">
+                            <label>Салони, де працює майстер</label>
+                            <div id="edit-master-salons" class="category-checkbox-group">${editSalonCheckboxes}</div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;"><label for="edit-master-tier">Ранг</label><input type="text" id="edit-master-tier"></div>
+                            <div class="form-group" style="flex:1;"><label for="edit-master-modifier">Націнка (%)</label><input type="number" id="edit-master-modifier" min="0"></div>
+                        </div>
+                        <div class="form-group"><label>Спеціалізації</label><div id="edit-master-categories" class="category-checkbox-group"></div></div>
+                        <div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem;"><label><input type="checkbox" id="edit-master-frozen"> Заморозити майстра</label></div>
+                        <button type="submit" class="btn">Зберегти зміни</button>
+                    </form>
+                </div>
             </div>`;
-        listEl.appendChild(li); 
-    }); 
-    
-    listEl.onclick = (event) => { 
-        const button = event.target.closest('button[data-action="edit-profile"]');
-        if (button) { 
-            event.stopPropagation(); 
-            showEditMasterModal(button.dataset.id); 
-        } else { 
-            const masterItem = event.target.closest('.master-info-clickable');
-            if (masterItem) { 
-                state.viewingMasterId = masterItem.dataset.id; 
-                renderView('masterDetail'); 
+            
+        document.getElementById('add-master-form').onsubmit = handleAddMaster; 
+        const editMasterModal = document.getElementById('edit-master-modal');
+        if (editMasterModal) {
+            editMasterModal.querySelector('.close-btn').onclick = () => editMasterModal.style.display = 'none'; 
+        }
+        document.getElementById('edit-master-form').onsubmit = handleUpdateMaster; 
+        populateCategoryCheckboxes('new-master-categories'); 
+        
+        const listEl = document.getElementById('masters-list'); 
+        listEl.innerHTML = state.masters.length > 0 ? '' : '<li>Немає майстрів.</li>'; 
+        state.masters.forEach(master => { 
+            const li = document.createElement('li');
+            li.className = master.isFrozen ? 'is-frozen' : '';
+            const masterSalons = (master.salonIds || []).map(id => state.salons.find(s => s.id === id)?.name || '').filter(Boolean).join(', ');
+            li.innerHTML = `
+                <div class="master-info-clickable" data-id="${master.id}" style="flex-grow: 1; cursor: pointer;">
+                    <strong>${master.name}</strong> ${master.tier ? `(${master.tier})` : ''} <br>
+                    <small>Салони: ${masterSalons || 'Не вказано'}</small>
+                </div>
+                <div class="actions">
+                    <button class="btn btn-edit" data-id="${master.id}" data-action="edit-profile">Ред.</button>
+                </div>`;
+            listEl.appendChild(li); 
+        }); 
+        
+        listEl.onclick = (event) => { 
+            const button = event.target.closest('button[data-action="edit-profile"]');
+            if (button) { 
+                event.stopPropagation(); 
+                showEditMasterModal(button.dataset.id);
+            } else { 
+                const masterItem = event.target.closest('.master-info-clickable');
+                if (masterItem) { 
+                    state.viewingMasterId = masterItem.dataset.id;
+                    renderView('masterDetail'); 
+                } 
             } 
-        } 
-    };
-}
+        };
+    }
 
     function renderMasterDetailView(container) {
         const masterId = state.viewingMasterId;
         const master = state.masters.find(m => m.id === masterId);
         if (!master) {
             container.innerHTML = `<div class="content-card"><h2>Майстра не знайдено</h2><p><button id="detail-view-back-btn" class="btn">Назад до списку</button></p></div>`;
-            container.onclick = (event) => { if (event.target.id === 'detail-view-back-btn') { renderView('masters'); } };
+            const backBtn = document.getElementById('detail-view-back-btn');
+            if(backBtn) backBtn.onclick = () => renderView('masters');
             return;
         }
         const categoriesList = (master.categoryIds || []).map(id => state.categories.find(c => c.id === id)?.name).filter(Boolean).join(', ') || 'Не вказано';
@@ -2142,32 +2289,38 @@ let state = {
             </div>
             <div class="content-card">
                 <h3>Видача авансу</h3>
-            <form id="add-advance-form">
-                <div class="form-row">
-                    <div class="form-group" style="flex:2;"><label for="advance-amount">Сума авансу (zł)</label><input type="number" id="advance-amount" min="1" required></div>
-                    <div class="form-group" style="flex:1;"><label for="advance-payment-type">Тип оплати</label><select id="advance-payment-type" required><option value="cash">Готівка</option><option value="card">Картка</option></select></div>
-                </div>
-            <div class="form-group"><label for="advance-description">Опис (необов'язково)</label><textarea id="advance-description" rows="2"></textarea></div>
-            <button type="submit" class="btn">Видати аванс</button>
-            </form>
+                <form id="add-advance-form">
+                    <div class="form-row">
+                        <div class="form-group" style="flex:2;"><label for="advance-amount">Сума авансу (zł)</label><input type="number" id="advance-amount" min="1" required></div>
+                        <div class="form-group" style="flex:1;"><label for="advance-payment-type">Тип оплати</label><select id="advance-payment-type" required><option value="cash">Готівка</option><option value="card">Картка</option></select></div>
+                    </div>
+                    <div class="form-group"><label for="advance-description">Опис (необов'язково)</label><textarea id="advance-description" rows="2"></textarea></div>
+                    <button type="submit" class="btn">Видати аванс</button>
+                </form>
             </div>
             <div class="content-card"><h3>Історія авансів</h3><ul id="master-advances-list" class="item-list"><li>Завантаження...</li></ul></div>
         `;
         
-        container.onclick = function(event) {
-            if (event.target.closest('#detail-view-back-btn')) { renderView('masters'); return; }
-            const deleteButton = event.target.closest('.btn-delete-advance');
-            if (deleteButton) { handleDeleteAdvance(deleteButton.dataset.id, master.name, deleteButton.dataset.amount, deleteButton.dataset.description); return; }
-        };
+        const backBtn = document.getElementById('detail-view-back-btn');
+        if(backBtn) backBtn.onclick = () => renderView('masters');
+
+        const listEl = document.getElementById('master-advances-list');
+        if(listEl) {
+            listEl.onclick = (event) => {
+                const deleteButton = event.target.closest('.btn-delete-advance');
+                if (deleteButton) { 
+                    handleDeleteAdvance(deleteButton.dataset.id, master.name, deleteButton.dataset.amount, deleteButton.dataset.description); 
+                }
+            };
+        }
 
         document.getElementById('add-advance-form').onsubmit = handleAddAdvance;
-        
         const advancesCollectionRef = collection(db, 'masters', masterId, 'advances');
         masterAdvancesUnsubscribe = onSnapshot(query(advancesCollectionRef, orderBy("date", "desc")), (snapshot) => {
             state.viewingMasterAdvances = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const listEl = document.getElementById('master-advances-list');
-            if (listEl) {
-                listEl.innerHTML = state.viewingMasterAdvances.length === 0 ? '<li>Авансів ще не було.</li>' : state.viewingMasterAdvances.map(adv => `
+            const advancesListEl = document.getElementById('master-advances-list');
+            if (advancesListEl) {
+                advancesListEl.innerHTML = state.viewingMasterAdvances.length === 0 ? '<li>Авансів ще не було.</li>' : state.viewingMasterAdvances.map(adv => `
                     <li>
                         <div><span>${adv.date.toDate().toLocaleString('uk-UA')}</span>${adv.description ? `<br><small style="color: var(--gray-text);">${adv.description}</small>` : ''}</div>
                         <div class="actions"><strong>${adv.amount} zł</strong><button class="btn btn-delete btn-delete-advance" data-id="${adv.id}" data-amount="${adv.amount}" data-description="${adv.description || ''}">Видалити</button></div>
@@ -2193,7 +2346,6 @@ let state = {
         if (description) { data.description = description; }
         
         const action = () => addDoc(collection(db, 'masters', masterId, 'advances'), data);
-        
         try {
             await logAndExecute('Видано аванс майстру', { masterId, name: master.name, amount, description }, action);
             amountInput.value = '';
@@ -2217,9 +2369,9 @@ let state = {
     }
 
     function populateCategoryCheckboxes(elementId, checkedIds = []) { 
-        const container = document.getElementById(elementId); 
+        const container = document.getElementById(elementId);
         if (!container) return;
-        container.innerHTML = state.categories.length ? '' : 'Спочатку додайте категорії'; 
+        container.innerHTML = state.categories.length ? '' : 'Спочатку додайте категорії';
         state.categories.forEach(category => { 
             const isChecked = checkedIds.includes(category.id); 
             container.innerHTML += `<label><input type="checkbox" value="${category.id}" ${isChecked ? 'checked' : ''}> ${category.name}</label>`; 
@@ -2227,58 +2379,56 @@ let state = {
     }
     
     async function handleAddMaster(event) { 
-    event.preventDefault();
-    const name = document.getElementById('new-master-name').value.trim(); 
-    const salonIds = Array.from(document.querySelectorAll('#new-master-salons input:checked')).map(el => el.value);
-    const tier = document.getElementById('new-master-tier').value.trim(); 
-    const priceModifier = parseFloat(document.getElementById('new-master-modifier').value) || 0;
-    const categoryIds = Array.from(document.querySelectorAll('#new-master-categories input:checked')).map(el => el.value); 
-    
-    if (!name || salonIds.length === 0) return showNotification("Введіть ім'я та оберіть хоча б один салон.", "error");
-    
-    const action = () => addDoc(collection(db, 'masters'), { name, salonIds, tier, priceModifier, categoryIds, isFrozen: false, timestamp: Timestamp.now() });
-    try { 
-        await logAndExecute('Створено майстра', { name }, action);
-        event.target.reset();
-    } catch (e) { showNotification('Не вдалося додати майстра.', "error"); } 
-}
+        event.preventDefault();
+        const name = document.getElementById('new-master-name').value.trim(); 
+        const salonIds = Array.from(document.querySelectorAll('#new-master-salons input:checked')).map(el => el.value);
+        const tier = document.getElementById('new-master-tier').value.trim(); 
+        const priceModifier = parseFloat(document.getElementById('new-master-modifier').value) || 0;
+        const categoryIds = Array.from(document.querySelectorAll('#new-master-categories input:checked')).map(el => el.value); 
+        
+        if (!name || salonIds.length === 0) return showNotification("Введіть ім'я та оберіть хоча б один салон.", "error");
+        const action = () => addDoc(collection(db, 'masters'), { name, salonIds, tier, priceModifier, categoryIds, isFrozen: false, timestamp: Timestamp.now() });
+        try { 
+            await logAndExecute('Створено майстра', { name }, action);
+            event.target.reset();
+        } catch (e) { showNotification('Не вдалося додати майстра.', "error"); } 
+    }
 
-function showEditMasterModal(id) { 
-    const master = state.masters.find(m => m.id === id);
-    if (!master) return showNotification('Майстра не знайдено!', "error"); 
+    function showEditMasterModal(id) { 
+        const master = state.masters.find(m => m.id === id);
+        if (!master) return showNotification('Майстра не знайдено!', "error"); 
+        
+        const modal = document.getElementById('edit-master-modal'); 
+        if(!modal) return;
+        modal.style.display = 'flex'; 
+        document.getElementById('edit-master-id').value = id; 
+        document.getElementById('edit-master-name').value = master.name;
+        document.getElementById('edit-master-tier').value = master.tier || ''; 
+        document.getElementById('edit-master-modifier').value = master.priceModifier || 0; 
+        document.getElementById('edit-master-frozen').checked = master.isFrozen || false;
+        document.querySelectorAll('.edit-master-salon-cb').forEach(cb => {
+            cb.checked = (master.salonIds || []).includes(cb.value);
+        });
+        populateCategoryCheckboxes('edit-master-categories', master.categoryIds || []);
+    }
     
-    const modal = document.getElementById('edit-master-modal'); 
-    modal.style.display = 'flex'; 
-    document.getElementById('edit-master-id').value = id; 
-    document.getElementById('edit-master-name').value = master.name;
-    document.getElementById('edit-master-tier').value = master.tier || ''; 
-    document.getElementById('edit-master-modifier').value = master.priceModifier || 0; 
-    document.getElementById('edit-master-frozen').checked = master.isFrozen || false; 
-    
-    document.querySelectorAll('.edit-master-salon-cb').forEach(cb => {
-        cb.checked = (master.salonIds || []).includes(cb.value);
-    });
-    populateCategoryCheckboxes('edit-master-categories', master.categoryIds || []);
-}
-    
-async function handleUpdateMaster(event) { 
-    event.preventDefault();
-    const id = document.getElementById('edit-master-id').value; 
-    const name = document.getElementById('edit-master-name').value.trim(); 
-    const salonIds = Array.from(document.querySelectorAll('#edit-master-salons input:checked')).map(el => el.value);
-    const tier = document.getElementById('edit-master-tier').value.trim(); 
-    const priceModifier = parseFloat(document.getElementById('edit-master-modifier').value) || 0;
-    const categoryIds = Array.from(document.querySelectorAll('#edit-master-categories input:checked')).map(el => el.value); 
-    const isFrozen = document.getElementById('edit-master-frozen').checked; 
-    
-    if (!name || salonIds.length === 0) return showNotification("Ім'я та салон не можуть бути порожніми.", "error");
-
-    const action = () => updateDoc(doc(db, 'masters', id), { name, salonIds, tier, priceModifier, categoryIds, isFrozen });
-    try { 
-        await logAndExecute('Оновлено дані майстра', { masterId: id, name }, action);
-        document.getElementById('edit-master-modal').style.display = 'none';
-    } catch(e) { showNotification('Не вдалося оновити.', "error"); } 
-}
+    async function handleUpdateMaster(event) { 
+        event.preventDefault();
+        const id = document.getElementById('edit-master-id').value; 
+        const name = document.getElementById('edit-master-name').value.trim(); 
+        const salonIds = Array.from(document.querySelectorAll('#edit-master-salons input:checked')).map(el => el.value);
+        const tier = document.getElementById('edit-master-tier').value.trim();
+        const priceModifier = parseFloat(document.getElementById('edit-master-modifier').value) || 0;
+        const categoryIds = Array.from(document.querySelectorAll('#edit-master-categories input:checked')).map(el => el.value); 
+        const isFrozen = document.getElementById('edit-master-frozen').checked;
+        if (!name || salonIds.length === 0) return showNotification("Ім'я та салон не можуть бути порожніми.", "error");
+        const action = () => updateDoc(doc(db, 'masters', id), { name, salonIds, tier, priceModifier, categoryIds, isFrozen });
+        try { 
+            await logAndExecute('Оновлено дані майстра', { masterId: id, name }, action);
+            const modal = document.getElementById('edit-master-modal');
+            if(modal) modal.style.display = 'none';
+        } catch(e) { showNotification('Не вдалося оновити.', "error"); } 
+    }
     // #endregion
 
     // #region Services View
@@ -2322,7 +2472,7 @@ async function handleUpdateMaster(event) {
                         <button type="submit">Зберегти</button>
                     </form>
                 </div>
-            </div>`; 
+            </div>`;
         setupCategoriesLogic(); 
         if (state.selectedCategoryId) { 
             renderServicesForCategory();
@@ -2330,8 +2480,11 @@ async function handleUpdateMaster(event) {
     }
     
     function setupCategoriesLogic() { 
-        document.getElementById('add-category-form').onsubmit = handleAddCategory; 
-        document.getElementById('edit-category-modal').querySelector('.close-btn').onclick = () => document.getElementById('edit-category-modal').style.display = 'none';
+        document.getElementById('add-category-form').onsubmit = handleAddCategory;
+        const editCategoryModal = document.getElementById('edit-category-modal');
+        if (editCategoryModal) {
+            editCategoryModal.querySelector('.close-btn').onclick = () => editCategoryModal.style.display = 'none';
+        }
         document.getElementById('edit-category-form').onsubmit = handleUpdateCategory; 
         const categoriesListEl = document.getElementById('categories-list'); 
         categoriesListEl.innerHTML = state.categories.length > 0 ? '' : '<li>Немає категорій.</li>';
@@ -2343,24 +2496,24 @@ async function handleUpdateMaster(event) {
             li.innerHTML = `<span>${category.name} ${category.discount ? `<strong style="color:var(--danger-color);">-`+category.discount+'%</strong>' : ''}</span><div class="actions"><button class="btn btn-edit" data-id="${category.id}" data-name="${category.name}" data-discount="${category.discount || 0}">✏️</button><button class="btn btn-delete" data-id="${category.id}" data-name="${category.name}">🗑️</button></div>`; 
             categoriesListEl.appendChild(li); 
         });
-        
         categoriesListEl.onclick = (event) => { 
-            const target = event.target; 
+            const target = event.target;
             const deleteBtn = target.closest('.btn-delete'); 
             if (deleteBtn) { handleDeleteCategory(deleteBtn.dataset.id, deleteBtn.dataset.name);
             } else if (target.closest('.btn-edit')) { 
-                const btn = target.closest('.btn-edit'); 
+                const btn = target.closest('.btn-edit');
                 showEditCategoryModal(btn.dataset.id, btn.dataset.name, btn.dataset.discount); 
             } else if (target.closest('.category-list-item')) { 
                 state.selectedCategoryId = target.closest('.category-list-item').dataset.id;
                 renderView('services'); 
             } 
-        }; 
+        };
     }
 
     function renderServicesForCategory() { 
-        const categoryId = state.selectedCategoryId; 
+        const categoryId = state.selectedCategoryId;
         const servicesContainer = document.getElementById('services-container');
+        if (!servicesContainer) return;
         const category = state.categories.find(c => c.id === categoryId); 
         const categoryName = category ? category.name : '';
         servicesContainer.innerHTML = `<div class="content-card"><div style="display:flex; justify-content:space-between; align-items:center;"><h2>Послуги: ${categoryName}</h2><button id="add-service-btn" class="btn">Додати послугу</button></div><ul id="services-list" class="item-list"></ul></div>`; 
@@ -2373,10 +2526,10 @@ async function handleUpdateMaster(event) {
             const discountedPrice = service.price * (1 - finalDiscount / 100); 
             const li = document.createElement('li'); 
             li.innerHTML = `<div><strong>${service.name}</strong><br><small>${service.duration || 'N/A'} хв. ${service.discount > 0 ? `(Знижка ${service.discount}%)` : ''}</small></div><div class="price-display">${finalDiscount > 0 ? `<span class="old-price">${service.price} zł</span>` : ''}<span class="new-price">${discountedPrice.toFixed(0)} zł</span></div><div class="actions"><button class="btn-edit btn-edit-service" data-id="${service.id}" data-name="${service.name}" data-duration="${service.duration}" data-price="${service.price}" data-discount="${service.discount || 0}">✏️</button><button class="btn btn-delete btn-delete-service" data-id="${service.id}" data-name="${service.name}">🗑️</button></div>`; 
-            servicesListEl.appendChild(li); 
+            servicesListEl.appendChild(li);
         });
         servicesListEl.onclick = (event) => { 
-            const target = event.target.closest('button'); 
+            const target = event.target.closest('button');
             if (!target) return; 
             const deleteBtn = target.closest('.btn-delete-service'); 
             if (deleteBtn) handleDeleteService(deleteBtn.dataset.id, deleteBtn.dataset.name);
@@ -2385,13 +2538,13 @@ async function handleUpdateMaster(event) {
     }
 
     async function handleAddCategory(event) { 
-        event.preventDefault(); 
+        event.preventDefault();
         const nameInput = document.getElementById('new-category-name');
         const name = nameInput.value.trim(); 
-        if (!name) return; 
+        if (!name) return;
         const action = () => addDoc(collection(db, 'serviceCategories'), { name, discount: 0 });
         try { 
-            await logAndExecute('Створено категорію', { name }, action); 
+            await logAndExecute('Створено категорію', { name }, action);
             nameInput.value = ''; 
         } catch (e) { showNotification('Не вдалося додати.', "error"); } 
     }
@@ -2413,11 +2566,12 @@ async function handleUpdateMaster(event) {
     }
 
     function showEditCategoryModal(id, name, discount) { 
-        const modal = document.getElementById('edit-category-modal'); 
+        const modal = document.getElementById('edit-category-modal');
+        if(!modal) return;
         modal.style.display = 'flex'; 
         document.getElementById('edit-category-id').value = id;
         document.getElementById('edit-category-name').value = name; 
-        document.getElementById('edit-category-discount').value = discount || 0; 
+        document.getElementById('edit-category-discount').value = discount || 0;
     }
 
     async function handleUpdateCategory(event) { 
@@ -2429,13 +2583,15 @@ async function handleUpdateMaster(event) {
         
         const action = () => updateDoc(doc(db, 'serviceCategories', id), { name, discount });
         try { 
-            await logAndExecute('Оновлено категорію', { categoryId: id, name }, action); 
-            document.getElementById('edit-category-modal').style.display = 'none';
+            await logAndExecute('Оновлено категорію', { categoryId: id, name }, action);
+            const modal = document.getElementById('edit-category-modal');
+            if(modal) modal.style.display = 'none';
         } catch(e) { showNotification('Не вдалося оновити.', "error"); } 
     }
 
     function showServiceModal(id = null, data = {}) { 
         const modal = document.getElementById('edit-service-modal');
+        if(!modal) return;
         modal.style.display = 'flex'; 
         modal.querySelector('h2').textContent = id ? 'Редагувати послугу' : 'Додати нову послугу'; 
         document.getElementById('edit-service-id').value = id || '';
@@ -2444,24 +2600,25 @@ async function handleUpdateMaster(event) {
         document.getElementById('edit-service-price').value = data.price || ''; 
         document.getElementById('edit-service-discount').value = data.discount || 0;
         document.getElementById('edit-service-form').onsubmit = id ? handleUpdateService : handleAddService; 
-        document.querySelector('#edit-service-modal .close-btn').onclick = () => modal.style.display = 'none';
+        const closeBtn = modal.querySelector('.close-btn');
+        if(closeBtn) closeBtn.onclick = () => modal.style.display = 'none';
     }
 
     async function handleAddService(event) { 
-        event.preventDefault(); 
+        event.preventDefault();
         if (!state.selectedCategoryId) return showNotification('Спочатку оберіть категорію!', "error"); 
         
         const name = document.getElementById('edit-service-name').value.trim();
         const duration = parseInt(document.getElementById('edit-service-duration').value); 
-        const price = parseFloat(document.getElementById('edit-service-price').value); 
+        const price = parseFloat(document.getElementById('edit-service-price').value);
         const discount = parseFloat(document.getElementById('edit-service-discount').value) || 0;
         
         if (!name || !(duration>=0) || !(price>=0)) return showNotification('Заповніть усі поля коректно.', "error");
-        
         const action = () => addDoc(collection(db, 'services'), { name, duration, price, discount, categoryId: state.selectedCategoryId });
         try { 
-            await logAndExecute('Створено послугу', { name, categoryId: state.selectedCategoryId }, action); 
-            document.getElementById('edit-service-modal').style.display = 'none';
+            await logAndExecute('Створено послугу', { name, categoryId: state.selectedCategoryId }, action);
+            const modal = document.getElementById('edit-service-modal');
+            if(modal) modal.style.display = 'none';
         } catch (e) { showNotification('Не вдалося додати.', "error"); } 
     }
 
@@ -2474,11 +2631,11 @@ async function handleUpdateMaster(event) {
         const discount = parseFloat(document.getElementById('edit-service-discount').value) || 0; 
         
         if (!name || !(duration>=0) || !(price>=0)) return showNotification('Заповніть усі поля коректно.', "error");
-        
         const action = () => updateDoc(doc(db, 'services', id), { name, duration, price, discount });
         try { 
-            await logAndExecute('Оновлено послугу', { serviceId: id, name }, action); 
-            document.getElementById('edit-service-modal').style.display = 'none';
+            await logAndExecute('Оновлено послугу', { serviceId: id, name }, action);
+            const modal = document.getElementById('edit-service-modal');
+            if(modal) modal.style.display = 'none';
         } catch(e) { showNotification('Не вдалося оновити.', "error"); } 
     }
 
@@ -2537,15 +2694,17 @@ async function handleUpdateMaster(event) {
             let reportHtml = '';
             masterReportParts.forEach(part => {
                 if (!part.includes('Майстер:')) return;
-                const name = part.match(/Майстер: (.*)/)[1];
-                const group = part.match(/\(Група: (.*)\)/)[1];
-                const base = part.match(/База для ЗП .*?: (.*) zł/)[1];
-                const rate = part.match(/Ставка: (.*)%/)[1];
-                const salaryFromBase = part.match(/Нараховано ЗП .*?: (.*) zł/)[1];
-                const bonus = part.match(/Нарахування .*?: \+(.*) zł/)[1];
-                const advances = part.match(/Аванси: -(.*) zł/)[1];
-                const settlements = part.match(/Взаєморозрахунок .*?: -(.*) zł/)[1];
-                const toPay = part.match(/ДО ВИПЛАТИ: (.*) zł/)[1];
+                const nameMatch = part.match(/Майстер: (.*)/);
+                if(!nameMatch) return;
+                const name = nameMatch[1];
+                const group = part.match(/\(Група: (.*)\)/)?.[1] || 'Н/Д';
+                const base = part.match(/База для .*?: (.*) zł/)?.[1] || '0';
+                const rate = part.match(/Ставка: (.*)%/)?.[1] || '0';
+                const salaryFromBase = part.match(/Нараховано ЗП .*?: (.*) zł/)?.[1] || '0';
+                const bonus = part.match(/Нарахування .*?: \+(.*) zł/)?.[1] || '0';
+                const advances = part.match(/Аванси: -(.*) zł/)?.[1] || '0';
+                const settlements = part.match(/Взаєморозрахунок .*?: -(.*) zł/)?.[1] || '0';
+                const toPay = part.match(/ДО ВИПЛАТИ: (.*) zł/)?.[1] || '0';
                 
                 if (selectedMasterId === 'all' || state.masters.find(m => m.name === name)?.id === selectedMasterId) {
                      reportHtml += `
@@ -2583,7 +2742,6 @@ async function handleUpdateMaster(event) {
                 </form>
             </div>
             <div class="content-card" style="margin-top:2rem;"><h2>Історія загальних витрат</h2><ul id="expenses-list" class="item-list"></ul></div>`;
-        
         document.getElementById('add-expense-form').onsubmit = handleAddExpense;
         document.getElementById('expense-date').valueAsDate = new Date();
         const listEl = document.getElementById('expenses-list');
@@ -2624,106 +2782,94 @@ async function handleUpdateMaster(event) {
     }
 
     function renderSalonExpensesView(container) {
-    const isSalonAdmin = state.user.role === 'salon_admin';
-    const userSalonId = state.user.salonId;
-
-    // Фільтруємо опції салонів, якщо це адмін салону
-    const salonOptions = (isSalonAdmin ? state.salons.filter(s => s.id === userSalonId) : state.salons)
-        .map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-
-    container.innerHTML = `
-        <div class="content-card">
-            <h2>Додати витрату в салоні</h2>
-            <form id="add-salon-expense-form">
-                <div class="form-row">
-                    <div class="form-group" style="flex:2;"><label for="salon-expense-description">Опис</label><input type="text" id="salon-expense-description" required></div>
-                    <div class="form-group" style="flex:1;"><label for="salon-expense-amount">Сума (zł)</label><input type="number" id="salon-expense-amount" required min="0" step="0.01"></div>
-                    <div class="form-group" style="flex:1;"><label for="salon-expense-payment-type">Тип оплати</label><select id="salon-expense-payment-type" required><option value="cash">Готівка</option><option value="card">Картка</option></select></div>
-                    <div class="form-group" style="flex:1;"><label for="salon-expense-date">Дата</label><input type="date" id="salon-expense-date" required></div>
-                </div>
-                <div class="form-group">
-                    <label for="salon-expense-salon">Салон</label>
-                    <select id="salon-expense-salon" required ${isSalonAdmin ? 'disabled' : ''}>
-                        ${!isSalonAdmin ? '<option value="">Оберіть салон</option>' : ''}
-                        ${salonOptions}
-                    </select>
-                </div>
-                <button type="submit" class="btn">Додати витрату</button>
-            </form>
-        </div>
-        <div class="content-card" style="margin-top:2rem;"><h2>Історія витрат в салонах</h2><ul id="salon-expenses-list" class="item-list"></ul></div>`;
-
-    document.getElementById('add-salon-expense-form').onsubmit = handleAddSalonExpense;
-    document.getElementById('salon-expense-date').valueAsDate = new Date();
-    
-    // Якщо це адмін салону, встановлюємо його салон за замовчуванням
-    if (isSalonAdmin) {
-        document.getElementById('salon-expense-salon').value = userSalonId;
-    }
-
-    const listEl = document.getElementById('salon-expenses-list');
-    listEl.innerHTML = '';
-    
-    // Список витрат вже автоматично фільтрується в setupRealtimeListeners
-    if (state.salonExpenses.length === 0) {
-        listEl.innerHTML = '<li>Витрат ще не було.</li>';
-    } else {
-        state.salonExpenses.forEach(expense => {
-            const salon = state.salons.find(s => s.id === expense.salonId);
-            const li = document.createElement('li');
-            const dateField = expense.date || expense.timestamp;
-            const expenseDate = dateField ? dateField.toDate().toLocaleDateString('uk-UA') : 'Дата невідома';
-            li.innerHTML = `<div><strong>${expense.description}</strong><br><small>${expenseDate} (${salon ? salon.name : 'Невідомий салон'})</small></div><div class="actions"><strong>${expense.amount.toFixed(2)} zł</strong>${state.user.role === 'admin' ? `<button class="btn btn-delete" data-id="${expense.id}" data-description="${expense.description}">🗑️</button>` : ''}</div>`;
-            listEl.appendChild(li);
-        });
-    }
-
-    listEl.onclick = (e) => {
-        const deleteBtn = e.target.closest('.btn-delete');
-        if (deleteBtn) {
-            handleDeleteSalonExpense(deleteBtn.dataset.id, deleteBtn.dataset.description);
+        const isSalonAdmin = state.user.role === 'salon_admin';
+        const userSalonId = state.user.salonId;
+        const salonOptions = (isSalonAdmin ? state.salons.filter(s => s.id === userSalonId) : state.salons)
+            .map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+        container.innerHTML = `
+            <div class="content-card">
+                <h2>Додати витрату в салоні</h2>
+                <form id="add-salon-expense-form">
+                    <div class="form-row">
+                        <div class="form-group" style="flex:2;"><label for="salon-expense-description">Опис</label><input type="text" id="salon-expense-description" required></div>
+                        <div class="form-group" style="flex:1;"><label for="salon-expense-amount">Сума (zł)</label><input type="number" id="salon-expense-amount" required min="0" step="0.01"></div>
+                        <div class="form-group" style="flex:1;"><label for="salon-expense-payment-type">Тип оплати</label><select id="salon-expense-payment-type" required><option value="cash">Готівка</option><option value="card">Картка</option></select></div>
+                        <div class="form-group" style="flex:1;"><label for="salon-expense-date">Дата</label><input type="date" id="salon-expense-date" required></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="salon-expense-salon">Салон</label>
+                        <select id="salon-expense-salon" required ${isSalonAdmin ? 'disabled' : ''}>
+                            ${!isSalonAdmin ? '<option value="">Оберіть салон</option>' : ''}
+                            ${salonOptions}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn">Додати витрату</button>
+                </form>
+            </div>
+            <div class="content-card" style="margin-top:2rem;"><h2>Історія витрат в салонах</h2><ul id="salon-expenses-list" class="item-list"></ul></div>`;
+        document.getElementById('add-salon-expense-form').onsubmit = handleAddSalonExpense;
+        document.getElementById('salon-expense-date').valueAsDate = new Date();
+        
+        if (isSalonAdmin) {
+            document.getElementById('salon-expense-salon').value = userSalonId;
         }
-    };
-}
+
+        const listEl = document.getElementById('salon-expenses-list');
+        listEl.innerHTML = '';
+        if (state.salonExpenses.length === 0) {
+            listEl.innerHTML = '<li>Витрат ще не було.</li>';
+        } else {
+            state.salonExpenses.forEach(expense => {
+                const salon = state.salons.find(s => s.id === expense.salonId);
+                const li = document.createElement('li');
+                const dateField = expense.date || expense.timestamp;
+                const expenseDate = dateField ? dateField.toDate().toLocaleDateString('uk-UA') : 'Дата невідома';
+                li.innerHTML = `<div><strong>${expense.description}</strong><br><small>${expenseDate} (${salon ? salon.name : 'Невідомий салон'})</small></div><div class="actions"><strong>${expense.amount.toFixed(2)} zł</strong>${state.user.role === 'admin' ? `<button class="btn btn-delete" data-id="${expense.id}" data-description="${expense.description}">🗑️</button>` : ''}</div>`;
+                listEl.appendChild(li);
+            });
+        }
+
+        listEl.onclick = (e) => {
+            const deleteBtn = e.target.closest('.btn-delete');
+            if (deleteBtn) {
+                handleDeleteSalonExpense(deleteBtn.dataset.id, deleteBtn.dataset.description);
+            }
+        };
+    }
 
     async function handleAddSalonExpense(event) {
-    event.preventDefault();
-    const description = document.getElementById('salon-expense-description').value.trim();
-    const amount = parseFloat(document.getElementById('salon-expense-amount').value);
-    const date = document.getElementById('salon-expense-date').value;
-    const paymentType = document.getElementById('salon-expense-payment-type').value;
-
-    // Логіка визначення салону в залежності від ролі
-    const salonId = state.user.role === 'salon_admin' 
-        ? state.user.salonId 
-        : document.getElementById('salon-expense-salon').value;
-
-    if (!description || !amount || !date || !salonId) { 
-        return showNotification("Будь ласка, заповніть усі поля.", "error"); 
-    }
-
-    const salon = state.salons.find(s => s.id === salonId);
-    const action = () => addDoc(collection(db, 'salonExpenses'), { 
-        description, 
-        amount, 
-        salonId, 
-        paymentType, 
-        authorEmail: state.user.email, 
-        timestamp: Timestamp.fromDate(new Date(date)) 
-    });
-    
-    try {
-        await logAndExecute('Додано витрату салону', { description, amount, salon: salon.name }, action);
-        event.target.reset();
-        document.getElementById('salon-expense-date').valueAsDate = new Date();
-        // Якщо це адмін салону, відновлюємо значення його салону
-        if(state.user.role === 'salon_admin'){
-            document.getElementById('salon-expense-salon').value = state.user.salonId;
+        event.preventDefault();
+        const description = document.getElementById('salon-expense-description').value.trim();
+        const amount = parseFloat(document.getElementById('salon-expense-amount').value);
+        const date = document.getElementById('salon-expense-date').value;
+        const paymentType = document.getElementById('salon-expense-payment-type').value;
+        const salonId = state.user.role === 'salon_admin' 
+            ? state.user.salonId 
+            : document.getElementById('salon-expense-salon').value;
+        if (!description || !amount || !date || !salonId) { 
+            return showNotification("Будь ласка, заповніть усі поля.", "error");
         }
-    } catch (e) { 
-        showNotification("Не вдалося додати витрату.", "error"); 
+
+        const salon = state.salons.find(s => s.id === salonId);
+        const action = () => addDoc(collection(db, 'salonExpenses'), { 
+            description, 
+            amount, 
+            salonId, 
+            paymentType, 
+            authorEmail: state.user.email, 
+            timestamp: Timestamp.fromDate(new Date(date)) 
+        });
+        try {
+            await logAndExecute('Додано витрату салону', { description, amount, salon: salon.name }, action);
+            event.target.reset();
+            document.getElementById('salon-expense-date').valueAsDate = new Date();
+            if(state.user.role === 'salon_admin'){
+                document.getElementById('salon-expense-salon').value = state.user.salonId;
+            }
+        } catch (e) { 
+            showNotification("Не вдалося додати витрату.", "error");
+        }
     }
-}
     
     async function handleDeleteSalonExpense(id, description) {
         showConfirmWithReasonModal('Ви впевнені, що хочете видалити цю витрату?', async (reason) => {
@@ -2887,6 +3033,7 @@ async function handleUpdateMaster(event) {
 
     function showSalaryGroupModal(groupId = null) {
         const modal = document.getElementById('salary-group-modal');
+        if(!modal) return;
         const form = document.getElementById('salary-group-form');
         const title = document.getElementById('salary-group-modal-title');
         form.reset();
@@ -2902,6 +3049,7 @@ async function handleUpdateMaster(event) {
 
     function renderSalaryGroupTiersInModal(tiers = []) {
         const container = document.getElementById('salary-group-tiers-table');
+        if(!container) return;
         container.innerHTML = '';
         tiers.sort((a, b) => a.threshold - b.threshold).forEach(tier => {
             const tierRow = document.createElement('div');
@@ -2917,6 +3065,7 @@ async function handleUpdateMaster(event) {
 
     function handleAddTierRowToModal() {
         const container = document.getElementById('salary-group-tiers-table');
+        if(!container) return;
         const tierRow = document.createElement('div');
         tierRow.className = 'form-row';
         tierRow.innerHTML = `
@@ -2947,7 +3096,8 @@ async function handleUpdateMaster(event) {
                 const action = () => addDoc(collection(db, 'salaryGroups'), data);
                 await logAndExecute('Створено групу зарплат', { name }, action);
             }
-            document.getElementById('salary-group-modal').style.display = 'none';
+            const modal = document.getElementById('salary-group-modal');
+            if(modal) modal.style.display = 'none';
         } catch (e) { showNotification('Не вдалося зберегти групу.', "error"); }
     }
 
@@ -2956,6 +3106,7 @@ async function handleUpdateMaster(event) {
             const action = () => deleteDoc(doc(db, 'salaryGroups', groupId));
             const logDetails = { groupId, name };
             if (reason) logDetails.reason = reason;
+ 
             try { await logAndExecute('Видалено групу зарплат', logDetails, action); } 
             catch(e) { showNotification('Не вдалося видалити групу.', "error"); }
         });
