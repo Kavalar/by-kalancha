@@ -1544,83 +1544,81 @@
 
     // #region Appointments View
     function renderAppointmentsView(container) {
-    // --- ВИПРАВЛЕННЯ: Додано перевірку ролі для відображення форми ---
-    const userRole = state.user.role;
-    const canCreate = userRole === 'admin' || userRole === 'salon_admin';
     const isEditMode = !!state.editingAppointmentId;
     let appointmentToEdit = null;
-
     if (isEditMode) {
-        [cite_start]appointmentToEdit = state.appointments.find(a => a.id === state.editingAppointmentId); [cite: 653]
+        appointmentToEdit = state.appointments.find(a => a.id === state.editingAppointmentId);
     }
-    
-    // Починаємо формувати HTML
-    let formHtml = '';
 
-    // Форму показуємо, тільки якщо користувач може створювати АБО він редагує запис
-    if (canCreate || isEditMode) {
-        [cite_start]const isSalonAdmin = state.user.role === 'salon_admin'; [cite: 654]
-        [cite_start]const userSalonId = state.user.salonId; [cite: 654]
+    // --- ВИПРАВЛЕННЯ ПОЧИНАЄТЬСЯ ТУТ ---
+    const userRole = state.user.role;
+    const canCreate = userRole === 'admin' || userRole === 'salon_admin';
+
+    let formHtml = '';
+    // Показуємо форму, тільки якщо користувач може створювати АБО він редагує існуючий запис
+    if (isEditMode || canCreate) {
+        const isSalonAdmin = state.user.role === 'salon_admin';
+        const userSalonId = state.user.salonId;
         const salonOptions = (isSalonAdmin ? state.salons.filter(s => s.id === userSalonId) : state.salons)
-            [cite_start].map(s => `<option value="${s.id}">${s.name}</option>`).join(''); [cite: 655]
-        
+            .map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+
         formHtml = `
-            <div class="content-card">
-                <h2 id="appointment-form-title">${isEditMode ? 'Редагувати запис' : 'Новий запис'}</h2>
-                <form id="appointment-form">
-                     <div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem; margin-bottom: 1rem;">
-                        <label><input type="checkbox" id="internal-service-checkbox"> Внутрішня послуга (для майстра)</label>
+        <div class="content-card">
+            <h2 id="appointment-form-title">${isEditMode ? 'Редагувати запис' : 'Новий запис'}</h2>
+            <form id="appointment-form">
+                 <div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem; margin-bottom: 1rem;">
+                    <label><input type="checkbox" id="internal-service-checkbox"> Внутрішня послуга (для майстра)</label>
+                </div>
+                <div id="regular-client-fields">
+                    <div class="form-group client-search-container">
+                        <label for="client-search-input">Пошук / Ім'я клієнта</label>
+                        <input type="text" id="client-search-input" autocomplete="off" required>
+                        <div id="client-search-results" style="display: none;"></div>
                     </div>
-                    <div id="regular-client-fields">
-                        <div class="form-group client-search-container">
-                            <label for="client-search-input">Пошук / Ім'я клієнта</label>
-                            <input type="text" id="client-search-input" autocomplete="off" required>
-                            <div id="client-search-results" style="display: none;"></div>
-                        </div>
-                        <div class="form-group" id="client-phone-group" style="display: none;">
-                            <label for="client-phone-input">Телефон нового клієнта</label>
-                            <input type="tel" id="client-phone-input">
-                        </div>
+                    <div class="form-group" id="client-phone-group" style="display: none;">
+                        <label for="client-phone-input">Телефон нового клієнта</label>
+                        <input type="tel" id="client-phone-input">
                     </div>
-                    <div id="master-client-fields" style="display: none;">
-                         <div class="form-group">
-                            <label for="master-as-client-select">Клієнт-майстер</label>
-                            <select id="master-as-client-select" class="form-group"></select>
-                        </div>
+                </div>
+                <div id="master-client-fields" style="display: none;">
+                     <div class="form-group">
+                        <label for="master-as-client-select">Клієнт-майстер</label>
+                        <select id="master-as-client-select" class="form-group"></select>
                     </div>
-                    <div class="form-group">
-                        <label for="appointment-datetime">Дата і час</label>
-                        <input type="datetime-local" id="appointment-datetime" required>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group" style="flex:1;"><label for="appointment-category">Категорія послуг</label><select id="appointment-category" required></select></div>
-                        <div class="form-group service-search-container" style="flex:1;"><label for="appointment-service-search">Послуга</label><input type="text" id="appointment-service-search" placeholder="Почніть вводити назву..." autocomplete="off" required><div id="service-search-results" style="display: none;"></div></div>
-                    </div>
-                    <div class="form-group"><label for="appointment-master">Майстер</label><select id="appointment-master" required></select></div>
-                    <div class="form-group">
-                        <label for="appointment-salon">Салон</label>
-                        <select id="appointment-salon" required ${isSalonAdmin ? 'disabled' : ''}>
-                            ${!isSalonAdmin ? '<option value="">Оберіть салон</option>' : ''}
-                            ${salonOptions}
-                        </select>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group" style="flex:2;"><label for="manual-discount-value">Додаткова знижка</label><input type="number" id="manual-discount-value" placeholder="0" min="0"></div>
-                        <div class="form-group" style="flex:1;"><label for="manual-discount-type">Тип</label><select id="manual-discount-type"><option value="percent">%</option><option value="fixed">zł</option></select></div>
-                    </div>
-                     <div class="form-row">
-                        <div class="form-group" style="flex:1;"><label for="additional-charge-amount">Додаткова плата (zł)</label><input type="number" id="additional-charge-amount" placeholder="0" min="0"></div>
-                        <div class="form-group" style="flex:2;"><label for="additional-charge-description">Опис дод. плати</label><input type="text" id="additional-charge-description" placeholder="напр. Миття голови"></div>
-                    </div>
-                    <div id="final-price-display">Сума до оплати: 0 zł</div>
-                    <button type="submit" id="appointment-submit-btn" class="btn" style="margin-top: 1rem;">${isEditMode ? 'Зберегти зміни' : 'Створити запис'}</button>
-                    ${isEditMode ? `<button type="button" id="appointment-cancel-edit-btn" class="btn" style="margin-top: 0.5rem; background-color: var(--gray-text);">Скасувати редагування</button>` : ''}
-                </form>
-            </div>
+                </div>
+                <div class="form-group">
+                    <label for="appointment-datetime">Дата і час</label>
+                    <input type="datetime-local" id="appointment-datetime" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;"><label for="appointment-category">Категорія послуг</label><select id="appointment-category" required></select></div>
+                    <div class="form-group service-search-container" style="flex:1;"><label for="appointment-service-search">Послуга</label><input type="text" id="appointment-service-search" placeholder="Почніть вводити назву..." autocomplete="off" required><div id="service-search-results" style="display: none;"></div></div>
+                </div>
+                <div class="form-group"><label for="appointment-master">Майстер</label><select id="appointment-master" required></select></div>
+                <div class="form-group">
+                    <label for="appointment-salon">Салон</label>
+                    <select id="appointment-salon" required ${isSalonAdmin ? 'disabled' : ''}>
+                        ${!isSalonAdmin ? '<option value="">Оберіть салон</option>' : ''}
+                        ${salonOptions}
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:2;"><label for="manual-discount-value">Додаткова знижка</label><input type="number" id="manual-discount-value" placeholder="0" min="0"></div>
+                    <div class="form-group" style="flex:1;"><label for="manual-discount-type">Тип</label><select id="manual-discount-type"><option value="percent">%</option><option value="fixed">zł</option></select></div>
+                </div>
+                 <div class="form-row">
+                    <div class="form-group" style="flex:1;"><label for="additional-charge-amount">Додаткова плата (zł)</label><input type="number" id="additional-charge-amount" placeholder="0" min="0"></div>
+                    <div class="form-group" style="flex:2;"><label for="additional-charge-description">Опис дод. плати</label><input type="text" id="additional-charge-description" placeholder="напр. Миття голови"></div>
+                </div>
+                <div id="final-price-display">Сума до оплати: 0 zł</div>
+                <button type="submit" id="appointment-submit-btn" class="btn" style="margin-top: 1rem;">${isEditMode ? 'Зберегти зміни' : 'Створити запис'}</button>
+                ${isEditMode ? `<button type="button" id="appointment-cancel-edit-btn" class="btn" style="margin-top: 0.5rem; background-color: var(--gray-text);">Скасувати редагування</button>` : ''}
+            </form>
+        </div>
         `;
     }
-
-    // Блок з незавершеними записами показуємо завжди, коли ми не в режимі редагування
+    
+    // Блок з незавершеними записами
     const dailyAppointmentsHtml = !isEditMode ? `
     <div class="content-card" style="margin-top: 2rem;">
         <h2>Незавершені записи</h2>
@@ -1632,86 +1630,92 @@
         <div id="pagination-controls" style="text-align: center; margin-top: 1rem;"></div>
     </div>` : '';
 
-    // Збираємо фінальний HTML для сторінки
     container.innerHTML = formHtml + dailyAppointmentsHtml;
+    
     // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
 
     setupAppointmentsLogic();
 
-    if (state.user.role === 'salon_admin') {
+    const isSalonAdmin = state.user.role === 'salon_admin';
+    if (isSalonAdmin) {
+        // Перевіряємо, чи існує форма перед тим, як щось робити
         const appointmentSalonEl = document.getElementById('appointment-salon');
-        if (appointmentSalonEl) appointmentSalonEl.value = state.user.salonId;
+        if (appointmentSalonEl) {
+            appointmentSalonEl.value = state.user.salonId;
+        }
     }
 
     if (isEditMode && appointmentToEdit) {
-        [cite_start]const d = new Date(appointmentToEdit.dateTime.toDate().getTime() - (appointmentToEdit.dateTime.toDate().getTimezoneOffset() * 60000)); [cite: 675]
-        [cite_start]document.getElementById('appointment-datetime').value = d.toISOString().slice(0, 16); [cite: 676]
-        document.getElementById('manual-discount-value').value = appointmentToEdit.manualDiscount?.value || [cite_start]0; [cite: 676]
-        document.getElementById('manual-discount-type').value = appointmentToEdit.manualDiscount?.type || [cite_start]'percent'; [cite: 676]
+        const d = new Date(appointmentToEdit.dateTime.toDate().getTime() - (appointmentToEdit.dateTime.toDate().getTimezoneOffset() * 60000));
+        document.getElementById('appointment-datetime').value = d.toISOString().slice(0, 16);
+        document.getElementById('manual-discount-value').value = appointmentToEdit.manualDiscount?.value || 0;
+        document.getElementById('manual-discount-type').value = appointmentToEdit.manualDiscount?.type || 'percent';
         if (appointmentToEdit.additionalCharge) {
-            document.getElementById('additional-charge-amount').value = appointmentToEdit.additionalCharge.amount || [cite_start]0; [cite: 677]
-            document.getElementById('additional-charge-description').value = appointmentToEdit.additionalCharge.description || [cite_start]''; [cite: 678]
+            document.getElementById('additional-charge-amount').value = appointmentToEdit.additionalCharge.amount || 0;
+            document.getElementById('additional-charge-description').value = appointmentToEdit.additionalCharge.description || '';
         }
-        [cite_start]const internalCheckbox = document.getElementById('internal-service-checkbox'); [cite: 678]
-        [cite_start]internalCheckbox.checked = appointmentToEdit.isInternal || false; [cite: 679]
-        [cite_start]internalCheckbox.dispatchEvent(new Event('change')); [cite: 679]
+        const internalCheckbox = document.getElementById('internal-service-checkbox');
+        internalCheckbox.checked = appointmentToEdit.isInternal || false;
+        internalCheckbox.dispatchEvent(new Event('change'));
         if(appointmentToEdit.isInternal) {
-            [cite_start]document.getElementById('master-as-client-select').value = appointmentToEdit.clientId; [cite: 679]
+            document.getElementById('master-as-client-select').value = appointmentToEdit.clientId;
         } else {
-            [cite_start]const client = state.clients.find(c => c.id === appointmentToEdit.clientId); [cite: 680]
-            [cite_start]document.getElementById('client-search-input').value = client?.name || appointmentToEdit.clientName; [cite: 681]
-            document.getElementById('client-phone-input').value = client?.phone || [cite_start]''; [cite: 681]
-            [cite_start]document.getElementById('client-phone-group').style.display = 'block'; [cite: 681]
+            const client = state.clients.find(c => c.id === appointmentToEdit.clientId);
+            document.getElementById('client-search-input').value = client?.name || appointmentToEdit.clientName;
+            document.getElementById('client-phone-input').value = client?.phone || '';
+            document.getElementById('client-phone-group').style.display = 'block';
         }
-        [cite_start]const service = state.services.find(s => s.id === appointmentToEdit.serviceId); [cite: 682]
+        const service = state.services.find(s => s.id === appointmentToEdit.serviceId);
         if (service) {
-            [cite_start]state.selectedServiceForAppointment = service; [cite: 683]
-            [cite_start]document.getElementById('appointment-service-search').value = service.name; [cite: 683]
-            [cite_start]const categorySelect = document.getElementById('appointment-category'); [cite: 683]
-            [cite_start]categorySelect.value = service.categoryId; [cite: 684]
-            [cite_start]categorySelect.dispatchEvent(new Event('change')); [cite: 684]
+            state.selectedServiceForAppointment = service;
+            document.getElementById('appointment-service-search').value = service.name;
+            const categorySelect = document.getElementById('appointment-category');
+            categorySelect.value = service.categoryId;
+            categorySelect.dispatchEvent(new Event('change'));
             setTimeout(() => {
-                [cite_start]document.getElementById('appointment-master').value = appointmentToEdit.masterId; [cite: 684]
+                document.getElementById('appointment-master').value = appointmentToEdit.masterId;
                 if (appointmentToEdit.salonId) {
-                    [cite_start]document.getElementById('appointment-salon').value = appointmentToEdit.salonId; [cite: 684]
+                    document.getElementById('appointment-salon').value = appointmentToEdit.salonId;
                 }
-                [cite_start]updateFinalPrice(); [cite: 685]
+                updateFinalPrice();
             }, 100);
         }
     } else if (!isEditMode && state.selectedClientForAppointment) {
-        [cite_start]const clientSearchInput = document.getElementById('client-search-input'); [cite: 686]
-        [cite_start]const clientPhoneInput = document.getElementById('client-phone-input'); [cite: 687]
-        [cite_start]const clientPhoneGroup = document.getElementById('client-phone-group'); [cite: 687]
-        [cite_start]clientSearchInput.value = state.selectedClientForAppointment.name; [cite: 687]
-        [cite_start]clientSearchInput.disabled = true; [cite: 687]
-        clientPhoneInput.value = state.selectedClientForAppointment.phone || [cite_start]''; [cite: 687]
-        [cite_start]clientPhoneGroup.style.display = 'block'; [cite: 688]
+        const clientSearchInput = document.getElementById('client-search-input');
+        const clientPhoneInput = document.getElementById('client-phone-input');
+        const clientPhoneGroup = document.getElementById('client-phone-group');
+        clientSearchInput.value = state.selectedClientForAppointment.name;
+        clientSearchInput.disabled = true;
+        clientPhoneInput.value = state.selectedClientForAppointment.phone || '';
+        clientPhoneGroup.style.display = 'block';
     } else if (state.preselectedAppointment) {
-        [cite_start]const { dateTime, masterId } = state.preselectedAppointment; [cite: 688]
-        [cite_start]const d = new Date(dateTime.getTime() - (dateTime.getTimezoneOffset() * 60000)); [cite: 689]
-        [cite_start]document.getElementById('appointment-datetime').value = d.toISOString().slice(0, 16); [cite: 689]
+        const { dateTime, masterId } = state.preselectedAppointment;
+        const d = new Date(dateTime.getTime() - (dateTime.getTimezoneOffset() * 60000));
+        document.getElementById('appointment-datetime').value = d.toISOString().slice(0, 16);
         if (masterId) {
-            [cite_start]const master = state.masters.find(m => m.id === masterId); [cite: 690]
-            [cite_start]const firstCategoryId = master?.categoryIds?.[0]; [cite: 691]
+            const master = state.masters.find(m => m.id === masterId);
+            const firstCategoryId = master?.categoryIds?.[0];
             if (firstCategoryId) {
-                [cite_start]const categorySelect = document.getElementById('appointment-category'); [cite: 691]
-                [cite_start]categorySelect.value = firstCategoryId; [cite: 692]
-                [cite_start]categorySelect.dispatchEvent(new Event('change')); [cite: 692]
+                const categorySelect = document.getElementById('appointment-category');
+                categorySelect.value = firstCategoryId;
+                categorySelect.dispatchEvent(new Event('change'));
                 setTimeout(() => {
-                    [cite_start]document.getElementById('appointment-master').value = masterId; [cite: 692]
+                    document.getElementById('appointment-master').value = masterId;
                 }, 100);
             }
         }
-        [cite_start]state.preselectedAppointment = null; [cite: 693]
-    } else if (!isEditMode) { // Додано перевірку, щоб цей блок не виконувався в режимі редагування
-        [cite_start]const dateFilter = document.getElementById('appointments-date-filter'); [cite: 694]
-        [cite_start]dateFilter.valueAsDate = state.appointmentsListDate; [cite: 694]
-        dateFilter.onchange = () => {
-            [cite_start]state.appointmentsListDate = dateFilter.valueAsDate; [cite: 695]
-            [cite_start]state.appointmentsPage = 1; [cite: 696]
-            [cite_start]renderDailyAppointmentsList(); [cite: 696]
-        };
-        [cite_start]renderDailyAppointmentsList(); [cite: 696]
+        state.preselectedAppointment = null;
+    } else if (!isEditMode) {
+        const dateFilter = document.getElementById('appointments-date-filter');
+        if (dateFilter) { // Додано перевірку на існування елемента
+            dateFilter.valueAsDate = state.appointmentsListDate;
+            dateFilter.onchange = () => {
+                state.appointmentsListDate = dateFilter.valueAsDate;
+                state.appointmentsPage = 1;
+                renderDailyAppointmentsList();
+            };
+            renderDailyAppointmentsList();
+        }
     }
 }
 
