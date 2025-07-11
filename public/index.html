@@ -1055,110 +1055,119 @@
     }
 
     function renderStaffDetailView(container) {
-        const staffId = state.viewingStaffId;
-        const person = state.staff.find(p => p.id === staffId);
+    const staffId = state.viewingStaffId;
+    const person = state.staff.find(p => p.id === staffId);
 
-        if (!person) {
-            container.innerHTML = `<div class="content-card"><h2>Співробітника не знайдено</h2></div>`;
-            return;
-        }
+    if (!person) {
+        container.innerHTML = `<div class="content-card"><h2>Співробітника не знайдено</h2></div>`;
+        return;
+    }
 
-        const salonOptions = state.salons.map(s => `<option value="${s.id}" ${person.salonId === s.id ? 'selected' : ''}>${s.name}</option>`).join('');
+    const salonOptions = state.salons.map(s => `<option value="${s.id}" ${person.salonId === s.id ? 'selected' : ''}>${s.name}</option>`).join('');
 
-        container.innerHTML = `
+    container.innerHTML = `
+        <div class="content-card">
+            <button id="back-to-staff-list" class="btn" style="margin-bottom: 1rem;">&larr; Назад до списку</button>
+            <h2>Редагувати: ${person.name}</h2>
+            <form id="edit-staff-form">
+                <input type="hidden" id="edit-staff-id" value="${person.id}">
+                <div class="form-group">
+                    <label for="edit-staff-name">Ім'я</label>
+                    <input type="text" id="edit-staff-name" value="${person.name}" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <label for="edit-staff-salary">Фіксована ставка (zł/міс)</label>
+                        <input type="number" id="edit-staff-salary" value="${person.fixedSalary || 0}" required min="0">
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label for="edit-staff-salon">Салон</label>
+                        <select id="edit-staff-salon" required>${salonOptions}</select>
+                    </div>
+                </div>
+                <div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem;">
+                    <label><input type="checkbox" id="edit-staff-frozen" ${person.isFrozen ? 'checked' : ''}> Заморозити співробітника</label>
+                </div>
+                <button type="submit" class="btn">Зберегти зміни</button>
+                <button type="button" id="delete-staff-btn" class="btn btn-delete" style="margin-left: 1rem;">Видалити</button>
+            </form>
+        </div>
+        <div class="services-layout" style="margin-top: 2rem; grid-template-columns: 350px 1fr; ">
             <div class="content-card">
-                <button id="back-to-staff-list" class="btn" style="margin-bottom: 1rem;">&larr; Назад до списку</button>
-                <h2>Редагувати: ${person.name}</h2>
-                <form id="edit-staff-form">
-                    <input type="hidden" id="edit-staff-id" value="${person.id}">
+                <h3>Операції з зарплатою</h3>
+                <form id="add-payment-form" class="form-group">
                     <div class="form-group">
-                        <label for="edit-staff-name">Ім'я</label>
-                        <input type="text" id="edit-staff-name" value="${person.name}" required>
+                        <label for="payment-type">Тип</label>
+                        <select id="payment-type">
+                            <option value="payout">Нарахувати ЗП</option>
+                            <option value="advance">Аванс</option>
+                            <option value="bonus">Премія</option>
+                        </select>
                     </div>
-                    <div class="form-row">
-                        <div class="form-group" style="flex:1;">
-                            <label for="edit-staff-salary">Фіксована ставка (zł/міс)</label>
-                            <input type="number" id="edit-staff-salary" value="${person.fixedSalary || 0}" required min="0">
-                        </div>
-                        <div class="form-group" style="flex:1;">
-                            <label for="edit-staff-salon">Салон</label>
-                            <select id="edit-staff-salon" required>${salonOptions}</select>
-                        </div>
+                    <div class="form-group" id="payout-period-group">
+                        <label for="payout-period">Період (Місяць та Рік)</label>
+                        <input type="month" id="payout-period">
                     </div>
-                    <div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem;">
-                        <label><input type="checkbox" id="edit-staff-frozen" ${person.isFrozen ? 'checked' : ''}> Заморозити співробітника</label>
+                    <div class="form-group">
+                        <label for="payment-amount">Сума (zł)</label>
+                        <input type="number" id="payment-amount" required min="1">
                     </div>
-                    <button type="submit" class="btn">Зберегти зміни</button>
-                    <button type="button" id="delete-staff-btn" class="btn btn-delete" style="margin-left: 1rem;">Видалити</button>
+                    <div class="form-group" id="payment-description-group" style="display:none;">
+                        <label for="payment-description">Опис</label>
+                        <textarea id="payment-description" rows="2"></textarea>
+                    </div>
+                    <button type="submit" class="btn">Провести операцію</button>
                 </form>
             </div>
-            <div class="services-layout" style="margin-top: 2rem; grid-template-columns: 350px 1fr; ">
+            <div id="history-container">
                 <div class="content-card">
-                    <h3>Операції з зарплатою</h3>
-                    <form id="add-payment-form" class="form-group">
-                        <div class="form-group">
-                            <label for="payment-type">Тип</label>
-                            <select id="payment-type">
-                                <option value="payout">Нарахувати ЗП</option>
-                                <option value="advance">Аванс</option>
-                                <option value="bonus">Премія</option>
-                            </select>
-                        </div>
-                        <div class="form-group" id="payout-period-group">
-                            <label for="payout-period">Період (Місяць та Рік)</label>
-                            <input type="month" id="payout-period">
-                        </div>
-                        <div class="form-group">
-                            <label for="payment-amount">Сума (zł)</label>
-                            <input type="number" id="payment-amount" required min="1">
-                        </div>
-                        <div class="form-group" id="payment-description-group" style="display:none;">
-                            <label for="payment-description">Опис</label>
-                            <textarea id="payment-description" rows="2"></textarea>
-                        </div>
-                        <button type="submit" class="btn">Провести операцію</button>
-                    </form>
-                </div>
-                <div id="history-container">
-                    <div class="content-card">
-                        <h3>Історія нарахувань та виплат</h3>
-                        <ul id="payouts-history-list" class="item-list"><li>Завантаження...</li></ul>
-                    </div>
+                    <h3>Історія нарахувань та виплат</h3>
+                    <ul id="payouts-history-list" class="item-list"><li>Завантаження...</li></ul>
                 </div>
             </div>
-        `;
+        </div>
+    `;
 
-        document.getElementById('back-to-staff-list').onclick = () => renderView('staff');
-        document.getElementById('edit-staff-form').onsubmit = handleUpdateStaff;
-        document.getElementById('delete-staff-btn').onclick = () => handleDeleteStaff(person.id, person.name);
-        const paymentTypeSelect = document.getElementById('payment-type');
-        const payoutPeriodGroup = document.getElementById('payout-period-group');
-        const paymentDescriptionGroup = document.getElementById('payment-description-group');
-        const paymentAmountInput = document.getElementById('payment-amount');
+    document.getElementById('back-to-staff-list').onclick = () => renderView('staff');
+    document.getElementById('edit-staff-form').onsubmit = handleUpdateStaff;
+    document.getElementById('delete-staff-btn').onclick = () => handleDeleteStaff(person.id, person.name);
+    const paymentTypeSelect = document.getElementById('payment-type');
+    const payoutPeriodGroup = document.getElementById('payout-period-group');
+    const paymentDescriptionGroup = document.getElementById('payment-description-group');
+    const paymentAmountInput = document.getElementById('payment-amount');
 
-        paymentTypeSelect.onchange = (e) => {
-            const isPayout = e.target.value === 'payout';
-            payoutPeriodGroup.style.display = isPayout ? 'block' : 'none';
-            paymentDescriptionGroup.style.display = isPayout ? 'none' : 'block';
-            paymentAmountInput.readOnly = isPayout;
-            if (isPayout) {
-                paymentAmountInput.value = person.fixedSalary || 0;
-            } else {
-                paymentAmountInput.value = '';
-            }
-        };
-        paymentTypeSelect.dispatchEvent(new Event('change'));
+    paymentTypeSelect.onchange = (e) => {
+        const isPayout = e.target.value === 'payout';
+        payoutPeriodGroup.style.display = isPayout ? 'block' : 'none';
+        paymentDescriptionGroup.style.display = isPayout ? 'none' : 'block';
+        paymentAmountInput.readOnly = isPayout;
+        if (isPayout) {
+            paymentAmountInput.value = person.fixedSalary || 0;
+        } else {
+            paymentAmountInput.value = '';
+        }
+    };
+    paymentTypeSelect.dispatchEvent(new Event('change'));
 
-        document.getElementById('add-payment-form').onsubmit = handleAddStaffPayment;
-        // Очищуємо старі слухачі перед тим, як встановити нові
-        staffSubcollectionUnsubscribers.forEach(unsub => unsub());
-        staffSubcollectionUnsubscribers = [];
+    document.getElementById('add-payment-form').onsubmit = handleAddStaffPayment;
+    
+    // Очищуємо старі слухачі перед тим, як встановити нові
+    staffSubcollectionUnsubscribers.forEach(unsub => unsub());
+    staffSubcollectionUnsubscribers = [];
 
-        // Встановлюємо слухачі для ВСІХ типів історії
-        setupSubcollectionListener('payouts', 'payouts-history-list', 'staffPayouts', renderPayoutHistoryList);
-        setupSubcollectionListener('advances', 'payouts-history-list', 'viewingStaffAdvances', renderPayoutHistoryList);
-        setupSubcollectionListener('bonuses', 'payouts-history-list', 'viewingStaffBonuses', renderPayoutHistoryList);
-    }
+    // Встановлюємо слухачі для ВСІХ типів історії
+    setupSubcollectionListener('payouts', 'payouts-history-list', 'staffPayouts', renderPayoutHistoryList);
+    setupSubcollectionListener('advances', 'payouts-history-list', 'viewingStaffAdvances', renderPayoutHistoryList);
+    setupSubcollectionListener('bonuses', 'payouts-history-list', 'viewingStaffBonuses', renderPayoutHistoryList);
+    
+    // ВІДСУТНІЙ ЕЛЕМЕНТ: ОБРОБНИК КЛІКІВ ДЛЯ КНОПКИ ВИДАЛЕННЯ
+    document.getElementById('payouts-history-list').onclick = (e) => {
+        const deleteBtn = e.target.closest('.btn-delete-staff-payment');
+        if (deleteBtn) {
+            handleDeleteStaffPayment(deleteBtn.dataset);
+        }
+    };
+}
 
     function setupSubcollectionListener(subcollectionName, listElementId, stateKey, renderer) {
     const staffId = state.viewingStaffId;
