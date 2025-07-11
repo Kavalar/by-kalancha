@@ -478,84 +478,82 @@
     });
 
     function setupRealtimeListeners() {
-        if (listenersAreActive) return;
-        const collections = { 
-            salons: 'salons',
-            categories: 'serviceCategories', 
-            services: 'services', 
-            masters: 'masters',
-            appointments: 'appointments', 
-            clients: 'clients',
-            expenses: 'expenses',
-            salonExpenses: 'salonExpenses',
-            notepadEntries: 'notepadEntries',
-            productSales: 'productSales',
-            staff: 'staff',
-            auditLog: 'auditLog',
-        };
+    if (listenersAreActive) return;
+    const collections = { 
+        salons: 'salons',
+        categories: 'serviceCategories', 
+        services: 'services', 
+        masters: 'masters',
+        appointments: 'appointments', 
+        clients: 'clients',
+        expenses: 'expenses',
+        salonExpenses: 'salonExpenses',
+        notepadEntries: 'notepadEntries',
+        productSales: 'productSales',
+        staff: 'staff',
+        auditLog: 'auditLog',
+    };
 
-        Object.entries(collections).forEach(([stateKey, colName]) => {
-            let q;
-            
-            if (['auditLog', 'expenses', 'productSales'].includes(colName)) {
-                 q = query(collection(db, colName), orderBy("timestamp", "desc"));
-            } else if (colName === 'appointments') {
-                 q = query(collection(db, colName), orderBy("dateTime", "desc"));
-            }
-            else {
-                q = collection(db, colName);
-            }
+    const userRole = state.user.role;
+    const userSalonId = state.user.salonId;
+    const collectionsToFilter = ['appointments', 'salonExpenses', 'productSales', 'staff', 'masters'];
 
-            onSnapshot(q, snapshot => {
-                state[stateKey] = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
-                
-                if (['categories', 'masters', 'clients', 'staff', 'salons'].includes(stateKey)) {
-                    state[stateKey].sort((a,b) => a.name.localeCompare(b.name));
-                }
-
-                if (stateKey === 'salonExpenses' || stateKey === 'notepadEntries') {
-                    state[stateKey].sort((a, b) => {
-                    // Універсально шукаємо поле з датою (date або timestamp)
-                    const dateFieldA = a.date || a.timestamp;
-                    const dateFieldB = b.date || b.timestamp;
-
-                    // Для сортування отримуємо числове значення дати (мілісекунди)
-                    const timeA = dateFieldA ? dateFieldA.toDate().getTime() : 0;
-                    const timeB = dateFieldB ? dateFieldB.toDate().getTime() : 0;
-
-                    // Сортуємо від нової дати до старої
-                    return timeB - timeA;
-    });
-}
-
-                if (state.user) {
-                    renderView(state.currentView);
-                }
-            }, error => {
-                console.error(`Error fetching ${colName}:`, error);
-            });
-        });
-
-        const isAdminOrSalonAdmin = state.user.role === 'admin' || state.user.role === 'salon_admin';
-        if (isAdminOrSalonAdmin) {
-            onSnapshot(query(collectionGroup(db, 'advances')), snapshot => {
-                state.advances = snapshot.docs.map(d => d.data());
-                if (state.user && state.currentView === 'calendar') {
-                    renderDailySummary();
-                }
-            });
-        }
+    Object.entries(collections).forEach(([stateKey, colName]) => {
+        let q;
         
-        if (state.user.role === 'admin') {
-            onSnapshot(collection(db, 'salaryGroups'), snapshot => {
-                state.salaryGroups = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
-                if (state.currentView === 'settings' || state.currentView === 'salary') {
-                    renderView(state.currentView);
-                }
-            });
+        // Початковий запит до колекції
+        let baseQuery = collection(db, colName);
+
+        // Фільтруємо по салону для salon_admin
+        if (userRole === 'salon_admin' && collectionsToFilter.includes(colName)) {
+            q = query(baseQuery, where("salonId", "==", userSalonId));
+        } else {
+            q = query(baseQuery);
         }
-        listenersAreActive = true;
+
+        // Додаємо сортування
+        if (['auditLog', 'expenses', 'productSales', 'salonExpenses', 'notepadEntries'].includes(colName)) {
+             q = query(q, orderBy("timestamp", "desc"));
+        } else if (colName === 'appointments') {
+             q = query(q, orderBy("dateTime", "desc"));
+        }
+
+        onSnapshot(q, snapshot => {
+            state[stateKey] = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
+            
+            if (['categories', 'masters', 'clients', 'staff', 'salons'].includes(stateKey)) {
+                state[stateKey].sort((a,b) => a.name.localeCompare(b.name));
+            }
+
+            if (state.user) {
+                renderView(state.currentView);
+            }
+        }, error => {
+            console.error(`Error fetching ${colName}:`, error);
+        });
+    });
+
+    // Слухачі для глобальних даних, які потрібні salon_admin (але не фільтруються)
+    const isAdminOrSalonAdmin = userRole === 'admin' || userRole === 'salon_admin';
+    if (isAdminOrSalonAdmin) {
+        onSnapshot(query(collectionGroup(db, 'advances')), snapshot => {
+            state.advances = snapshot.docs.map(d => d.data());
+            if (state.user && state.currentView === 'calendar') {
+                renderDailySummary();
+            }
+        });
     }
+    
+    if (userRole === 'admin') {
+        onSnapshot(collection(db, 'salaryGroups'), snapshot => {
+            state.salaryGroups = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
+            if (state.currentView === 'settings' || state.currentView === 'salary') {
+                renderView(state.currentView);
+            }
+        });
+    }
+    listenersAreActive = true;
+}
 
     // #region Core App Logic & Audit
     async function logAndExecute(action, details, operationFn) {
@@ -1456,6 +1454,11 @@
 
     // #region Calendar View & Modals
     function renderCalendarView(container) {
+        // [ДОДАЙТЕ ЦЕЙ БЛОК НА ПОЧАТКУ ФУНКЦІЇ]
+        const userRole = state.user.role;
+        const userSalonId = state.user.salonId;
+        const isSalonAdmin = userRole === 'salon_admin';
+        // [КІНЕЦЬ БЛОКУ]
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
         container.innerHTML = `
             <div class="content-card">
@@ -1467,7 +1470,7 @@
                         </div>
                         <div class="form-group" style="flex:1;">
                             <label for="calendar-salon-filter">Салон:</label>
-                            <select id="calendar-salon-filter">
+                            <select id="calendar-salon-filter" ${isSalonAdmin ? 'disabled' : ''}>
                                 <option value="all">Всі салони</option>
                                 ${salonOptions}
                             </select>
@@ -1485,7 +1488,7 @@
                     </div>
                     <div class="form-group" style="flex:1;">
                         <label for="summary-salon-filter">Оберіть салон</label>
-                        <select id="summary-salon-filter">
+                        <select id="summary-salon-filter" ${isSalonAdmin ? 'disabled' : ''}>
                             <option value="all">Всі салони</option>
                             ${salonOptions}
                         </select>
@@ -1510,7 +1513,11 @@
         const activeMasters = state.masters.filter(m => !m.isFrozen);
         masterFilter.innerHTML = '<option value="all">Всі майстри</option>' + activeMasters.map(m => `<option value="${m.id}" ${state.calendarSelectedMasterId === m.id ? 'selected' : ''}>${m.name}</option>`).join('');
         salonFilter.value = state.calendarSelectedSalonId;
-        
+        if (isSalonAdmin) {
+            salonFilter.value = userSalonId;
+            state.calendarSelectedSalonId = userSalonId;
+            document.getElementById('summary-salon-filter').value = userSalonId;
+        }
         if (!calendarEl || !masterFilter || !salonFilter) return;
 
         const colorPalette = ['#3788d8', '#e25141', '#4caf50', '#ff9800', '#9c27b0', '#795548', '#607d8b'];
