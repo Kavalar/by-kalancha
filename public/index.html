@@ -454,6 +454,7 @@
 
     onAuthStateChanged(auth, async (user) => {
     if (user) {
+        // Ця частина залишається без змін
         if (listenersAreActive) return;
         appContainer.innerHTML = '<h1>Завантаження...</h1>';
         
@@ -472,16 +473,19 @@
     } else {
         // [ПОЧАТОК ВИПРАВЛЕННЯ] Повна очистка при виході
         
-        // Відписуємося від всіх основних слухачів
+        // 1. Відписуємося від всіх основних слухачів
         mainUnsubscribers.forEach(unsub => unsub());
         mainUnsubscribers = [];
 
-        // Відписуємося від специфічних слухачів (якщо вони є)
+        // 2. Відписуємося від специфічних слухачів (для карток майстрів/персоналу)
         if(masterAdvancesUnsubscribe) masterAdvancesUnsubscribe();
         staffSubcollectionUnsubscribers.forEach(unsub => unsub());
         staffSubcollectionUnsubscribers = [];
 
+        // 3. Скидаємо прапорець активності
         listenersAreActive = false;
+        
+        // 4. Показуємо екран входу
         renderLoginView();
         // [КІНЕЦЬ ВИПРАВЛЕННЯ]
     }
