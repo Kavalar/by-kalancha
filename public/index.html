@@ -366,7 +366,8 @@
     let listenersAreActive = false;
     let masterAdvancesUnsubscribe = null;
     let staffSubcollectionUnsubscribers = [];
-
+    let mainUnsubscribers = [];
+    
     // #region UI Helper Functions (Notifications & Confirmations)
     function showNotification(message, type = 'success') {
         const toast = document.getElementById('notification-toast');
@@ -452,46 +453,52 @@
     }
 
     onAuthStateChanged(auth, async (user) => {
-        if (user) {
-            if (listenersAreActive) return;
-            appContainer.innerHTML = '<h1>Завантаження...</h1>';
-            
-            const userDocRef = doc(db, "users", user.uid);
-            const userDocSnap = await getDoc(userDocRef);
-    
-            state.user = { 
-                uid: user.uid, 
-                email: user.email, 
-                role: userDocSnap.exists() ? userDocSnap.data().role : 'master',
-                salonId: userDocSnap.exists() ? userDocSnap.data().salonId : null
-            };
+    if (user) {
+        if (listenersAreActive) return;
+        appContainer.innerHTML = '<h1>Завантаження...</h1>';
+        
+        const userDocRef = doc(db, "users", user.uid);
+        const userDocSnap = await getDoc(userDocRef);
 
-            renderAppLayout(state.user);
-            setupRealtimeListeners();
-        } else {
-            renderLoginView();
-            if(masterAdvancesUnsubscribe) masterAdvancesUnsubscribe();
-            staffSubcollectionUnsubscribers.forEach(unsub => unsub());
-            staffSubcollectionUnsubscribers = [];
-            listenersAreActive = false;
-        }
-    });
+        state.user = { 
+            uid: user.uid, 
+            email: user.email, 
+            role: userDocSnap.exists() ? userDocSnap.data().role : 'master',
+            salonId: userDocSnap.exists() ? userDocSnap.data().salonId : null
+        };
+
+        renderAppLayout(state.user);
+        setupRealtimeListeners();
+    } else {
+        // [ПОЧАТОК ВИПРАВЛЕННЯ] Повна очистка при виході
+        
+        // Відписуємося від всіх основних слухачів
+        mainUnsubscribers.forEach(unsub => unsub());
+        mainUnsubscribers = [];
+
+        // Відписуємося від специфічних слухачів (якщо вони є)
+        if(masterAdvancesUnsubscribe) masterAdvancesUnsubscribe();
+        staffSubcollectionUnsubscribers.forEach(unsub => unsub());
+        staffSubcollectionUnsubscribers = [];
+
+        listenersAreActive = false;
+        renderLoginView();
+        // [КІНЕЦЬ ВИПРАВЛЕННЯ]
+    }
+});
 
     function setupRealtimeListeners() {
     if (listenersAreActive) return;
+    
+    // Очищуємо всі попередні підписки перед створенням нових
+    mainUnsubscribers.forEach(unsub => unsub());
+    mainUnsubscribers = [];
+
     const collections = { 
-        salons: 'salons',
-        categories: 'serviceCategories', 
-        services: 'services', 
-        masters: 'masters',
-        appointments: 'appointments', 
-        clients: 'clients',
-        expenses: 'expenses',
-        salonExpenses: 'salonExpenses',
-        notepadEntries: 'notepadEntries',
-        productSales: 'productSales',
-        staff: 'staff',
-        auditLog: 'auditLog',
+        salons: 'salons', categories: 'serviceCategories', services: 'services', 
+        masters: 'masters', appointments: 'appointments', clients: 'clients',
+        expenses: 'expenses', salonExpenses: 'salonExpenses', notepadEntries: 'notepadEntries',
+        productSales: 'productSales', staff: 'staff', auditLog: 'auditLog',
     };
 
     const userRole = state.user.role;
@@ -508,20 +515,15 @@
             q = query(baseQuery);
         }
         
-        // ВАЖЛИВА ЗМІНА: Ми сортуємо тільки appointments на рівні запиту,
-        // бо в них стабільне поле dateTime. Решту будемо сортувати в браузері.
         if (colName === 'appointments') {
              q = query(q, orderBy("dateTime", "desc"));
         }
 
-        onSnapshot(q, snapshot => {
-            // Спочатку отримуємо всі документи
+        const unsubscribe = onSnapshot(q, snapshot => {
             let docs = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
             
-            // НОВА ЛОГІКА: Сортуємо дані в браузері, а не в базі
             if (['auditLog', 'expenses', 'productSales', 'salonExpenses', 'notepadEntries'].includes(colName)) {
                 docs.sort((a, b) => {
-                    // Ця логіка знайде дату, як би вона не називалася (date або timestamp)
                     const timeA = (a.timestamp || a.date)?.toDate().getTime() || 0;
                     const timeB = (b.timestamp || b.date)?.toDate().getTime() || 0;
                     return timeB - timeA;
@@ -530,7 +532,6 @@
             
             state[stateKey] = docs;
             
-            // Сортування за іменем для довідників залишається
             if (['categories', 'masters', 'clients', 'staff', 'salons'].includes(stateKey)) {
                 state[stateKey].sort((a,b) => a.name.localeCompare(b.name));
             }
@@ -541,25 +542,30 @@
         }, error => {
             console.error(`Error fetching ${colName}:`, error);
         });
+
+        // Зберігаємо функцію для відписки
+        mainUnsubscribers.push(unsubscribe);
     });
 
     const isAdminOrSalonAdmin = userRole === 'admin' || userRole === 'salon_admin';
     if (isAdminOrSalonAdmin) {
-        onSnapshot(query(collectionGroup(db, 'advances')), snapshot => {
+        const unsubAdvances = onSnapshot(query(collectionGroup(db, 'advances')), snapshot => {
             state.advances = snapshot.docs.map(d => d.data());
             if (state.user && state.currentView === 'calendar') {
                 renderDailySummary();
             }
         });
+        mainUnsubscribers.push(unsubAdvances);
     }
     
     if (userRole === 'admin') {
-        onSnapshot(collection(db, 'salaryGroups'), snapshot => {
+        const unsubGroups = onSnapshot(collection(db, 'salaryGroups'), snapshot => {
             state.salaryGroups = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
             if (state.currentView === 'settings' || state.currentView === 'salary') {
                 renderView(state.currentView);
             }
         });
+        mainUnsubscribers.push(unsubGroups);
     }
     listenersAreActive = true;
 }
@@ -2943,7 +2949,13 @@
     }
 
     function renderSalonExpensesView(container) {
-    const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+    const isSalonAdmin = state.user.role === 'salon_admin';
+    const userSalonId = state.user.salonId;
+
+    // Фільтруємо опції салонів, якщо це адмін салону
+    const salonOptions = (isSalonAdmin ? state.salons.filter(s => s.id === userSalonId) : state.salons)
+        .map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+
     container.innerHTML = `
         <div class="content-card">
             <h2>Додати витрату в салоні</h2>
@@ -2953,16 +2965,31 @@
                     <div class="form-group" style="flex:1;"><label for="salon-expense-amount">Сума (zł)</label><input type="number" id="salon-expense-amount" required min="0" step="0.01"></div>
                     <div class="form-group" style="flex:1;"><label for="salon-expense-payment-type">Тип оплати</label><select id="salon-expense-payment-type" required><option value="cash">Готівка</option><option value="card">Картка</option></select></div>
                     <div class="form-group" style="flex:1;"><label for="salon-expense-date">Дата</label><input type="date" id="salon-expense-date" required></div>
-                    <div class="form-group" style="flex:1;"><label for="salon-expense-salon">Салон</label><select id="salon-expense-salon" required><option value="">Оберіть салон</option>${salonOptions}</select></div>
+                </div>
+                <div class="form-group">
+                    <label for="salon-expense-salon">Салон</label>
+                    <select id="salon-expense-salon" required ${isSalonAdmin ? 'disabled' : ''}>
+                        ${!isSalonAdmin ? '<option value="">Оберіть салон</option>' : ''}
+                        ${salonOptions}
+                    </select>
                 </div>
                 <button type="submit" class="btn">Додати витрату</button>
             </form>
         </div>
         <div class="content-card" style="margin-top:2rem;"><h2>Історія витрат в салонах</h2><ul id="salon-expenses-list" class="item-list"></ul></div>`;
+
     document.getElementById('add-salon-expense-form').onsubmit = handleAddSalonExpense;
     document.getElementById('salon-expense-date').valueAsDate = new Date();
+    
+    // Якщо це адмін салону, встановлюємо його салон за замовчуванням
+    if (isSalonAdmin) {
+        document.getElementById('salon-expense-salon').value = userSalonId;
+    }
+
     const listEl = document.getElementById('salon-expenses-list');
     listEl.innerHTML = '';
+    
+    // Список витрат вже автоматично фільтрується в setupRealtimeListeners
     if (state.salonExpenses.length === 0) {
         listEl.innerHTML = '<li>Витрат ще не було.</li>';
     } else {
@@ -2975,6 +3002,7 @@
             listEl.appendChild(li);
         });
     }
+
     listEl.onclick = (e) => {
         const deleteBtn = e.target.closest('.btn-delete');
         if (deleteBtn) {
@@ -2984,21 +3012,43 @@
 }
 
     async function handleAddSalonExpense(event) {
-        event.preventDefault();
-        const description = document.getElementById('salon-expense-description').value.trim();
-        const amount = parseFloat(document.getElementById('salon-expense-amount').value);
-        const date = document.getElementById('salon-expense-date').value;
-        const salonId = document.getElementById('salon-expense-salon').value;
-        if (!description || !amount || !date || !salonId) { return showNotification("Будь ласка, заповніть усі поля.", "error"); }
-        const salon = state.salons.find(s => s.id === salonId);
-        const paymentType = document.getElementById('salon-expense-payment-type').value;
-        const action = () => addDoc(collection(db, 'salonExpenses'), { description, amount, salonId, paymentType, authorEmail: state.user.email, timestamp: Timestamp.fromDate(new Date(date)) });
-        try {
-            await logAndExecute('Додано витрату салону', { description, amount, salon: salon.name }, action);
-            event.target.reset();
-            document.getElementById('salon-expense-date').valueAsDate = new Date();
-        } catch (e) { showNotification("Не вдалося додати витрату.", "error"); }
+    event.preventDefault();
+    const description = document.getElementById('salon-expense-description').value.trim();
+    const amount = parseFloat(document.getElementById('salon-expense-amount').value);
+    const date = document.getElementById('salon-expense-date').value;
+    const paymentType = document.getElementById('salon-expense-payment-type').value;
+
+    // Логіка визначення салону в залежності від ролі
+    const salonId = state.user.role === 'salon_admin' 
+        ? state.user.salonId 
+        : document.getElementById('salon-expense-salon').value;
+
+    if (!description || !amount || !date || !salonId) { 
+        return showNotification("Будь ласка, заповніть усі поля.", "error"); 
     }
+
+    const salon = state.salons.find(s => s.id === salonId);
+    const action = () => addDoc(collection(db, 'salonExpenses'), { 
+        description, 
+        amount, 
+        salonId, 
+        paymentType, 
+        authorEmail: state.user.email, 
+        timestamp: Timestamp.fromDate(new Date(date)) 
+    });
+    
+    try {
+        await logAndExecute('Додано витрату салону', { description, amount, salon: salon.name }, action);
+        event.target.reset();
+        document.getElementById('salon-expense-date').valueAsDate = new Date();
+        // Якщо це адмін салону, відновлюємо значення його салону
+        if(state.user.role === 'salon_admin'){
+            document.getElementById('salon-expense-salon').value = state.user.salonId;
+        }
+    } catch (e) { 
+        showNotification("Не вдалося додати витрату.", "error"); 
+    }
+}
     
     async function handleDeleteSalonExpense(id, description) {
         showConfirmWithReasonModal('Ви впевнені, що хочете видалити цю витрату?', async (reason) => {
