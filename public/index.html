@@ -570,18 +570,6 @@
         // Зберігаємо функцію відписки, щоб потім її викликати при виході з системи
         mainUnsubscribers.push(unsubscribe);
     });
-
-    // Окремий слухач для авансів (collectionGroup)
-    const isAdminOrSalonAdmin = userRole === 'admin' || userRole === 'salon_admin';
-    if (isAdminOrSalonAdmin) {
-        const unsubAdvances = onSnapshot(query(collectionGroup(db, 'advances')), snapshot => {
-            state.advances = snapshot.docs.map(d => d.data());
-            if (state.user && state.currentView === 'calendar') {
-                renderDailySummary();
-            }
-        });
-        mainUnsubscribers.push(unsubAdvances);
-    }
     
     listenersAreActive = true;
 }
