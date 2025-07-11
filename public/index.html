@@ -2407,11 +2407,14 @@
             </div>
             <div class="content-card">
                 <h3>Видача авансу</h3>
-                <form id="add-advance-form">
-                    <div class="form-group"><label for="advance-amount">Сума авансу (zł)</label><input type="number" id="advance-amount" min="1" required></div>
-                    <div class="form-group"><label for="advance-description">Опис (необов'язково)</label><textarea id="advance-description" rows="2"></textarea></div>
-                    <button type="submit" class="btn">Видати аванс</button>
-                </form>
+            <form id="add-advance-form">
+                <div class="form-row">
+                    <div class="form-group" style="flex:2;"><label for="advance-amount">Сума авансу (zł)</label><input type="number" id="advance-amount" min="1" required></div>
+                    <div class="form-group" style="flex:1;"><label for="advance-payment-type">Тип оплати</label><select id="advance-payment-type" required><option value="cash">Готівка</option><option value="card">Картка</option></select></div>
+                </div>
+            <div class="form-group"><label for="advance-description">Опис (необов'язково)</label><textarea id="advance-description" rows="2"></textarea></div>
+            <button type="submit" class="btn">Видати аванс</button>
+            </form>
             </div>
             <div class="content-card"><h3>Історія авансів</h3><ul id="master-advances-list" class="item-list"><li>Завантаження...</li></ul></div>
         `;
@@ -2450,7 +2453,8 @@
         
         if (!masterId || !amount || amount <= 0) { return showNotification('Будь ласка, введіть коректну суму.', "error"); }
         
-        const data = { amount: amount, date: Timestamp.now() };
+        const paymentType = document.getElementById('advance-payment-type').value;
+        const data = { amount: amount, date: Timestamp.now(), paymentType: paymentType };
         if (description) { data.description = description; }
         
         const action = () => addDoc(collection(db, 'masters', masterId, 'advances'), data);
@@ -2889,6 +2893,7 @@
                 <div class="form-row">
                     <div class="form-group" style="flex:2;"><label for="salon-expense-description">Опис</label><input type="text" id="salon-expense-description" required></div>
                     <div class="form-group" style="flex:1;"><label for="salon-expense-amount">Сума (zł)</label><input type="number" id="salon-expense-amount" required min="0" step="0.01"></div>
+                    <div class="form-group" style="flex:1;"><label for="salon-expense-payment-type">Тип оплати</label><select id="salon-expense-payment-type" required><option value="cash">Готівка</option><option value="card">Картка</option></select></div>
                     <div class="form-group" style="flex:1;"><label for="salon-expense-date">Дата</label><input type="date" id="salon-expense-date" required></div>
                     <div class="form-group" style="flex:1;"><label for="salon-expense-salon">Салон</label><select id="salon-expense-salon" required><option value="">Оберіть салон</option>${salonOptions}</select></div>
                 </div>
@@ -2928,7 +2933,8 @@
         const salonId = document.getElementById('salon-expense-salon').value;
         if (!description || !amount || !date || !salonId) { return showNotification("Будь ласка, заповніть усі поля.", "error"); }
         const salon = state.salons.find(s => s.id === salonId);
-        const action = () => addDoc(collection(db, 'salonExpenses'), { description, amount, salonId, authorEmail: state.user.email, date: Timestamp.fromDate(new Date(date)) });
+        const paymentType = document.getElementById('salon-expense-payment-type').value;
+        const action = () => addDoc(collection(db, 'salonExpenses'), { description, amount, salonId, paymentType, authorEmail: state.user.email, timestamp: Timestamp.fromDate(new Date(date)) });
         try {
             await logAndExecute('Додано витрату салону', { description, amount, salon: salon.name }, action);
             event.target.reset();
