@@ -1150,23 +1150,29 @@
         paymentTypeSelect.dispatchEvent(new Event('change'));
 
         document.getElementById('add-payment-form').onsubmit = handleAddStaffPayment;
-        setupSubcollectionListener('payouts', 'payouts-history-list', 'staffPayouts', renderPayoutHistoryList);
-    }
-
-    function setupSubcollectionListener(subcollectionName, listElementId, stateKey, renderer) {
-        const staffId = state.viewingStaffId;
-        if (!staffId) return;
-
+        // Очищуємо старі слухачі перед тим, як встановити нові
         staffSubcollectionUnsubscribers.forEach(unsub => unsub());
         staffSubcollectionUnsubscribers = [];
 
-        const collectionRef = collection(db, 'staff', staffId, subcollectionName);
-        const unsubscribe = onSnapshot(query(collectionRef, orderBy("date", "desc")), (snapshot) => {
-            state[stateKey] = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-            renderer(listElementId, state[stateKey]);
-        });
-        staffSubcollectionUnsubscribers.push(unsubscribe);
+        // Встановлюємо слухачі для ВСІХ типів історії
+        setupSubcollectionListener('payouts', 'payouts-history-list', 'staffPayouts', renderPayoutHistoryList);
+        setupSubcollectionListener('advances', 'payouts-history-list', 'viewingStaffAdvances', renderPayoutHistoryList);
+        setupSubcollectionListener('bonuses', 'payouts-history-list', 'viewingStaffBonuses', renderPayoutHistoryList);
     }
+
+    function setupSubcollectionListener(subcollectionName, listElementId, stateKey, renderer) {
+    const staffId = state.viewingStaffId;
+    if (!staffId) return;
+
+    // Помилка була тут - ми видалили рядки, що все очищували
+
+    const collectionRef = collection(db, 'staff', staffId, subcollectionName);
+    const unsubscribe = onSnapshot(query(collectionRef, orderBy("date", "desc")), (snapshot) => {
+        state[stateKey] = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderer(listElementId, state[stateKey]);
+    });
+    staffSubcollectionUnsubscribers.push(unsubscribe);
+}
 
     function renderPayoutHistoryList(elementId, items) {
         const listEl = document.getElementById(elementId);
