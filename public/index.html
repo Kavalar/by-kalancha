@@ -1234,20 +1234,34 @@
         }
     }
 
-    async function handleDeleteStaff(staffId, name) {
-        showConfirmWithReasonModal(`Ви впевнені, що хочете видалити співробітника ${name}?`, async (reason) => {
-            const action = () => deleteDoc(doc(db, 'staff', staffId));
-            const logDetails = { staffId, name };
-            if (reason) logDetails.reason = reason;
-            try {
-                await logAndExecute('Видалено співробітника', logDetails, action);
-                showNotification('Співробітника видалено.');
-                renderView('staff');
-            } catch (e) {
-                showNotification('Не вдалося видалити співробітника.', "error");
-            }
-        });
+    async function handleDeleteStaffPayment(dataset) {
+    console.log('Функцію handleDeleteStaffPayment викликано з даними:', dataset); // ДІАГНОСТИКА
+    
+    const { id, subcollection } = dataset;
+    const staffId = state.viewingStaffId;
+
+    console.log(`Намагаюся видалити документ за шляхом: staff/${staffId}/${subcollection}/${id}`); // ДІАГНОСТИКА
+
+    if (!id || !subcollection || !staffId) {
+        console.error('Помилка: не вистачає даних для видалення (id, subcollection або staffId)!');
+        return;
     }
+
+    showConfirmWithReasonModal(`Ви впевнені, що хочете видалити цей запис з історії? Цю дію не можна скасувати.`, async (reason) => {
+        const action = () => deleteDoc(doc(db, 'staff', staffId, subcollection, id));
+        const logDetails = { staffId, subcollection, docId: id };
+        if (reason) logDetails.reason = reason;
+        
+        try {
+            await logAndExecute('Видалено запис історії персоналу', logDetails, action);
+            showNotification('Запис видалено.');
+        } catch (e) {
+            // Цей блок покаже нам помилку, якщо вона є
+            console.error("!!! ПОМИЛКА ПРИ ВИДАЛЕННІ !!!", e); 
+            showNotification('Не вдалося видалити запис. Помилка: ' + e.message, "error");
+        }
+    });
+}
 
     async function handleAddStaffPayment(event) {
         event.preventDefault();
