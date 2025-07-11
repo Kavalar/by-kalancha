@@ -2898,7 +2898,7 @@
             state.salonExpenses.forEach(expense => {
                 const salon = state.salons.find(s => s.id === expense.salonId);
                 const li = document.createElement('li');
-                const expenseDate = expense.timestamp ? expense.timestamp.toDate().toLocaleDateString('uk-UA') : 'Дата невідома';
+                const expenseDate = expense.date ? expense.date.toDate().toLocaleDateString('uk-UA') : 'Дата невідома';
                 li.innerHTML = `<div><strong>${expense.description}</strong><br><small>${expenseDate} (${salon ? salon.name : 'Невідомий салон'})</small></div><div class="actions"><strong>${expense.amount.toFixed(2)} zł</strong>${state.user.role === 'admin' ? `<button class="btn btn-delete" data-id="${expense.id}" data-description="${expense.description}">🗑️</button>` : ''}</div>`;
                 listEl.appendChild(li);
             });
