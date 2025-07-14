@@ -1228,114 +1228,134 @@
     }
     // #endregion
 
-    // #region Daily Summary
-    async function renderDailySummary() {
-        const dateInput = document.getElementById('summary-date-picker');
-        const salonInput = document.getElementById('summary-salon-filter');
-        const advancesEl = document.getElementById('summary-advances');
-        const salonExpensesEl = document.getElementById('summary-salon-expenses');
-        const productSalesEl = document.getElementById('summary-product-sales');
-        if (!dateInput || !salonInput || !advancesEl || !salonExpensesEl || !productSalesEl) return;
+    // --- ПОЧАТОК ВИПРАВЛЕНОГО КОДУ ---
+async function renderDailySummary() {
+    // Отримуємо всі необхідні елементи на самому початку
+    const dateInput = document.getElementById('summary-date-picker');
+    const salonInput = document.getElementById('summary-salon-filter');
+    const advancesEl = document.getElementById('summary-advances');
+    const salonExpensesEl = document.getElementById('summary-salon-expenses');
+    const productSalesEl = document.getElementById('summary-product-sales');
+    const totalEl = document.getElementById('summary-total');
+    const cashEl = document.getElementById('summary-cash');
+    const cardEl = document.getElementById('summary-card');
+    const blikEl = document.getElementById('summary-blik');
+    const servicesCountEl = document.getElementById('summary-services-count');
 
-        const selectedDate = new Date(dateInput.value);
-        const selectedSalonId = salonInput.value;
-        const startOfDay = new Date(selectedDate);
-        startOfDay.setHours(0, 0, 0, 0);
-        
-        const endOfDay = new Date(selectedDate);
-        endOfDay.setHours(23, 59, 59, 999);
-        let relevantAppointments = state.appointments.filter(app => {
-            if (!app.dateTime) return false;
-            const appointmentDate = app.dateTime.toDate();
-            return appointmentDate >= startOfDay && appointmentDate <= endOfDay;
-        });
-        if (selectedSalonId !== 'all') {
-            relevantAppointments = relevantAppointments.filter(app => app.salonId === selectedSalonId);
-        }
-
-        let total = 0, cash = 0, card = 0, blik = 0;
-        let servicesWithPayment = 0;
-
-        relevantAppointments.forEach(app => {
-            if (app.payments && app.payments.length > 0) {
-                servicesWithPayment++;
-                app.payments.forEach(p => {
-                    if (p.type !== 'settlement') {
-                        total += p.amount;
-                        if(p.type === 'cash') cash += p.amount;
-                        else if(p.type === 'card') card += p.amount;
-                        else if(p.type === 'blik') blik += p.amount;
-                    }
-                });
-            }
-        });
-        
-        let productSalesCash = 0, productSalesCard = 0, productSalesBlik = 0;
-        let filteredProductSales = state.productSales.filter(s => {
-            if (!s.timestamp && !s.date) return false;
-            const saleDate = (s.timestamp || s.date).toDate();
-            return saleDate >= startOfDay && saleDate <= endOfDay;
-        });
-        if (selectedSalonId !== 'all') {
-            filteredProductSales = filteredProductSales.filter(s => s.salonId === selectedSalonId);
-        }
-        filteredProductSales.forEach(sale => {
-            if (sale.paymentType === 'cash') productSalesCash += sale.amount;
-            else if (sale.paymentType === 'card') productSalesCard += sale.amount;
-            else if (sale.paymentType === 'blik') productSalesBlik += sale.amount;
-        });
-        const totalProductSales = productSalesCash + productSalesCard + productSalesBlik;
-        total += totalProductSales;
-        cash += productSalesCash;
-        card += productSalesCard;
-        blik += productSalesBlik;
-        
-        let totalAdvances = 0;
-        try {
-            const advancePromises = [];
-            const mastersForSalon = state.masters.filter(m => selectedSalonId === 'all' || (m.salonIds && m.salonIds.includes(selectedSalonId)));
-            const staffForSalon = state.staff.filter(p => selectedSalonId === 'all' || p.salonId === selectedSalonId);
-            mastersForSalon.forEach(master => {
-                const q = query(collection(db, 'masters', master.id, 'advances'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
-                advancePromises.push(getDocs(q));
-            });
-            staffForSalon.forEach(person => {
-                const q = query(collection(db, 'staff', person.id, 'advances'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
-                advancePromises.push(getDocs(q));
-            });
-            const querySnapshots = await Promise.all(advancePromises);
-            querySnapshots.forEach(snap => {
-                snap.forEach(doc => {
-                    totalAdvances += doc.data().amount;
-                });
-            });
-        } catch (e) {
-            console.error("Помилка завантаження авансів для підсумку:", e);
-        }
-
-        let totalSalonExpenses = 0;
-        let filteredSalonExpenses = state.salonExpenses.filter(e => {
-            if (!e.timestamp && !e.date) return false;
-            const expenseDate = (e.timestamp || e.date).toDate();
-            return expenseDate >= startOfDay && expenseDate <= endOfDay;
-        });
-        if (selectedSalonId !== 'all') {
-            filteredSalonExpenses = filteredSalonExpenses.filter(e => e.salonId === selectedSalonId);
-        }
-        filteredSalonExpenses.forEach(expense => {
-            totalSalonExpenses += expense.amount;
-        });
-
-        document.getElementById('summary-total').textContent = `${total.toFixed(0)} zł`;
-        document.getElementById('summary-cash').textContent = `${cash.toFixed(0)} zł`;
-        document.getElementById('summary-card').textContent = `${card.toFixed(0)} zł`;
-        document.getElementById('summary-blik').textContent = `${blik.toFixed(0)} zł`;
-        advancesEl.textContent = `-${totalAdvances.toFixed(0)} zł`;
-        salonExpensesEl.textContent = `-${totalSalonExpenses.toFixed(0)} zł`;
-        productSalesEl.textContent = `${totalProductSales.toFixed(0)} zł`;
-        document.getElementById('summary-services-count').textContent = servicesWithPayment;
+    // Надійна перевірка: якщо хоча б одного елемента немає, виходимо з функції
+    if (!dateInput || !salonInput || !advancesEl || !salonExpensesEl || !productSalesEl || !totalEl || !cashEl || !cardEl || !blikEl || !servicesCountEl) {
+        return;
     }
-    // #endregion
+
+    const selectedDate = new Date(dateInput.value);
+    const selectedSalonId = salonInput.value;
+    const startOfDay = new Date(selectedDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(selectedDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    let relevantAppointments = state.appointments.filter(app => {
+        if (!app.dateTime) return false;
+        const appointmentDate = app.dateTime.toDate();
+        return appointmentDate >= startOfDay && appointmentDate <= endOfDay;
+    });
+
+    if (selectedSalonId !== 'all') {
+        relevantAppointments = relevantAppointments.filter(app => app.salonId === selectedSalonId);
+    }
+
+    let total = 0, cash = 0, card = 0, blik = 0;
+    let servicesWithPayment = 0;
+
+    relevantAppointments.forEach(app => {
+        if (app.payments && app.payments.length > 0) {
+            servicesWithPayment++;
+            app.payments.forEach(p => {
+                if (p.type !== 'settlement') {
+                    total += p.amount;
+                    if(p.type === 'cash') cash += p.amount;
+                    else if(p.type === 'card') card += p.amount;
+                    else if(p.type === 'blik') blik += p.amount;
+                }
+            });
+        }
+    });
+    
+    let productSalesCash = 0, productSalesCard = 0, productSalesBlik = 0;
+    let filteredProductSales = state.productSales.filter(s => {
+        if (!s.timestamp && !s.date) return false;
+        const saleDate = (s.timestamp || s.date).toDate();
+        return saleDate >= startOfDay && saleDate <= endOfDay;
+    });
+
+    if (selectedSalonId !== 'all') {
+        filteredProductSales = filteredProductSales.filter(s => s.salonId === selectedSalonId);
+    }
+
+    filteredProductSales.forEach(sale => {
+        if (sale.paymentType === 'cash') productSalesCash += sale.amount;
+        else if (sale.paymentType === 'card') productSalesCard += sale.amount;
+        else if (sale.paymentType === 'blik') productSalesBlik += sale.amount;
+    });
+
+    const totalProductSales = productSalesCash + productSalesCard + productSalesBlik;
+    total += totalProductSales;
+    cash += productSalesCash;
+    card += productSalesCard;
+    blik += productSalesBlik;
+    
+    let totalAdvances = 0;
+    try {
+        const advancePromises = [];
+        const mastersForSalon = state.masters.filter(m => selectedSalonId === 'all' || (m.salonIds && m.salonIds.includes(selectedSalonId)));
+        const staffForSalon = state.staff.filter(p => selectedSalonId === 'all' || p.salonId === selectedSalonId);
+        
+        mastersForSalon.forEach(master => {
+            const q = query(collection(db, 'masters', master.id, 'advances'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
+            advancePromises.push(getDocs(q));
+        });
+
+        staffForSalon.forEach(person => {
+            const q = query(collection(db, 'staff', person.id, 'advances'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
+            advancePromises.push(getDocs(q));
+        });
+
+        const querySnapshots = await Promise.all(advancePromises);
+        querySnapshots.forEach(snap => {
+            snap.forEach(doc => {
+                totalAdvances += doc.data().amount;
+            });
+        });
+    } catch (e) {
+        console.error("Помилка завантаження авансів для підсумку:", e);
+    }
+
+    let totalSalonExpenses = 0;
+    let filteredSalonExpenses = state.salonExpenses.filter(e => {
+        if (!e.timestamp && !e.date) return false;
+        const expenseDate = (e.timestamp || e.date).toDate();
+        return expenseDate >= startOfDay && expenseDate <= endOfDay;
+    });
+
+    if (selectedSalonId !== 'all') {
+        filteredSalonExpenses = filteredSalonExpenses.filter(e => e.salonId === selectedSalonId);
+    }
+    
+    filteredSalonExpenses.forEach(expense => {
+        totalSalonExpenses += expense.amount;
+    });
+
+    totalEl.textContent = `${total.toFixed(0)} zł`;
+    cashEl.textContent = `${cash.toFixed(0)} zł`;
+    cardEl.textContent = `${card.toFixed(0)} zł`;
+    blikEl.textContent = `${blik.toFixed(0)} zł`;
+    advancesEl.textContent = `-${totalAdvances.toFixed(0)} zł`;
+    salonExpensesEl.textContent = `-${totalSalonExpenses.toFixed(0)} zł`;
+    productSalesEl.textContent = `${totalProductSales.toFixed(0)} zł`;
+    servicesCountEl.textContent = servicesWithPayment;
+}
+// --- КІНЕЦЬ ВИПРАВЛЕНОГО КОДУ ---
 
     // #region Calendar View & Modals
     function renderCalendarView(container) {
