@@ -2187,7 +2187,11 @@ async function renderDailySummary() {
         const dateTimeString = document.getElementById('appointment-datetime').value;
         const service = state.selectedServiceForAppointment;
         const masterId = document.getElementById('appointment-master').value;
-        const salonId = document.getElementById('appointment-salon').value;
+        // --- ПОЧАТОК ВИПРАВЛЕННЯ ---
+        const salonId = (state.user.role === 'salon_admin')
+        ? state.user.salonId
+        : document.getElementById('appointment-salon').value;
+        // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
 
         if (!dateTimeString) {
             return showNotification("Будь ласка, вкажіть дату і час.", "error");
