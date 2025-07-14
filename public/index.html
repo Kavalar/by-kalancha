@@ -384,106 +384,86 @@
     });
 
     function setupRealtimeListeners() {
-        if (listenersAreActive) return;
+    if (listenersAreActive) return;
+    
+    mainUnsubscribers.forEach(unsub => unsub());
+    mainUnsubscribers = [];
+
+    const collections = { 
+        salons: 'salons',
+        categories: 'serviceCategories', 
+        services: 'services', 
+        masters: 'masters',
+        appointments: 'appointments', 
+        clients: 'clients',
+        expenses: 'expenses',
+        salonExpenses: 'salonExpenses',
+        notepadEntries: 'notepadEntries',
+        productSales: 'productSales',
+        staff: 'staff',
+        auditLog: 'auditLog',
+        salaryGroups: 'salaryGroups'
+    };
+    const userRole = state.user.role;
+    const userSalonId = state.user.salonId;
+    
+    Object.entries(collections).forEach(([stateKey, colName]) => {
+        // --- ПОЧАТОК ВИПРАВЛЕННЯ: Пропускаємо завантаження персоналу для salon_admin ---
+        if ((colName === 'expenses' || colName === 'auditLog' || colName === 'salaryGroups' || colName === 'staff') && userRole !== 'admin') {
+            return;
+        }
+        // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
+
+        let q;
+        let baseQuery = collection(db, colName);
         
-        mainUnsubscribers.forEach(unsub => unsub());
-        mainUnsubscribers = [];
+        const collectionsToFilterBySalon = ['appointments', 'salonExpenses', 'productSales'];
 
-        const collections = { 
-            salons: 'salons',
-            categories: 'serviceCategories', 
-            services: 'services', 
-            masters: 'masters',
-            appointments: 'appointments', 
-            clients: 'clients',
-            expenses: 'expenses',
-            salonExpenses: 'salonExpenses',
-            notepadEntries: 'notepadEntries',
-            productSales: 'productSales',
-            staff: 'staff',
-            auditLog: 'auditLog',
-            salaryGroups: 'salaryGroups'
-        };
-        const userRole = state.user.role;
-        const userSalonId = state.user.salonId;
-        
-        Object.entries(collections).forEach(([stateKey, colName]) => {
-            if ((colName === 'expenses' || colName === 'auditLog' || colName === 'salaryGroups') && userRole !== 'admin') {
-                return;
-            }
-
-            let q;
-            let baseQuery = collection(db, colName);
-            const collectionsToFilterBySalon = ['appointments', 'salonExpenses', 'productSales', 'staff'];
-
-            if (userRole === 'salon_admin') {
-                if (collectionsToFilterBySalon.includes(colName)) {
-                    q = query(baseQuery, where("salonId", "==", userSalonId));
-                } else if (colName === 'masters') {
-                    q = query(baseQuery, where("salonIds", "array-contains", userSalonId));
-                } else {
-                    q = query(baseQuery);
-                }
+        if (userRole === 'salon_admin') {
+            if (collectionsToFilterBySalon.includes(colName)) {
+                q = query(baseQuery, where("salonId", "==", userSalonId));
+            } else if (colName === 'masters') {
+                q = query(baseQuery, where("salonIds", "array-contains", userSalonId));
             } else {
                 q = query(baseQuery);
             }
+        } else {
+            q = query(baseQuery);
+        }
+        
+        if (colName === 'appointments') {
+             q = query(q, orderBy("dateTime", "desc"));
+        }
+
+        const unsubscribe = onSnapshot(q, snapshot => {
+            let docs = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
             
-            if (colName === 'appointments') {
-                 q = query(q, orderBy("dateTime", "desc"));
+            if (['auditLog', 'expenses', 'productSales', 'salonExpenses', 'notepadEntries'].includes(colName)) {
+               docs.sort((a, b) => {
+                    const timeA = (a.timestamp || a.date)?.toDate().getTime() || 0;
+                    const timeB = (b.timestamp || b.date)?.toDate().getTime() || 0;
+                    return timeB - timeA;
+               });
+            }
+            
+            state[stateKey] = docs;
+            
+            if (['categories', 'masters', 'clients', 'staff', 'salons'].includes(stateKey)) {
+                state[stateKey].sort((a,b) => a.name.localeCompare(b.name));
             }
 
-            const unsubscribe = onSnapshot(q, snapshot => {
-                let docs = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
-                
-                if (['auditLog', 'expenses', 'productSales', 'salonExpenses', 'notepadEntries'].includes(colName)) {
-                   docs.sort((a, b) => {
-                        const timeA = (a.timestamp || a.date)?.toDate().getTime() || 0;
-                        const timeB = (b.timestamp || b.date)?.toDate().getTime() || 0;
-                        return timeB - timeA;
-                    });
-                }
-                
-                state[stateKey] = docs;
-                
-                if (['categories', 'masters', 'clients', 'staff', 'salons'].includes(stateKey)) {
-                    state[stateKey].sort((a,b) => a.name.localeCompare(b.name));
-                }
-
-                if (state.user) {
-                    renderView(state.currentView);
-                }
-            }, error => {
-                console.error(`Error fetching ${colName}:`, error);
-            });
-
-            mainUnsubscribers.push(unsubscribe);
-        });
-        
-        listenersAreActive = true;
-    }
-
-    // #region Core App Logic & Audit
-    async function logAndExecute(action, details, operationFn) {
-    try {
-        const operationResult = await operationFn(); // Виконуємо операцію
-        
-        // Логуємо дію в auditLog
-        await addDoc(collection(db, 'auditLog'), {
-            action: action,
-            details: details,
-            userEmail: state.user.email,
-            timestamp: Timestamp.now()
+            if (state.user) {
+                renderView(state.currentView);
+            }
+        }, error => {
+            console.error(`Error fetching ${colName}:`, error);
         });
 
-        // --- ВИПРАВЛЕННЯ: Повертаємо результат операції ---
-        return operationResult; 
-
-    } catch (error) {
-        // Якщо сталася помилка, виводимо її в консоль і прокидаємо далі
-        console.error(`Error during logged action "${action}":`, error);
-        throw error;
-    }
-    }
+        mainUnsubscribers.push(unsubscribe);
+    });
+    
+    listenersAreActive = true;
+}
 
     function renderLoginView() {
         appContainer.innerHTML = `<div class="auth-bg"><div class="auth-card"><h1>Вхід у CRM</h1><div id="login-error" class="error-msg"></div><input id="email" type="email" placeholder="Email" autocomplete="username" autofocus><input id="password" type="password" placeholder="Пароль" autocomplete="current-password"><button id="login-btn">Увійти</button></div></div>`;
