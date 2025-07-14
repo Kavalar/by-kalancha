@@ -1255,8 +1255,8 @@
     // #endregion
 
     // --- ПОЧАТОК ВИПРАВЛЕНОГО КОДУ ---
+// --- ПОЧАТОК ЗМІН: Оновлення для фільтрації авансів і премій ---
 async function renderDailySummary() {
-    // Отримуємо всі необхідні елементи на самому початку
     const dateInput = document.getElementById('summary-date-picker');
     const salonInput = document.getElementById('summary-salon-filter');
     const advancesEl = document.getElementById('summary-advances');
@@ -1268,7 +1268,6 @@ async function renderDailySummary() {
     const blikEl = document.getElementById('summary-blik');
     const servicesCountEl = document.getElementById('summary-services-count');
 
-    // Надійна перевірка: якщо хоча б одного елемента немає, виходимо з функції
     if (!dateInput || !salonInput || !advancesEl || !salonExpensesEl || !productSalesEl || !totalEl || !cashEl || !cardEl || !blikEl || !servicesCountEl) {
         return;
     }
@@ -1277,100 +1276,81 @@ async function renderDailySummary() {
     const selectedSalonId = salonInput.value;
     const startOfDay = new Date(selectedDate);
     startOfDay.setHours(0, 0, 0, 0);
-    
     const endOfDay = new Date(selectedDate);
     endOfDay.setHours(23, 59, 59, 999);
     
-    let relevantAppointments = state.appointments.filter(app => {
-        if (!app.dateTime) return false;
-        const appointmentDate = app.dateTime.toDate();
-        return appointmentDate >= startOfDay && appointmentDate <= endOfDay;
-    });
-
+    // ... (код розрахунку доходів залишається без змін) ...
+    let relevantAppointments = state.appointments.filter(app => app.dateTime?.toDate() >= startOfDay && app.dateTime?.toDate() <= endOfDay);
     if (selectedSalonId !== 'all') {
         relevantAppointments = relevantAppointments.filter(app => app.salonId === selectedSalonId);
     }
-
-    let total = 0, cash = 0, card = 0, blik = 0;
-    let servicesWithPayment = 0;
-
+    let total = 0, cash = 0, card = 0, blik = 0, servicesWithPayment = 0;
     relevantAppointments.forEach(app => {
-        if (app.payments && app.payments.length > 0) {
+        if (app.payments?.length > 0) {
             servicesWithPayment++;
             app.payments.forEach(p => {
                 if (p.type !== 'settlement') {
                     total += p.amount;
-                    if(p.type === 'cash') cash += p.amount;
-                    else if(p.type === 'card') card += p.amount;
-                    else if(p.type === 'blik') blik += p.amount;
+                    if(p.type === 'cash') cash += p.amount; else if(p.type === 'card') card += p.amount; else if(p.type === 'blik') blik += p.amount;
                 }
             });
         }
     });
-    
     let productSalesCash = 0, productSalesCard = 0, productSalesBlik = 0;
-    let filteredProductSales = state.productSales.filter(s => {
-        if (!s.timestamp && !s.date) return false;
-        const saleDate = (s.timestamp || s.date).toDate();
-        return saleDate >= startOfDay && saleDate <= endOfDay;
-    });
-
+    let filteredProductSales = state.productSales.filter(s => s.timestamp?.toDate() >= startOfDay && s.timestamp?.toDate() <= endOfDay);
     if (selectedSalonId !== 'all') {
         filteredProductSales = filteredProductSales.filter(s => s.salonId === selectedSalonId);
     }
-
     filteredProductSales.forEach(sale => {
-        if (sale.paymentType === 'cash') productSalesCash += sale.amount;
-        else if (sale.paymentType === 'card') productSalesCard += sale.amount;
-        else if (sale.paymentType === 'blik') productSalesBlik += sale.amount;
+        if (sale.paymentType === 'cash') productSalesCash += sale.amount; else if (sale.paymentType === 'card') productSalesCard += sale.amount; else if (sale.paymentType === 'blik') productSalesBlik += sale.amount;
     });
-
     const totalProductSales = productSalesCash + productSalesCard + productSalesBlik;
-    total += totalProductSales;
-    cash += productSalesCash;
-    card += productSalesCard;
-    blik += productSalesBlik;
-    
+    total += totalProductSales; cash += productSalesCash; card += productSalesCard; blik += productSalesBlik;
+
+    // --- Логіка отримання авансів та премій з фільтрацією по салону ---
     let totalAdvances = 0;
+    let totalBonuses = 0; // Додано премії
     try {
-        const advancePromises = [];
-        const mastersForSalon = state.masters.filter(m => selectedSalonId === 'all' || (m.salonIds && m.salonIds.includes(selectedSalonId)));
+        const opPromises = [];
+        const mastersForSalon = state.masters.filter(m => selectedSalonId === 'all' || m.salonIds?.includes(selectedSalonId));
         const staffForSalon = state.staff.filter(p => selectedSalonId === 'all' || p.salonId === selectedSalonId);
         
+        const processSubcollection = (entity, entityType, subcollection) => {
+            let q = query(collection(db, entityType, entity.id, subcollection), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
+            // Фільтруємо по салону, якщо він обраний
+            if (selectedSalonId !== 'all') {
+                q = query(q, where('salonId', '==', selectedSalonId));
+            }
+            opPromises.push(getDocs(q).then(snap => ({ subcollection, snap })));
+        };
+
         mastersForSalon.forEach(master => {
-            const q = query(collection(db, 'masters', master.id, 'advances'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
-            advancePromises.push(getDocs(q));
+            processSubcollection(master, 'masters', 'advances');
+            processSubcollection(master, 'masters', 'bonuses');
         });
-
-        staffForSalon.forEach(person => {
-            const q = query(collection(db, 'staff', person.id, 'advances'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
-            advancePromises.push(getDocs(q));
-        });
-
-        const querySnapshots = await Promise.all(advancePromises);
-        querySnapshots.forEach(snap => {
-            snap.forEach(doc => {
-                totalAdvances += doc.data().amount;
+        staffForSalon.forEach(person => processSubcollection(person, 'staff', 'advances'));
+        
+        const results = await Promise.all(opPromises);
+        results.forEach(res => {
+            res.snap.forEach(doc => {
+                if (res.subcollection === 'advances') {
+                    totalAdvances += doc.data().amount;
+                } else if (res.subcollection === 'bonuses') {
+                    totalBonuses += doc.data().amount;
+                }
             });
         });
     } catch (e) {
-        console.error("Помилка завантаження авансів для підсумку:", e);
+        console.error("Помилка завантаження авансів та премій:", e);
     }
-
+    
+    // ... (код розрахунку витрат салону залишається без змін) ...
     let totalSalonExpenses = 0;
-    let filteredSalonExpenses = state.salonExpenses.filter(e => {
-        if (!e.timestamp && !e.date) return false;
-        const expenseDate = (e.timestamp || e.date).toDate();
-        return expenseDate >= startOfDay && expenseDate <= endOfDay;
-    });
-
+    let filteredSalonExpenses = state.salonExpenses.filter(e => e.timestamp?.toDate() >= startOfDay && e.timestamp?.toDate() <= endOfDay);
     if (selectedSalonId !== 'all') {
         filteredSalonExpenses = filteredSalonExpenses.filter(e => e.salonId === selectedSalonId);
     }
-    
-    filteredSalonExpenses.forEach(expense => {
-        totalSalonExpenses += expense.amount;
-    });
+    filteredSalonExpenses.forEach(expense => totalSalonExpenses += expense.amount);
 
     totalEl.textContent = `${total.toFixed(0)} zł`;
     cashEl.textContent = `${cash.toFixed(0)} zł`;
@@ -1381,7 +1361,7 @@ async function renderDailySummary() {
     productSalesEl.textContent = `${totalProductSales.toFixed(0)} zł`;
     servicesCountEl.textContent = servicesWithPayment;
 }
-// --- КІНЕЦЬ ВИПРАВЛЕНОГО КОДУ ---
+// --- КІНЕЦЬ ЗМІН ---
 
     // #region Calendar View & Modals
     function renderCalendarView(container) {
@@ -2445,101 +2425,180 @@ async function renderDailySummary() {
     }
 
     function renderMasterDetailView(container) {
-        const masterId = state.viewingMasterId;
-        const master = state.masters.find(m => m.id === masterId);
-        if (!master) {
-            container.innerHTML = `<div class="content-card"><h2>Майстра не знайдено</h2><p><button id="detail-view-back-btn" class="btn">Назад до списку</button></p></div>`;
-            const backBtn = document.getElementById('detail-view-back-btn');
-            if(backBtn) backBtn.onclick = () => renderView('masters');
-            return;
-        }
-        const categoriesList = (master.categoryIds || []).map(id => state.categories.find(c => c.id === id)?.name).filter(Boolean).join(', ') || 'Не вказано';
-        container.innerHTML = `
-            <div class="content-card">
-                <button id="detail-view-back-btn" class="btn" style="margin-bottom: 2rem; width: auto; background-color: var(--gray-text);">&larr; Назад до списку майстрів</button>
-                <h2>${master.name} ${master.tier ? `(${master.tier})` : ''}</h2>
-                <p><strong>Спеціалізації:</strong> ${categoriesList}</p>
-            </div>
-            <div class="content-card">
-                <h3>Видача авансу</h3>
-                <form id="add-advance-form">
-                    <div class="form-row">
-                        <div class="form-group" style="flex:2;"><label for="advance-amount">Сума авансу (zł)</label><input type="number" id="advance-amount" min="1" required></div>
-                        <div class="form-group" style="flex:1;"><label for="advance-payment-type">Тип оплати</label><select id="advance-payment-type" required><option value="cash">Готівка</option><option value="card">Картка</option></select></div>
-                    </div>
-                    <div class="form-group"><label for="advance-description">Опис (необов'язково)</label><textarea id="advance-description" rows="2"></textarea></div>
-                    <button type="submit" class="btn">Видати аванс</button>
-                </form>
-            </div>
-            <div class="content-card"><h3>Історія авансів</h3><ul id="master-advances-list" class="item-list"><li>Завантаження...</li></ul></div>
-        `;
-        
+    const masterId = state.viewingMasterId;
+    const master = state.masters.find(m => m.id === masterId);
+    if (!master) {
+        container.innerHTML = `<div class="content-card"><h2>Майстра не знайдено</h2><p><button id="detail-view-back-btn" class="btn">Назад до списку</button></p></div>`;
         const backBtn = document.getElementById('detail-view-back-btn');
         if(backBtn) backBtn.onclick = () => renderView('masters');
-
-        const listEl = document.getElementById('master-advances-list');
-        if(listEl) {
-            listEl.onclick = (event) => {
-                const deleteButton = event.target.closest('.btn-delete-advance');
-                if (deleteButton) { 
-                    handleDeleteAdvance(deleteButton.dataset.id, master.name, deleteButton.dataset.amount, deleteButton.dataset.description); 
-                }
-            };
-        }
-
-        document.getElementById('add-advance-form').onsubmit = handleAddAdvance;
-        const advancesCollectionRef = collection(db, 'masters', masterId, 'advances');
-        masterAdvancesUnsubscribe = onSnapshot(query(advancesCollectionRef, orderBy("date", "desc")), (snapshot) => {
-            state.viewingMasterAdvances = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const advancesListEl = document.getElementById('master-advances-list');
-            if (advancesListEl) {
-                advancesListEl.innerHTML = state.viewingMasterAdvances.length === 0 ? '<li>Авансів ще не було.</li>' : state.viewingMasterAdvances.map(adv => `
-                    <li>
-                        <div><span>${adv.date.toDate().toLocaleString('uk-UA')}</span>${adv.description ? `<br><small style="color: var(--gray-text);">${adv.description}</small>` : ''}</div>
-                        <div class="actions"><strong>${adv.amount} zł</strong><button class="btn btn-delete btn-delete-advance" data-id="${adv.id}" data-amount="${adv.amount}" data-description="${adv.description || ''}">Видалити</button></div>
-                    </li>
-                `).join('');
-            }
-        });
+        return;
     }
 
-    async function handleAddAdvance(event) {
-        event.preventDefault();
-        const masterId = state.viewingMasterId;
-        const master = state.masters.find(m => m.id === masterId);
-        const amountInput = document.getElementById('advance-amount');
-        const descriptionInput = document.getElementById('advance-description');
-        const amount = parseFloat(amountInput.value);
-        const description = descriptionInput.value.trim();
+    // --- ПОЧАТОК ЗМІН: Додаємо вибір салону для адміна ---
+    const userRole = state.user.role;
+    const isSalonAdmin = userRole === 'salon_admin';
+    const userSalonId = state.user.salonId;
+    const salonOptions = (isSalonAdmin ? state.salons.filter(s => s.id === userSalonId) : state.salons)
+        .map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+
+    const salonSelectHtml = userRole === 'admin' 
+        ? `<div class="form-group" style="flex:1;">
+             <label for="operation-salon">Салон</label>
+             <select id="operation-salon" required>${salonOptions}</select>
+           </div>` 
+        : '';
+    // --- КІНЕЦЬ ЗМІН ---
+
+    const categoriesList = (master.categoryIds || []).map(id => state.categories.find(c => c.id === id)?.name).filter(Boolean).join(', ') || 'Не вказано';
+    container.innerHTML = `
+        <div class="content-card">
+            <button id="detail-view-back-btn" class="btn" style="margin-bottom: 2rem; width: auto; background-color: var(--gray-text);">&larr; Назад до списку майстрів</button>
+            <h2>${master.name} ${master.tier ? `(${master.tier})` : ''}</h2>
+            <p><strong>Спеціалізації:</strong> ${categoriesList}</p>
+        </div>
+        <div class="content-card">
+            <h3>Фінансова операція</h3>
+            <form id="add-master-operation-form">
+                <div class="form-row">
+                    <div class="form-group" style="flex:2;">
+                        <label for="operation-type">Тип операції</label>
+                        <select id="operation-type" required>
+                            <option value="advance">Аванс</option>
+                            <option value="bonus">Премія</option>
+                        </select>
+                    </div>
+                    ${salonSelectHtml}
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:2;"><label for="operation-amount">Сума (zł)</label><input type="number" id="operation-amount" min="1" required></div>
+                    <div class="form-group" style="flex:1;"><label for="operation-payment-type">Тип оплати</label><select id="operation-payment-type" required><option value="cash">Готівка</option><option value="card">Картка</option></select></div>
+                </div>
+                <div class="form-group"><label for="operation-description">Опис (необов'язково)</label><textarea id="operation-description" rows="2"></textarea></div>
+                <button type="submit" class="btn">Провести операцію</button>
+            </form>
+        </div>
+        <div class="content-card"><h3>Історія операцій (Аванси та Премії)</h3><ul id="master-operations-list" class="item-list"><li>Завантаження...</li></ul></div>
+    `;
+
+    const backBtn = document.getElementById('detail-view-back-btn');
+    if(backBtn) backBtn.onclick = () => renderView('masters');
+
+    document.getElementById('add-master-operation-form').onsubmit = handleAddMasterOperation;
+
+    // --- ПОЧАТОК ЗМІН: Налаштування слухачів для авансів та премій ---
+    if(masterAdvancesUnsubscribe) masterAdvancesUnsubscribe();
+    staffSubcollectionUnsubscribers.forEach(unsub => unsub());
+    staffSubcollectionUnsubscribers = [];
+    state.viewingMasterAdvances = [];
+    state.viewingMasterBonuses = [];
+
+    const advancesRef = collection(db, 'masters', masterId, 'advances');
+    const bonusesRef = collection(db, 'masters', masterId, 'bonuses');
+
+    const renderCombinedHistory = () => {
+        const listEl = document.getElementById('master-operations-list');
+        if (!listEl) return;
         
-        if (!masterId || !amount || amount <= 0) { return showNotification('Будь ласка, введіть коректну суму.', "error"); }
-        
-        const paymentType = document.getElementById('advance-payment-type').value;
-        const data = { amount: amount, date: Timestamp.now(), paymentType: paymentType };
-        if (description) { data.description = description; }
-        
-        const action = () => addDoc(collection(db, 'masters', masterId, 'advances'), data);
+        const combined = [
+            ...(state.viewingMasterAdvances || []).map(a => ({ ...a, type: 'Аванс', isNegative: true })),
+            ...(state.viewingMasterBonuses || []).map(b => ({ ...b, type: 'Премія', isNegative: false }))
+        ].sort((a, b) => b.date.toDate() - a.date.toDate());
+
+        listEl.innerHTML = combined.length === 0 ? '<li>Історія порожня.</li>' : combined.map(op => {
+            const subcollection = op.type === 'Аванс' ? 'advances' : 'bonuses';
+            const color = op.isNegative ? 'var(--danger-color)' : 'var(--success-color)';
+            const salon = state.salons.find(s => s.id === op.salonId);
+            return `
+                <li style="color: ${color};">
+                    <div>
+                        <span><strong>${op.type}</strong> у салоні "${salon?.name || 'Невідомо'}"</span>
+                        <br><small>${op.date.toDate().toLocaleString('uk-UA')} ${op.description ? ` - ${op.description}` : ''}</small>
+                    </div>
+                    <div class="actions">
+                        <strong>${op.amount.toFixed(2)} zł</strong>
+                        <button class="btn btn-delete btn-delete-operation" data-id="${op.id}" data-subcollection="${subcollection}" data-description="${op.description || ''}" data-amount="${op.amount}">Видалити</button>
+                    </div>
+                </li>`;
+        }).join('');
+    };
+
+    const unsubAdvances = onSnapshot(query(advancesRef, orderBy("date", "desc")), snapshot => {
+        state.viewingMasterAdvances = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderCombinedHistory();
+    });
+    const unsubBonuses = onSnapshot(query(bonusesRef, orderBy("date", "desc")), snapshot => {
+        state.viewingMasterBonuses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderCombinedHistory();
+    });
+
+    masterAdvancesUnsubscribe = () => {
+        unsubAdvances();
+        unsubBonuses();
+    };
+    
+    document.getElementById('master-operations-list').onclick = (event) => {
+        const deleteButton = event.target.closest('.btn-delete-operation');
+        if (deleteButton) { 
+            handleDeleteMasterOperation(deleteButton.dataset);
+        }
+    };
+    // --- КІНЕЦЬ ЗМІН ---
+}
+
+    // --- ПОЧАТОК ЗМІН: Нові функції для операцій ---
+async function handleAddMasterOperation(event) {
+    event.preventDefault();
+    const masterId = state.viewingMasterId;
+    const master = state.masters.find(m => m.id === masterId);
+    
+    const operationType = document.getElementById('operation-type').value;
+    const amount = parseFloat(document.getElementById('operation-amount').value);
+    const description = document.getElementById('operation-description').value.trim();
+    const paymentType = document.getElementById('operation-payment-type').value;
+
+    const salonId = state.user.role === 'salon_admin'
+        ? state.user.salonId
+        : document.getElementById('operation-salon').value;
+    
+    if (!masterId || !amount || amount <= 0 || !salonId) {
+        return showNotification('Будь ласка, заповніть усі поля.', "error");
+    }
+    
+    const subcollectionName = operationType === 'bonus' ? 'bonuses' : 'advances';
+    const logAction = operationType === 'bonus' ? 'Нараховано премію' : 'Видано аванс майстру';
+    
+    const data = { amount, date: Timestamp.now(), paymentType, salonId };
+    if (description) data.description = description;
+    
+    const action = () => addDoc(collection(db, 'masters', masterId, subcollectionName), data);
+    try {
+        await logAndExecute(logAction, { masterId, name: master.name, amount, description, salonId }, action);
+        event.target.reset();
+        showNotification("Операцію успішно проведено!");
+    } catch (e) {
+        showNotification("Помилка при проведенні операції.", "error");
+    }
+}
+
+async function handleDeleteMasterOperation(dataset) {
+    const { id, subcollection, description, amount } = dataset;
+    const masterId = state.viewingMasterId;
+    if (!masterId || !id || !subcollection) return;
+
+    showConfirmWithReasonModal(`Ви впевнені, що хочете видалити цю операцію?`, async (reason) => {
+        const action = () => deleteDoc(doc(db, 'masters', masterId, subcollection, id));
+        const logAction = subcollection === 'bonuses' ? 'Видалено премію' : 'Видалено аванс';
+        const logDetails = { masterId, name: state.masters.find(m=>m.id === masterId)?.name, amount: parseFloat(amount), description };
+        if (reason) logDetails.reason = reason;
+
         try {
-            await logAndExecute('Видано аванс майстру', { masterId, name: master.name, amount, description }, action);
-            amountInput.value = '';
-            descriptionInput.value = '';
+            await logAndExecute(logAction, logDetails, action);
         } catch (e) {
-            showNotification("Помилка при видачі авансу.", "error");
+            showNotification("Помилка при видаленні операції.", "error");
         }
-    }
-
-    async function handleDeleteAdvance(advanceId, masterName, amount, description) {
-        const masterId = state.viewingMasterId;
-        if (!masterId || !advanceId) return;
-
-        showConfirmWithReasonModal('Ви впевнені, що хочете видалити цей аванс?', async (reason) => {
-            const action = () => deleteDoc(doc(db, 'masters', masterId, 'advances', advanceId));
-            const logDetails = { masterId, name: masterName, amount: parseFloat(amount), description };
-            if (reason) logDetails.reason = reason;
-            try { await logAndExecute('Видалено аванс майстра', logDetails, action); } 
-            catch (e) { showNotification("Помилка при видаленні авансу.", "error"); }
-        });
-    }
+    });
+}
+// --- КІНЕЦЬ ЗМІН ---
 
     function populateCategoryCheckboxes(elementId, checkedIds = []) { 
         const container = document.getElementById(elementId);
