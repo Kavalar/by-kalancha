@@ -438,19 +438,25 @@
 
     // #region Core App Logic & Audit
     async function logAndExecute(action, details, operationFn) {
-        try {
-            const operationResult = await operationFn();
-            await addDoc(collection(db, 'auditLog'), {
-                action: action,
-                details: details,
-                userEmail: state.user.email,
-                timestamp: Timestamp.now()
-            });
-            return operationResult;
-        } catch (error) {
-            console.error(`Error during logged action "${action}":`, error);
-            throw error;
-        }
+    try {
+        const operationResult = await operationFn(); // Виконуємо операцію
+        
+        // Логуємо дію в auditLog
+        await addDoc(collection(db, 'auditLog'), {
+            action: action,
+            details: details,
+            userEmail: state.user.email,
+            timestamp: Timestamp.now()
+        });
+
+        // --- ВИПРАВЛЕННЯ: Повертаємо результат операції ---
+        return operationResult; 
+
+    } catch (error) {
+        // Якщо сталася помилка, виводимо її в консоль і прокидаємо далі
+        console.error(`Error during logged action "${action}":`, error);
+        throw error;
+    }
     }
 
     function renderLoginView() {
