@@ -91,6 +91,32 @@
         .summary-card { background-color: var(--main-bg); padding: 1rem; border-radius: 8px; }
         .summary-card .value { font-size: 2rem; font-weight: 600; color: var(--primary-color); }
         .summary-card .label { font-size: 0.9rem; color: var(--gray-text); margin-top: 0.25rem; }
+        /* --- СТИЛІ ДЛЯ ВИПАДАЮЧИХ СПИСКІВ ПОШУКУ --- */
+        .client-search-container, .service-search-container {
+            position: relative;
+        }
+        #client-search-results, #service-search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            box-shadow: var(--shadow);
+            z-index: 100;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        #client-search-results div, #service-search-results div {
+            padding: 0.75rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        #client-search-results div:hover, #service-search-results div:hover {
+            background-color: var(--main-bg);
+        }
     </style>
 </head>
 <body>
