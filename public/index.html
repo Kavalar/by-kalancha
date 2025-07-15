@@ -2514,13 +2514,53 @@ async function renderDailySummary() {
             if(backBtn) backBtn.onclick = () => renderView('masters');
             return;
         }
+
         const categoriesList = (master.categoryIds || []).map(id => state.categories.find(c => c.id === id)?.name).filter(Boolean).join(', ') || 'Не вказано';
+        
+        // --- ПОЧАТОК: Логіка для історії робіт ---
+        const masterAppointments = state.appointments
+            .filter(app => app.masterId === masterId)
+            .sort((a, b) => b.dateTime.toDate() - a.dateTime.toDate());
+
+        let appointmentsHtml = masterAppointments.map(app => {
+            const service = state.services.find(s => s.id === app.serviceId);
+            const salon = state.salons.find(s => s.id === app.salonId);
+            const appDate = app.dateTime.toDate().toLocaleString('uk-UA');
+            
+            let paymentDetails = "Очікує оплати";
+            if (app.payments && app.payments.length > 0) {
+                paymentDetails = app.payments.map(p => {
+                    let type = p.type;
+                    if (p.type === 'cash') type = 'Готівка';
+                    if (p.type === 'card') type = 'Картка';
+                    if (p.type === 'blik') type = 'Blik';
+                    if (p.type === 'settlement') type = 'Взаєморозрахунок';
+                    return `<strong>${p.amount.toFixed(0)} zł</strong> (${type})`;
+                }).join('<br>');
+            } else if (app.status === 'completed') {
+                paymentDetails = `<span class="status-badge status-completed">Оплачено</span>`;
+            }
+
+            return `
+                <tr>
+                    <td>${appDate}</td>
+                    <td>${app.clientName}</td>
+                    <td>${service ? service.name : 'Послугу видалено'}</td>
+                    <td>${salon ? salon.name : 'Не вказано'}</td>
+                    <td><strong>${app.finalPrice.toFixed(0)} zł</strong></td>
+                    <td>${paymentDetails}</td>
+                </tr>
+            `;
+        }).join('');
+        // --- КІНЕЦЬ: Логіка для історії робіт ---
+
         container.innerHTML = `
             <div class="content-card">
                 <button id="detail-view-back-btn" class="btn" style="margin-bottom: 2rem; width: auto; background-color: var(--gray-text);">&larr; Назад до списку майстрів</button>
                 <h2>${master.name} ${master.tier ? `(${master.tier})` : ''}</h2>
                 <p><strong>Спеціалізації:</strong> ${categoriesList}</p>
             </div>
+            
             <div class="content-card">
                 <h3>Видача авансу</h3>
                 <form id="add-advance-form">
@@ -2532,18 +2572,67 @@ async function renderDailySummary() {
                     <button type="submit" class="btn">Видати аванс</button>
                 </form>
             </div>
+
             <div class="content-card"><h3>Історія авансів</h3><ul id="master-advances-list" class="item-list"><li>Завантаження...</li></ul></div>
+            
+            <div class="content-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h2>Історія робіт</h2>
+                    <button id="send-master-report-btn" class="btn">Надіслати звіт на пошту</button>
+                </div>
+                <div style="max-height: 600px; overflow-y: auto;">
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>Дата</th>
+                                <th>Клієнт</th>
+                                <th>Послуга</th>
+                                <th>Салон</th>
+                                <th>Сума</th>
+                                <th>Оплата</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${appointmentsHtml || `<tr><td colspan="6" style="text-align:center;">Історія робіт порожня.</td></tr>`}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         `;
-        
+
         const backBtn = document.getElementById('detail-view-back-btn');
         if(backBtn) backBtn.onclick = () => renderView('masters');
+
+        // --- ПОЧАТОК: Логіка для кнопки відправки ---
+        const sendReportBtn = document.getElementById('send-master-report-btn');
+        if (sendReportBtn) {
+            sendReportBtn.onclick = async () => {
+                showConfirmModal(`Надіслати звіт по роботах майстра ${master.name} на пошти, вказані в налаштуваннях?`, async () => {
+                    sendReportBtn.disabled = true;
+                    sendReportBtn.textContent = 'Відправка...';
+                    try {
+                        const sendMasterWorkReport = httpsCallable(functions, 'sendMasterWorkReport');
+                        const result = await sendMasterWorkReport({ masterId: master.id });
+                        showNotification(result.data.message, 'success');
+                    } catch (error) {
+                        console.error("Помилка відправки звіту по майстру:", error);
+                        showNotification(`Помилка: ${error.message}`, 'error');
+                    } finally {
+                        sendReportBtn.disabled = false;
+                        sendReportBtn.textContent = 'Надіслати звіт на пошту';
+                    }
+                });
+            };
+        }
+        // --- КІНЕЦЬ: Логіка для кнопки відправки ---
+
 
         const listEl = document.getElementById('master-advances-list');
         if(listEl) {
             listEl.onclick = (event) => {
                 const deleteButton = event.target.closest('.btn-delete-advance');
                 if (deleteButton) { 
-                    handleDeleteAdvance(deleteButton.dataset.id, master.name, deleteButton.dataset.amount, deleteButton.dataset.description); 
+                    handleDeleteAdvance(deleteButton.dataset.id, master.name, deleteButton.dataset.amount, deleteButton.dataset.description);
                 }
             };
         }
