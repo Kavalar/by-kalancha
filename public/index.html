@@ -1624,9 +1624,7 @@ async function renderDailySummary() {
     document.getElementById('edit-payments-appointment-id').value = appointment.id;
     listEl.innerHTML = '';
 
-    if (!appointment.payments || appointment.payments.length === 0) {
-        listEl.innerHTML = '<li>Оплат ще не було.</li>'; [cite: 448]
-    } else {
+    if (Array.isArray(appointment.payments) && appointment.payments.length > 0) {
         appointment.payments.forEach((payment, index) => {
             const li = document.createElement('li');
             li.dataset.index = index;
@@ -1658,7 +1656,10 @@ async function renderDailySummary() {
             };
             listEl.appendChild(li);
         });
+    } else {
+        listEl.innerHTML = '<li>Оплат ще не було.</li>';
     }
+    
     modal.style.display = 'flex';
 }
     async function handleDeleteSinglePayment(appointmentId, paymentIndex) {
