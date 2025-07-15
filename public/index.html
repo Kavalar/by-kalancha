@@ -1619,41 +1619,96 @@ async function renderDailySummary() {
     }
 
     function showEditPaymentsModal(appointment) {
-        const modal = document.getElementById('edit-payments-modal');
-        const listEl = document.getElementById('edit-payments-list');
-        document.getElementById('edit-payments-appointment-id').value = appointment.id;
-        listEl.innerHTML = '';
-        if (!appointment.payments || appointment.payments.length === 0) {
-            listEl.innerHTML = '<li>Оплат ще не було.</li>';
-        } else {
-            appointment.payments.forEach((payment, index) => {
-                const li = document.createElement('li');
-                li.dataset.index = index;
-                const isSettlement = payment.type === 'settlement';
-                li.innerHTML = `
-                    <div style="flex-grow: 1;"><strong>${payment.amount.toFixed(2)} zł</strong></div>
-                    <div style="flex-grow: 1.5;">
-                        <select class="payment-type-selector" ${isSettlement ? 'disabled' : ''}>
-                            <option value="cash" ${payment.type === 'cash' ? 'selected' : ''}>Готівка</option>
-                            <option value="card" ${payment.type === 'card' ? 'selected' : ''}>Картка</option>
-                            <option value="blik" ${payment.type === 'blik' ? 'selected' : ''}>Blik</option>
-                            ${isSettlement ? `<option value="settlement" selected>Взаєморозрахунок</option>` : ''}
-                        </select>
-                    </div>
-                    <div class="actions">
-                        <button type="button" class="btn btn-delete btn-delete-single-payment">Видалити</button>
-                    </div>
-                `;
-                li.querySelector('.btn-delete-single-payment').onclick = () => {
-                    showConfirmModal('Ви впевнені, що хочете видалити цей платіж?', () => {
-                        li.remove();
-                    });
-                };
-                listEl.appendChild(li);
-            });
-        }
-        modal.style.display = 'flex';
+    const modal = document.getElementById('edit-payments-modal');
+    const listEl = document.getElementById('edit-payments-list');
+    document.getElementById('edit-payments-appointment-id').value = appointment.id;
+    listEl.innerHTML = '';
+
+    if (!appointment.payments || appointment.payments.length === 0) {
+        listEl.innerHTML = '<li>Оплат ще не було.</li>'; [cite: 448]
+    } else {
+        appointment.payments.forEach((payment, index) => {
+            const li = document.createElement('li');
+            li.dataset.index = index;
+            const isSettlement = payment.type === 'settlement';
+            li.innerHTML = `
+                <div style="flex-grow: 1;"><strong>${payment.amount.toFixed(2)} zł</strong></div>
+                <div style="flex-grow: 1.5;">
+                    <select class="payment-type-selector" ${isSettlement ? 'disabled' : ''}>
+                        <option value="cash" ${payment.type === 'cash' ? 'selected' : ''}>Готівка</option>
+                        <option value="card" ${payment.type === 'card' ? 'selected' : ''}>Картка</option>
+                        <option value="blik" ${payment.type === 'blik' ? 'selected' : ''}>Blik</option>
+                        ${isSettlement ? `<option value="settlement" selected>Взаєморозрахунок</option>` : ''}
+                    </select>
+                </div>
+                <div class="actions">
+                    <button type="button" class="btn btn-delete btn-delete-single-payment">Видалити</button>
+                </div>
+            `;
+            const deleteBtn = li.querySelector('.btn-delete-single-payment');
+            
+            deleteBtn.dataset.appointmentId = appointment.id;
+            deleteBtn.dataset.paymentIndex = index;
+
+            deleteBtn.onclick = () => {
+                const { appointmentId, paymentIndex } = deleteBtn.dataset;
+                showConfirmModal('Ви впевнені, що хочете видалити цей платіж?', () => {
+                    handleDeleteSinglePayment(appointmentId, parseInt(paymentIndex));
+                });
+            };
+            listEl.appendChild(li);
+        });
     }
+    modal.style.display = 'flex';
+}
+    async function handleDeleteSinglePayment(appointmentId, paymentIndex) {
+    const appointment = state.appointments.find(a => a.id === appointmentId);
+    if (!appointment) {
+        return showNotification('Помилка: запис не знайдено.', 'error');
+    }
+
+    const payments = [...appointment.payments];
+
+    const removedPayment = payments.splice(paymentIndex, 1)[0];
+    if (!removedPayment) {
+        return showNotification('Помилка: платіж для видалення не знайдено.', 'error');
+    }
+
+    const newTotalPaid = (appointment.totalPaid || 0) - removedPayment.amount;
+
+    let newStatus = 'upcoming';
+    if (newTotalPaid > 0) {
+        if (newTotalPaid >= (appointment.finalPrice || 0) - 0.001) {
+            newStatus = 'completed';
+        } else {
+            newStatus = 'partially_paid';
+        }
+    }
+
+    const updateData = {
+        payments: payments,
+        totalPaid: newTotalPaid,
+        status: newStatus
+    };
+
+    const action = () => updateDoc(doc(db, 'appointments', appointmentId), updateData);
+
+    try {
+        await logAndExecute('Видалено платіж із запису', {
+            appointmentId: appointmentId,
+            clientName: appointment.clientName,
+            amount: removedPayment.amount,
+            type: removedPayment.type
+        }, action);
+
+        showNotification('Платіж успішно видалено!', 'success');
+        document.getElementById('edit-payments-modal').style.display = 'none';
+
+    } catch (e) {
+        showNotification('Не вдалося видалити платіж. Спробуйте ще раз.', 'error');
+        console.error("Помилка під час видалення платежу:", e);
+    }
+}
 
     async function handleUpdatePayments(event) {
         event.preventDefault();
