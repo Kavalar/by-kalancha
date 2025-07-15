@@ -2510,49 +2510,16 @@ async function renderDailySummary() {
         const master = state.masters.find(m => m.id === masterId);
         if (!master) {
             container.innerHTML = `<div class="content-card"><h2>Майстра не знайдено</h2><p><button id="detail-view-back-btn" class="btn">Назад до списку</button></p></div>`;
-            const backBtn = document.getElementById('detail-view-back-btn');
-            if(backBtn) backBtn.onclick = () => renderView('masters');
+            document.getElementById('detail-view-back-btn').onclick = () => renderView('masters');
             return;
         }
 
         const categoriesList = (master.categoryIds || []).map(id => state.categories.find(c => c.id === id)?.name).filter(Boolean).join(', ') || 'Не вказано';
         
-        // --- ПОЧАТОК: Логіка для історії робіт ---
-        const masterAppointments = state.appointments
-            .filter(app => app.masterId === masterId)
-            .sort((a, b) => b.dateTime.toDate() - a.dateTime.toDate());
-
-        let appointmentsHtml = masterAppointments.map(app => {
-            const service = state.services.find(s => s.id === app.serviceId);
-            const salon = state.salons.find(s => s.id === app.salonId);
-            const appDate = app.dateTime.toDate().toLocaleString('uk-UA');
-            
-            let paymentDetails = "Очікує оплати";
-            if (app.payments && app.payments.length > 0) {
-                paymentDetails = app.payments.map(p => {
-                    let type = p.type;
-                    if (p.type === 'cash') type = 'Готівка';
-                    if (p.type === 'card') type = 'Картка';
-                    if (p.type === 'blik') type = 'Blik';
-                    if (p.type === 'settlement') type = 'Взаєморозрахунок';
-                    return `<strong>${p.amount.toFixed(0)} zł</strong> (${type})`;
-                }).join('<br>');
-            } else if (app.status === 'completed') {
-                paymentDetails = `<span class="status-badge status-completed">Оплачено</span>`;
-            }
-
-            return `
-                <tr>
-                    <td>${appDate}</td>
-                    <td>${app.clientName}</td>
-                    <td>${service ? service.name : 'Послугу видалено'}</td>
-                    <td>${salon ? salon.name : 'Не вказано'}</td>
-                    <td><strong>${app.finalPrice.toFixed(0)} zł</strong></td>
-                    <td>${paymentDetails}</td>
-                </tr>
-            `;
-        }).join('');
-        // --- КІНЕЦЬ: Логіка для історії робіт ---
+        // Встановлюємо дати за замовчуванням: поточний місяць
+        const today = new Date();
+        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+        const todayStr = today.toISOString().split('T')[0];
 
         container.innerHTML = `
             <div class="content-card">
@@ -2580,6 +2547,18 @@ async function renderDailySummary() {
                     <h2>Історія робіт</h2>
                     <button id="send-master-report-btn" class="btn">Надіслати звіт на пошту</button>
                 </div>
+                
+                <div class="form-row" style="margin-bottom: 1.5rem;">
+                    <div class="form-group" style="flex:1;">
+                        <label for="work-history-start">Період З</label>
+                        <input type="date" id="work-history-start" value="${firstDayOfMonth}">
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label for="work-history-end">Період По</label>
+                        <input type="date" id="work-history-end" value="${todayStr}">
+                    </div>
+                </div>
+
                 <div style="max-height: 600px; overflow-y: auto;">
                     <table class="report-table">
                         <thead>
@@ -2592,51 +2571,96 @@ async function renderDailySummary() {
                                 <th>Оплата</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            ${appointmentsHtml || `<tr><td colspan="6" style="text-align:center;">Історія робіт порожня.</td></tr>`}
-                        </tbody>
+                        <tbody id="work-history-tbody">
+                            </tbody>
                     </table>
                 </div>
             </div>
         `;
 
-        const backBtn = document.getElementById('detail-view-back-btn');
-        if(backBtn) backBtn.onclick = () => renderView('masters');
-
-        // --- ПОЧАТОК: Логіка для кнопки відправки ---
+        // --- Логіка для оновлення таблиці та відправки звіту ---
+        const startDateInput = document.getElementById('work-history-start');
+        const endDateInput = document.getElementById('work-history-end');
+        const tableBody = document.getElementById('work-history-tbody');
         const sendReportBtn = document.getElementById('send-master-report-btn');
-        if (sendReportBtn) {
-            sendReportBtn.onclick = async () => {
-                showConfirmModal(`Надіслати звіт по роботах майстра ${master.name} на пошти, вказані в налаштуваннях?`, async () => {
-                    sendReportBtn.disabled = true;
-                    sendReportBtn.textContent = 'Відправка...';
-                    try {
-                        const sendMasterWorkReport = httpsCallable(functions, 'sendMasterWorkReport');
-                        const result = await sendMasterWorkReport({ masterId: master.id });
-                        showNotification(result.data.message, 'success');
-                    } catch (error) {
-                        console.error("Помилка відправки звіту по майстру:", error);
-                        showNotification(`Помилка: ${error.message}`, 'error');
-                    } finally {
-                        sendReportBtn.disabled = false;
-                        sendReportBtn.textContent = 'Надіслати звіт на пошту';
-                    }
-                });
-            };
-        }
-        // --- КІНЕЦЬ: Логіка для кнопки відправки ---
 
+        const updateWorkHistoryTable = () => {
+            const start = new Date(startDateInput.value);
+            start.setHours(0, 0, 0, 0);
+            const end = new Date(endDateInput.value);
+            end.setHours(23, 59, 59, 999);
 
-        const listEl = document.getElementById('master-advances-list');
-        if(listEl) {
-            listEl.onclick = (event) => {
-                const deleteButton = event.target.closest('.btn-delete-advance');
-                if (deleteButton) { 
-                    handleDeleteAdvance(deleteButton.dataset.id, master.name, deleteButton.dataset.amount, deleteButton.dataset.description);
+            const masterAppointments = state.appointments
+                .filter(app => {
+                    const appDate = app.dateTime.toDate();
+                    return app.masterId === masterId && appDate >= start && appDate <= end;
+                })
+                .sort((a, b) => b.dateTime.toDate() - a.dateTime.toDate());
+
+            let appointmentsHtml = masterAppointments.map(app => {
+                const service = state.services.find(s => s.id === app.serviceId);
+                const salon = state.salons.find(s => s.id === app.salonId);
+                const appDate = app.dateTime.toDate().toLocaleString('uk-UA');
+                
+                let paymentDetails = "Очікує оплати";
+                if (app.payments && app.payments.length > 0) {
+                    paymentDetails = app.payments.map(p => {
+                        let type = p.type;
+                        if (p.type === 'cash') type = 'Готівка';
+                        if (p.type === 'card') type = 'Картка';
+                        if (p.type === 'blik') type = 'Blik';
+                        if (p.type === 'settlement') type = 'Взаєморозрахунок';
+                        return `<strong>${p.amount.toFixed(0)} zł</strong> (${type})`;
+                    }).join('<br>');
+                } else if (app.status === 'completed') {
+                    paymentDetails = `<span class="status-badge status-completed">Оплачено</span>`;
                 }
-            };
-        }
 
+                return `<tr>
+                    <td>${appDate}</td>
+                    <td>${app.clientName}</td>
+                    <td>${service ? service.name : 'Послугу видалено'}</td>
+                    <td>${salon ? salon.name : 'Не вказано'}</td>
+                    <td><strong>${app.finalPrice.toFixed(0)} zł</strong></td>
+                    <td>${paymentDetails}</td>
+                </tr>`;
+            }).join('');
+            
+            tableBody.innerHTML = appointmentsHtml || `<tr><td colspan="6" style="text-align:center;">Історія робіт за обраний період порожня.</td></tr>`;
+        };
+        
+        // Обробники подій
+        startDateInput.onchange = updateWorkHistoryTable;
+        endDateInput.onchange = updateWorkHistoryTable;
+        
+        sendReportBtn.onclick = async () => {
+            const startDate = startDateInput.value;
+            const endDate = endDateInput.value;
+            if (!startDate || !endDate) {
+                return showNotification('Будь ласка, оберіть період.', 'error');
+            }
+            showConfirmModal(`Надіслати звіт по роботах майстра ${master.name} за період з ${startDate} по ${endDate}?`, async () => {
+                sendReportBtn.disabled = true;
+                sendReportBtn.textContent = 'Відправка...';
+                try {
+                    const sendMasterWorkReport = httpsCallable(functions, 'sendMasterWorkReport');
+                    const result = await sendMasterWorkReport({ masterId: master.id, startDate, endDate });
+                    showNotification(result.data.message, 'success');
+                } catch (error) {
+                    console.error("Помилка відправки звіту по майстру:", error);
+                    showNotification(`Помилка: ${error.message}`, 'error');
+                } finally {
+                    sendReportBtn.disabled = false;
+                    sendReportBtn.textContent = 'Надіслати звіт на пошту';
+                }
+            });
+        };
+
+        // Перший рендер таблиці
+        updateWorkHistoryTable();
+
+        // Стара логіка для авансів
+        document.getElementById('detail-view-back-btn').onclick = () => renderView('masters');
         document.getElementById('add-advance-form').onsubmit = handleAddAdvance;
         const advancesCollectionRef = collection(db, 'masters', masterId, 'advances');
         masterAdvancesUnsubscribe = onSnapshot(query(advancesCollectionRef, orderBy("date", "desc")), (snapshot) => {
@@ -2649,6 +2673,13 @@ async function renderDailySummary() {
                         <div class="actions"><strong>${adv.amount} zł</strong><button class="btn btn-delete btn-delete-advance" data-id="${adv.id}" data-amount="${adv.amount}" data-description="${adv.description || ''}">Видалити</button></div>
                     </li>
                 `).join('');
+                
+                advancesListEl.onclick = (event) => {
+                    const deleteButton = event.target.closest('.btn-delete-advance');
+                    if (deleteButton) { 
+                        handleDeleteAdvance(deleteButton.dataset.id, master.name, deleteButton.dataset.amount, deleteButton.dataset.description);
+                    }
+                };
             }
         });
     }
