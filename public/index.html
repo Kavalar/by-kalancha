@@ -1623,8 +1623,9 @@ async function renderDailySummary() {
     const listEl = document.getElementById('edit-payments-list');
     document.getElementById('edit-payments-appointment-id').value = appointment.id;
     listEl.innerHTML = '';
-
-    if (Array.isArray(appointment.payments) && appointment.payments.length > 0) {
+    if (!appointment.payments || appointment.payments.length === 0) {
+        listEl.innerHTML = '<li>Оплат ще не було.</li>';
+    } else {
         appointment.payments.forEach((payment, index) => {
             const li = document.createElement('li');
             li.dataset.index = index;
@@ -1643,23 +1644,25 @@ async function renderDailySummary() {
                     <button type="button" class="btn btn-delete btn-delete-single-payment">Видалити</button>
                 </div>
             `;
-            const deleteBtn = li.querySelector('.btn-delete-single-payment');
             
-            deleteBtn.dataset.appointmentId = appointment.id;
-            deleteBtn.dataset.paymentIndex = index;
-
-            deleteBtn.onclick = () => {
-                const { appointmentId, paymentIndex } = deleteBtn.dataset;
+            // --- ОСЬ ТУТ ЄДИНА ЗМІНА ---
+            li.querySelector('.btn-delete-single-payment').onclick = () => {
                 showConfirmModal('Ви впевнені, що хочете видалити цей платіж?', () => {
-                    handleDeleteSinglePayment(appointmentId, parseInt(paymentIndex));
+                    // Крок 1: Видаляємо елемент з екрану, як і раніше
+                    li.remove();
+                    
+                    // Крок 2: Програмно "натискаємо" на кнопку "Зберегти зміни"
+                    const form = document.getElementById('edit-payments-form');
+                    if (form) {
+                        form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+                    }
                 });
             };
+            // --- КІНЕЦЬ ЗМІНИ ---
+
             listEl.appendChild(li);
         });
-    } else {
-        listEl.innerHTML = '<li>Оплат ще не було.</li>';
     }
-    
     modal.style.display = 'flex';
 }
     async function handleDeleteSinglePayment(appointmentId, paymentIndex) {
