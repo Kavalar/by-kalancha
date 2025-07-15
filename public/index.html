@@ -1645,6 +1645,9 @@ async function renderDailySummary() {
             `;
             const deleteBtn = li.querySelector('.btn-delete-single-payment');
             
+            deleteBtn.dataset.appointmentId = appointment.id;
+            deleteBtn.dataset.paymentIndex = index;
+
             deleteBtn.onclick = () => {
                 const { appointmentId, paymentIndex } = deleteBtn.dataset;
                 showConfirmModal('Ви впевнені, що хочете видалити цей платіж?', () => {
