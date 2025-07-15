@@ -1623,8 +1623,9 @@ async function renderDailySummary() {
     const listEl = document.getElementById('edit-payments-list');
     document.getElementById('edit-payments-appointment-id').value = appointment.id;
     listEl.innerHTML = '';
-
-    if (Array.isArray(appointment.payments) && appointment.payments.length > 0) {
+    if (!appointment.payments || appointment.payments.length === 0) {
+        listEl.innerHTML = '<li>Оплат ще не було.</li>';
+    } else {
         appointment.payments.forEach((payment, index) => {
             const li = document.createElement('li');
             li.dataset.index = index;
@@ -1643,20 +1644,14 @@ async function renderDailySummary() {
                     <button type="button" class="btn btn-delete btn-delete-single-payment">Видалити</button>
                 </div>
             `;
-            const deleteBtn = li.querySelector('.btn-delete-single-payment');
-            
-            deleteBtn.onclick = () => {
-                const { appointmentId, paymentIndex } = deleteBtn.dataset;
+            li.querySelector('.btn-delete-single-payment').onclick = () => {
                 showConfirmModal('Ви впевнені, що хочете видалити цей платіж?', () => {
-                    handleDeleteSinglePayment(appointmentId, parseInt(paymentIndex));
+                    li.remove();
                 });
             };
             listEl.appendChild(li);
         });
-    } else {
-        listEl.innerHTML = '<li>Оплат ще не було.</li>';
     }
-    
     modal.style.display = 'flex';
 }
     async function handleDeleteSinglePayment(appointmentId, paymentIndex) {
@@ -1717,23 +1712,28 @@ async function renderDailySummary() {
     const appointmentId = document.getElementById('edit-payments-appointment-id').value;
     const appointment = state.appointments.find(a => a.id === appointmentId);
     if (!appointment) return showNotification('Помилка: запис не знайдено.', 'error');
-
-    // Безпечно оновлюємо тільки типи платежів, не видаляючи їх
-    const newPayments = appointment.payments.map((payment, index) => {
-        const li = document.querySelector(`#edit-payments-list li[data-index="${index}"]`);
-        // Якщо елемента немає (наприклад, його видалили вручну), ми нічого не робимо
-        if (!li) return payment;
-        
+    
+    const newPayments = [];
+    let newTotalPaid = 0;
+    document.querySelectorAll('#edit-payments-list li').forEach(li => {
+        const originalPayment = appointment.payments[li.dataset.index];
         const newType = li.querySelector('.payment-type-selector').value;
-        return { ...payment, type: newType };
+        newPayments.push({ ...originalPayment, type: newType });
+        newTotalPaid += originalPayment.amount;
     });
-
-    // Оскільки ми лише змінюємо типи, загальна сума і статус не змінюються
-    const action = () => updateDoc(doc(db, 'appointments', appointmentId), { payments: newPayments });
-
+    
+    const finalPrice = appointment.finalPrice || 0;
+    let newStatus = (newTotalPaid > 0) ? 'partially_paid' : 'upcoming';
+    if (appointment.isInternal) {
+        if (newTotalPaid > 0) newStatus = 'completed';
+    } else {
+        if (newTotalPaid >= finalPrice - 0.001) newStatus = 'completed';
+    }
+    
+    const action = () => updateDoc(doc(db, 'appointments', appointmentId), { payments: newPayments, totalPaid: newTotalPaid, status: newStatus });
     try {
-        await logAndExecute('Оновлено типи оплат', { appointmentId, clientName: appointment.clientName }, action);
-        showNotification('Типи оплат успішно оновлено!');
+        await logAndExecute('Оновлено оплати запису', { appointmentId, clientName: appointment.clientName }, action);
+        showNotification('Оплати успішно оновлено!');
         document.getElementById('edit-payments-modal').style.display = 'none';
     } catch (e) {
         showNotification("Не вдалося оновити оплати.", "error");
