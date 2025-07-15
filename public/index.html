@@ -2449,11 +2449,13 @@ async function renderDailySummary() {
     function renderMasterDetailView(container) {
     const masterId = state.viewingMasterId;
     const master = state.masters.find(m => m.id === masterId);
+
     if (!master) {
         container.innerHTML = `<div class="content-card"><h2>Майстра не знайдено</h2><p><button id="detail-view-back-btn" class="btn">Назад до списку</button></p></div>`;
         document.getElementById('detail-view-back-btn')?.onclick = () => renderView('masters');
         return;
     }
+
     const categoriesList = (master.categoryIds || []).map(id => state.categories.find(c => c.id === id)?.name).filter(Boolean).join(', ') || 'Не вказано';
     
     container.innerHTML = `
