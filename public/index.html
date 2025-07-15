@@ -260,6 +260,7 @@
         calendarSelectedSalonId: 'all', editingAppointmentId: null, selectedClientForAppointment: null,
         selectedServiceForAppointment: null, viewingClientId: null, viewingMasterId: null,
         viewingMasterAdvances: [], viewingStaffId: null, viewingStaffBonuses: [],
+        viewingMasterBonuses: [],
         viewingStaffAdvances: [], staffPayouts: [], appointmentsPage: 1, appointmentsListDate: new Date(),
     };
 
@@ -613,80 +614,82 @@
     }
 
     function renderView(viewName) {
-        if (!state.user) return;
-        const masterViews = ['calendar', 'appointments', 'notepad', 'salonExpenses'];
-        if (state.user.role === 'master' && !masterViews.includes(viewName)) {
-             viewName = 'calendar';
-        }
-        
-        const salonAdminForbiddenViews = ['settings', 'salary', 'expenses', 'staff', 'auditLog'];
-        if (state.user.role === 'salon_admin' && salonAdminForbiddenViews.includes(viewName)) {
-             if(viewName !== 'payouts') {
-                viewName = 'calendar';
-            }
-        }
-
-        if (state.currentView === 'appointments' && viewName !== 'appointments') {
-            state.editingAppointmentId = null;
-            state.selectedClientForAppointment = null;
-            state.selectedServiceForAppointment = null;
-        }
-        state.currentView = viewName;
-        if(viewName !== 'clientDetail') { state.viewingClientId = null; }
-        if(viewName !== 'masterDetail') {
-            if (masterAdvancesUnsubscribe) {
-                masterAdvancesUnsubscribe();
-                masterAdvancesUnsubscribe = null;
-            }
-            state.viewingMasterId = null;
-        }
-        if(viewName !== 'staffDetail') {
-            state.viewingStaffId = null;
-            staffSubcollectionUnsubscribers.forEach(unsub => unsub());
-            staffSubcollectionUnsubscribers = [];
-        }
-        if(viewName !== 'appointments') { state.appointmentsPage = 1; }
-
-        const headerTitle = document.getElementById('header-title');
-        if(headerTitle) {
-            const viewTitles = { calendar: 'Календар', appointments: 'Запис', clients: 'Клієнти', services: 'Послуги та Категорії', masters: 'Майстри', shop: 'Магазин', salary: 'Звіт по Зарплаті', payouts: 'Видача ЗП', expenses: 'Загальні витрати', salonExpenses: 'Витрати в салоні', notepad: 'Блокнот', settings: 'Налаштування', clientDetail: 'Історія Клієнта', masterDetail: 'Картка Майстра', staff: 'Персонал', staffDetail: 'Картка Співробітника', auditLog: 'Журнал дій' };
-            headerTitle.textContent = viewTitles[viewName] || 'Dashboard';
-        }
-
-        const navList = document.querySelector('#main-nav ul');
-        if (!navList) return;
-        navList.querySelectorAll('li').forEach(li => li.classList.remove('active'));
-        const activeView = ['clientDetail', 'masterDetail', 'staffDetail'].includes(viewName) ? viewName.replace('Detail', 's') : viewName;
-        const activeLi = navList.querySelector(`li[data-view="${activeView}"]`);
-        if(activeLi) activeLi.classList.add('active');
-        
-        const contentWrapper = document.getElementById('content-wrapper');
-        if(!contentWrapper) return;
-        switch (viewName) {
-            case 'calendar': renderCalendarView(contentWrapper); break;
-            case 'appointments': renderAppointmentsView(contentWrapper); break;
-            case 'clients': renderClientsView(contentWrapper); break;
-            case 'clientDetail': renderClientDetailView(contentWrapper); break;
-            case 'services': renderServicesView(contentWrapper); break;
-            case 'masters': renderMastersView(contentWrapper); break;
-            case 'masterDetail': renderMasterDetailView(contentWrapper); break;
-            case 'salary': renderSalaryView(contentWrapper); break;
-            case 'payouts': renderPayoutsView(contentWrapper); break;
-            case 'expenses': renderExpensesView(contentWrapper); break;
-            case 'salonExpenses': renderSalonExpensesView(contentWrapper); break;
-            case 'notepad': renderNotepadView(contentWrapper); break;
-            case 'shop': renderShopView(contentWrapper); break;
-            case 'settings': renderSettingsView(contentWrapper); break;
-            case 'staff': renderStaffView(contentWrapper); break;
-            case 'staffDetail': renderStaffDetailView(contentWrapper); break;
-            case 'auditLog': renderAuditLogView(contentWrapper); break;
-            default:
-                contentWrapper.innerHTML = `<h2>Невідомий розділ</h2>`;
+    if (!state.user) return;
+    const masterViews = ['calendar', 'appointments', 'notepad', 'salonExpenses'];
+    if (state.user.role === 'master' && !masterViews.includes(viewName)) {
+         viewName = 'calendar';
+    }
+    
+    const salonAdminForbiddenViews = ['settings', 'salary', 'expenses', 'staff', 'auditLog'];
+    if (state.user.role === 'salon_admin' && salonAdminForbiddenViews.includes(viewName)) {
+         if(viewName !== 'payouts') {
+            viewName = 'calendar';
         }
     }
-    // #endregion
 
-    // #region Payouts View
+    if (state.currentView === 'appointments' && viewName !== 'appointments') {
+        state.editingAppointmentId = null;
+        state.selectedClientForAppointment = null;
+        state.selectedServiceForAppointment = null;
+    }
+    state.currentView = viewName;
+    if(viewName !== 'clientDetail') { state.viewingClientId = null; }
+    if(viewName !== 'masterDetail') {
+        if (masterAdvancesUnsubscribe) {
+            masterAdvancesUnsubscribe();
+            masterAdvancesUnsubscribe = null;
+        }
+        // --- ОНОВЛЕНО ---
+        if (window.masterBonusesUnsubscribe) {
+            window.masterBonusesUnsubscribe();
+            window.masterBonusesUnsubscribe = null;
+        }
+        state.viewingMasterId = null;
+    }
+    if(viewName !== 'staffDetail') {
+        state.viewingStaffId = null;
+        staffSubcollectionUnsubscribers.forEach(unsub => unsub());
+        staffSubcollectionUnsubscribers = [];
+    }
+    if(viewName !== 'appointments') { state.appointmentsPage = 1; }
+
+    const headerTitle = document.getElementById('header-title');
+    if(headerTitle) {
+        const viewTitles = { calendar: 'Календар', appointments: 'Запис', clients: 'Клієнти', services: 'Послуги та Категорії', masters: 'Майстри', shop: 'Магазин', salary: 'Звіт по Зарплаті', payouts: 'Видача ЗП', expenses: 'Загальні витрати', salonExpenses: 'Витрати в салоні', notepad: 'Блокнот', settings: 'Налаштування', clientDetail: 'Історія Клієнта', masterDetail: 'Картка Майстра', staff: 'Персонал', staffDetail: 'Картка Співробітника', auditLog: 'Журнал дій' };
+        headerTitle.textContent = viewTitles[viewName] || 'Dashboard';
+    }
+
+    const navList = document.querySelector('#main-nav ul');
+    if (!navList) return;
+    navList.querySelectorAll('li').forEach(li => li.classList.remove('active'));
+    const activeView = ['clientDetail', 'masterDetail', 'staffDetail'].includes(viewName) ? viewName.replace('Detail', 's') : viewName;
+    const activeLi = navList.querySelector(`li[data-view="${activeView}"]`);
+    if(activeLi) activeLi.classList.add('active');
+    
+    const contentWrapper = document.getElementById('content-wrapper');
+    if(!contentWrapper) return;
+    switch (viewName) {
+        case 'calendar': renderCalendarView(contentWrapper); break;
+        case 'appointments': renderAppointmentsView(contentWrapper); break;
+        case 'clients': renderClientsView(contentWrapper); break;
+        case 'clientDetail': renderClientDetailView(contentWrapper); break;
+        case 'services': renderServicesView(contentWrapper); break;
+        case 'masters': renderMastersView(contentWrapper); break;
+        case 'masterDetail': renderMasterDetailView(contentWrapper); break;
+        case 'salary': renderSalaryView(contentWrapper); break;
+        case 'payouts': renderPayoutsView(contentWrapper); break;
+        case 'expenses': renderExpensesView(contentWrapper); break;
+        case 'salonExpenses': renderSalonExpensesView(contentWrapper); break;
+        case 'notepad': renderNotepadView(contentWrapper); break;
+        case 'shop': renderShopView(contentWrapper); break;
+        case 'settings': renderSettingsView(contentWrapper); break;
+        case 'staff': renderStaffView(contentWrapper); break;
+        case 'staffDetail': renderStaffDetailView(contentWrapper); break;
+        case 'auditLog': renderAuditLogView(contentWrapper); break;
+        default:
+            contentWrapper.innerHTML = `<h2>Невідомий розділ</h2>`;
+    }
+}
     function renderPayoutsView(container) {
         const today = new Date();
         const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
@@ -2445,64 +2448,176 @@ async function renderDailySummary() {
     }
 
     function renderMasterDetailView(container) {
-        const masterId = state.viewingMasterId;
-        const master = state.masters.find(m => m.id === masterId);
-        if (!master) {
-            container.innerHTML = `<div class="content-card"><h2>Майстра не знайдено</h2><p><button id="detail-view-back-btn" class="btn">Назад до списку</button></p></div>`;
-            const backBtn = document.getElementById('detail-view-back-btn');
-            if(backBtn) backBtn.onclick = () => renderView('masters');
-            return;
-        }
-        const categoriesList = (master.categoryIds || []).map(id => state.categories.find(c => c.id === id)?.name).filter(Boolean).join(', ') || 'Не вказано';
-        container.innerHTML = `
-            <div class="content-card">
-                <button id="detail-view-back-btn" class="btn" style="margin-bottom: 2rem; width: auto; background-color: var(--gray-text);">&larr; Назад до списку майстрів</button>
-                <h2>${master.name} ${master.tier ? `(${master.tier})` : ''}</h2>
-                <p><strong>Спеціалізації:</strong> ${categoriesList}</p>
-            </div>
+    const masterId = state.viewingMasterId;
+    const master = state.masters.find(m => m.id === masterId);
+    if (!master) {
+        container.innerHTML = `<div class="content-card"><h2>Майстра не знайдено</h2><p><button id="detail-view-back-btn" class="btn">Назад до списку</button></p></div>`;
+        document.getElementById('detail-view-back-btn')?.onclick = () => renderView('masters');
+        return;
+    }
+    const categoriesList = (master.categoryIds || []).map(id => state.categories.find(c => c.id === id)?.name).filter(Boolean).join(', ') || 'Не вказано';
+    
+    container.innerHTML = `
+        <div class="content-card">
+            <button id="detail-view-back-btn" class="btn" style="margin-bottom: 2rem; width: auto; background-color: var(--gray-text);">&larr; Назад до списку майстрів</button>
+            <h2>${master.name} ${master.tier ? `(${master.tier})` : ''}</h2>
+            <p><strong>Спеціалізації:</strong> ${categoriesList}</p>
+        </div>
+
+        <div class="services-layout" style="grid-template-columns: 1fr 1fr; align-items: start;">
             <div class="content-card">
                 <h3>Видача авансу</h3>
                 <form id="add-advance-form">
-                    <div class="form-row">
-                        <div class="form-group" style="flex:2;"><label for="advance-amount">Сума авансу (zł)</label><input type="number" id="advance-amount" min="1" required></div>
-                        <div class="form-group" style="flex:1;"><label for="advance-payment-type">Тип оплати</label><select id="advance-payment-type" required><option value="cash">Готівка</option><option value="card">Картка</option></select></div>
-                    </div>
+                    <div class="form-group"><label for="advance-amount">Сума авансу (zł)</label><input type="number" id="advance-amount" min="1" required></div>
+                    <div class="form-group"><label for="advance-payment-type">Тип оплати</label><select id="advance-payment-type" required><option value="cash">Готівка</option><option value="card">Картка</option></select></div>
                     <div class="form-group"><label for="advance-description">Опис (необов'язково)</label><textarea id="advance-description" rows="2"></textarea></div>
                     <button type="submit" class="btn">Видати аванс</button>
                 </form>
             </div>
-            <div class="content-card"><h3>Історія авансів</h3><ul id="master-advances-list" class="item-list"><li>Завантаження...</li></ul></div>
-        `;
-        
-        const backBtn = document.getElementById('detail-view-back-btn');
-        if(backBtn) backBtn.onclick = () => renderView('masters');
 
-        const listEl = document.getElementById('master-advances-list');
-        if(listEl) {
-            listEl.onclick = (event) => {
-                const deleteButton = event.target.closest('.btn-delete-advance');
-                if (deleteButton) { 
-                    handleDeleteAdvance(deleteButton.dataset.id, master.name, deleteButton.dataset.amount, deleteButton.dataset.description); 
+            <div class="content-card">
+                <h3>Нарахувати премію</h3>
+                <form id="add-bonus-form">
+                    <div class="form-group"><label for="bonus-amount">Сума премії (zł)</label><input type="number" id="bonus-amount" min="1" required></div>
+                    <div class="form-group"><label for="bonus-payment-type">Тип оплати</label><select id="bonus-payment-type" required><option value="cash">Готівка</option><option value="card">Картка</option></select></div>
+                    <div class="form-group"><label for="bonus-description">Опис (обов'язково)</label><textarea id="bonus-description" rows="2" required></textarea></div>
+                    <button type="submit" class="btn" style="background-color: var(--success-color);">Нарахувати премію</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="content-card">
+            <h3>Історія операцій (Аванси та Премії)</h3>
+            <ul id="master-history-list" class="item-list"><li>Завантаження...</li></ul>
+        </div>
+    `;
+
+    document.getElementById('detail-view-back-btn').onclick = () => renderView('masters');
+    document.getElementById('add-advance-form').onsubmit = handleAddAdvance;
+    document.getElementById('add-bonus-form').onsubmit = handleAddBonus;
+
+    const listEl = document.getElementById('master-history-list');
+    if(listEl) {
+        listEl.onclick = (event) => {
+            const deleteButton = event.target.closest('.btn-delete-operation');
+            if (deleteButton) {
+                const { id, type, name, amount, description } = deleteButton.dataset;
+                if (type === 'advance') {
+                    handleDeleteAdvance(id, name, amount, description);
+                } else if (type === 'bonus') {
+                    handleDeleteBonus(id, name, amount, description);
                 }
-            };
-        }
-
-        document.getElementById('add-advance-form').onsubmit = handleAddAdvance;
-        const advancesCollectionRef = collection(db, 'masters', masterId, 'advances');
-        masterAdvancesUnsubscribe = onSnapshot(query(advancesCollectionRef, orderBy("date", "desc")), (snapshot) => {
-            state.viewingMasterAdvances = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const advancesListEl = document.getElementById('master-advances-list');
-            if (advancesListEl) {
-                advancesListEl.innerHTML = state.viewingMasterAdvances.length === 0 ? '<li>Авансів ще не було.</li>' : state.viewingMasterAdvances.map(adv => `
-                    <li>
-                        <div><span>${adv.date.toDate().toLocaleString('uk-UA')}</span>${adv.description ? `<br><small style="color: var(--gray-text);">${adv.description}</small>` : ''}</div>
-                        <div class="actions"><strong>${adv.amount} zł</strong><button class="btn btn-delete btn-delete-advance" data-id="${adv.id}" data-amount="${adv.amount}" data-description="${adv.description || ''}">Видалити</button></div>
-                    </li>
-                `).join('');
             }
-        });
+        };
     }
 
+    if (masterAdvancesUnsubscribe) masterAdvancesUnsubscribe();
+    if (window.masterBonusesUnsubscribe) window.masterBonusesUnsubscribe();
+
+    const advancesRef = collection(db, 'masters', masterId, 'advances');
+    masterAdvancesUnsubscribe = onSnapshot(query(advancesRef, orderBy("date", "desc")), (snapshot) => {
+        state.viewingMasterAdvances = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderMasterHistoryList();
+    });
+
+    const bonusesRef = collection(db, 'masters', masterId, 'bonuses');
+    window.masterBonusesUnsubscribe = onSnapshot(query(bonusesRef, orderBy("date", "desc")), (snapshot) => {
+        state.viewingMasterBonuses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderMasterHistoryList();
+    });
+}
+    function renderMasterHistoryList() {
+    const listEl = document.getElementById('master-history-list');
+    if (!listEl) return;
+
+    const combinedHistory = [
+        ...(state.viewingMasterAdvances || []).map(item => ({...item, type: 'advance', displayType: 'Аванс', color: 'var(--danger-color)' })),
+        ...(state.viewingMasterBonuses || []).map(item => ({...item, type: 'bonus', displayType: 'Премія', color: 'var(--success-color)' }))
+    ].sort((a, b) => b.date.toDate() - a.date.toDate());
+
+    if (combinedHistory.length === 0) {
+        listEl.innerHTML = '<li>Історія операцій порожня.</li>';
+        return;
+    }
+
+    listEl.innerHTML = combinedHistory.map(item => {
+        const master = state.masters.find(m => m.id === state.viewingMasterId);
+        return `
+         <li>
+            <div>
+                <strong style="color: ${item.color};">${item.displayType}</strong><br>
+                <span>${item.date.toDate().toLocaleString('uk-UA')}</span>
+                ${item.description ? `<br><small style="color: var(--gray-text);">${item.description}</small>` : ''}
+            </div>
+            <div class="actions">
+                <strong>${item.amount.toFixed(2)} zł</strong>
+                <button class="btn btn-delete btn-delete-operation"
+                        data-id="${item.id}"
+                        data-type="${item.type}"
+                        data-name="${master.name}"
+                        data-amount="${item.amount}"
+                        data-description="${item.description || ''}">
+                    Видалити
+                </button>
+            </div>
+         </li>
+        `;
+    }).join('');
+}
+
+async function handleAddBonus(event) {
+    event.preventDefault();
+    const masterId = state.viewingMasterId;
+    const master = state.masters.find(m => m.id === masterId);
+    const amountInput = document.getElementById('bonus-amount');
+    const descriptionInput = document.getElementById('bonus-description');
+    const paymentTypeInput = document.getElementById('bonus-payment-type');
+
+    const amount = parseFloat(amountInput.value);
+    const description = descriptionInput.value.trim();
+    const paymentType = paymentTypeInput.value;
+
+    if (!masterId || !amount || amount <= 0 || !description) {
+        return showNotification('Будь ласка, заповніть усі поля коректно.', "error");
+    }
+    
+    const data = {
+        amount,
+        description,
+        paymentType,
+        salonId: (state.user.role === 'salon_admin') ? state.user.salonId : null,
+        date: Timestamp.now()
+    };
+    
+    const action = () => addDoc(collection(db, 'masters', masterId, 'bonuses'), data);
+    try {
+        await logAndExecute('Нараховано премію майстру', { masterId, name: master.name, amount, description }, action);
+        showNotification(`Премію для ${master.name} успішно нараховано!`);
+        event.target.reset();
+    } catch (e) {
+        showNotification("Помилка при нарахуванні премії.", "error");
+        console.error(e);
+    }
+}
+
+async function handleDeleteBonus(bonusId, masterName, amount, description) {
+    const masterId = state.viewingMasterId;
+    if (!masterId || !bonusId) return;
+
+    showConfirmWithReasonModal('Ви впевнені, що хочете видалити цю премію?', async (reason) => {
+        const action = () => deleteDoc(doc(db, 'masters', masterId, 'bonuses', bonusId));
+        const logDetails = { masterId, name: masterName, amount: parseFloat(amount), description };
+        if (reason) logDetails.reason = reason;
+        
+        try {
+            await logAndExecute('Видалено премію майстра', logDetails, action);
+            showNotification("Премію видалено.");
+        } catch (e) {
+            showNotification("Помилка при видаленні премії.", "error");
+            console.error(e);
+        }
+    });
+}
     async function handleAddAdvance(event) {
         event.preventDefault();
         const masterId = state.viewingMasterId;
