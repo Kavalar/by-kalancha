@@ -639,7 +639,6 @@
             masterAdvancesUnsubscribe();
             masterAdvancesUnsubscribe = null;
         }
-        // --- ОНОВЛЕНО ---
         if (window.masterBonusesUnsubscribe) {
             window.masterBonusesUnsubscribe();
             window.masterBonusesUnsubscribe = null;
@@ -2598,6 +2597,25 @@ async function handleAddBonus(event) {
         showNotification("Помилка при нарахуванні премії.", "error");
         console.error(e);
     }
+}
+
+async function handleDeleteBonus(bonusId, masterName, amount, description) {
+    const masterId = state.viewingMasterId;
+    if (!masterId || !bonusId) return;
+
+    showConfirmWithReasonModal('Ви впевнені, що хочете видалити цю премію?', async (reason) => {
+        const action = () => deleteDoc(doc(db, 'masters', masterId, 'bonuses', bonusId));
+        const logDetails = { masterId, name: masterName, amount: parseFloat(amount), description };
+        if (reason) logDetails.reason = reason;
+        
+        try {
+            await logAndExecute('Видалено премію майстра', logDetails, action);
+            showNotification("Премію видалено.");
+        } catch (e) {
+            showNotification("Помилка при видаленні премії.", "error");
+            console.error(e);
+        }
+    });
 }
 
 async function handleDeleteBonus(bonusId, masterName, amount, description) {
