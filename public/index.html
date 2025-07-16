@@ -163,26 +163,53 @@
 </div>
 
 <div class="modal-overlay" id="payment-modal">
-    <div class="modal-panel" style="width: 400px;">
+    <div class="modal-panel" style="width: 480px;">
         <div class="modal-header">
             <h2>Внести оплату</h2>
             <button class="close-btn">&times;</button>
         </div>
+        
         <div class="payment-summary">
             <p><span>Сума до сплати:</span> <span id="payment-total-price">0 zł</span></p>
             <p><span>Вже сплачено:</span> <span id="payment-total-paid">0 zł</span></p>
-            <p class="remaining"><span>Залишилось:</span> <span id="payment-remaining">0 zł</span></p>
         </div>
-        <hr style="margin: 1.5rem 0;">
-        <form id="payment-form">
-            <input type="hidden" id="payment-appointment-id">
+
+        <div id="certificate-payment-block" style="background-color: #f8f9fa; padding: 1rem; border-radius: 8px; margin-top: 1rem;">
+            <h4>Застосувати сертифікат</h4>
             <div class="form-row">
                 <div class="form-group" style="flex:2;">
-                    <label for="payment-amount">Сума</label>
-                    <input type="number" id="payment-amount" required step="0.01" min="0.01">
+                    <label for="cert-payment-number">Номер сертифіката</label>
+                    <input type="text" id="cert-payment-number" placeholder="Введіть номер...">
+                </div>
+                <div style="flex:1; align-self: flex-end; padding-bottom: 1.5rem;">
+                    <button type="button" id="check-certificate-btn" class="btn btn-edit">Перевірити</button>
+                </div>
+            </div>
+            <div id="certificate-info" style="display: none;">
+                <p><strong>Баланс сертифіката: <span id="cert-balance">0.00</span> zł</strong></p>
+                <div class="form-group">
+                    <label for="cert-use-amount">Списати з сертифіката</label>
+                    <input type="number" id="cert-use-amount" step="0.01" min="0">
+                </div>
+            </div>
+        </div>
+
+        <hr style="margin: 1.5rem 0;">
+        <p class="remaining" style="text-align: center; font-size: 1.5rem;">
+            <span>Залишилось доплатити:</span> <span id="payment-remaining">0 zł</span>
+        </p>
+        
+        <form id="payment-form">
+            <input type="hidden" id="payment-appointment-id">
+            <input type="hidden" id="applied-certificate-id">
+            
+            <div class="form-row">
+                <div class="form-group" style="flex:2;">
+                    <label for="payment-amount">Сума доплати</label>
+                    <input type="number" id="payment-amount" step="0.01" min="0">
                 </div>
                 <div class="form-group" style="flex:1;">
-                    <label for="payment-modal-type">Тип</label>
+                    <label for="payment-modal-type">Тип доплати</label>
                     <select id="payment-modal-type">
                         <option value="cash">Готівка</option>
                         <option value="card">Картка</option>
@@ -1513,20 +1540,7 @@ async function renderDailySummary() {
         summaryDatePicker.onchange = () => renderDailySummary();
         summarySalonFilter.onchange = () => renderDailySummary();
         renderDailySummary();
-    }
-
-    function openPaymentModal(appointment) {
-        const totalPrice = appointment.finalPrice || 0;
-        const totalPaid = appointment.totalPaid || 0;
-        const remaining = totalPrice - totalPaid;
-        document.getElementById('payment-appointment-id').value = appointment.id;
-        document.getElementById('payment-total-price').textContent = `${totalPrice.toFixed(0)} zł`;
-        document.getElementById('payment-total-paid').textContent = `${totalPaid.toFixed(0)} zł`;
-        document.getElementById('payment-remaining').textContent = `${remaining.toFixed(0)} zł`;
-        const amountInput = document.getElementById('payment-amount');
-        amountInput.value = remaining > 0 ? remaining.toFixed(2) : '0.00';
-        amountInput.max = remaining.toFixed(2);
-        document.getElementById('payment-modal').style.display = 'flex';
+        
     }
 
     function showActionModal(appointment) {
@@ -2384,41 +2398,159 @@ async function renderDailySummary() {
             showNotification('Не вдалося зберегти запис.', "error");
         }
     }
-     
+    
+        // --- ПОЧАТОК ОНОВЛЕНОГО БЛОКУ ОПЛАТИ ---
+
+    let appliedCertificate = null; // Глобальна змінна для збереження даних застосованого сертифіката
+
+    function openPaymentModal(appointment) {
+        // Скидання стану
+        appliedCertificate = null;
+        document.getElementById('applied-certificate-id').value = '';
+        document.getElementById('cert-payment-number').value = '';
+        document.getElementById('cert-use-amount').value = '';
+        document.getElementById('certificate-info').style.display = 'none';
+        document.getElementById('payment-form').reset();
+        
+        const totalPrice = appointment.finalPrice || 0;
+        const totalPaid = appointment.totalPaid || 0;
+        const remaining = totalPrice - totalPaid;
+
+        document.getElementById('payment-appointment-id').value = appointment.id;
+        document.getElementById('payment-total-price').textContent = totalPrice.toFixed(2) + ' zł';
+        document.getElementById('payment-total-paid').textContent = totalPaid.toFixed(2) + ' zł';
+        
+        const remainingEl = document.getElementById('payment-remaining');
+        const paymentAmountInput = document.getElementById('payment-amount');
+
+        remainingEl.textContent = remaining.toFixed(2) + ' zł';
+        paymentAmountInput.value = remaining > 0 ? remaining.toFixed(2) : '0.00';
+        paymentAmountInput.max = remaining.toFixed(2);
+        
+        document.getElementById('payment-modal').style.display = 'flex';
+    }
+
+    // Додаємо обробник для кнопки перевірки сертифіката
+    document.getElementById('check-certificate-btn').onclick = async () => {
+        const number = document.getElementById('cert-payment-number').value.trim();
+        if (!number) return showNotification('Введіть номер сертифіката.', 'error');
+
+        const cert = state.certificates.find(c => c.certificateNumber === number);
+
+        if (!cert) {
+            appliedCertificate = null;
+            document.getElementById('certificate-info').style.display = 'none';
+            return showNotification('Сертифікат з таким номером не знайдено.', 'error');
+        }
+        if (cert.status !== 'active') {
+            appliedCertificate = null;
+            document.getElementById('certificate-info').style.display = 'none';
+            return showNotification('Цей сертифікат неактивний (використаний або анульований).', 'error');
+        }
+        if (cert.currentBalance <= 0) {
+            appliedCertificate = null;
+            document.getElementById('certificate-info').style.display = 'none';
+            return showNotification('На цьому сертифікаті нульовий баланс.', 'error');
+        }
+
+        appliedCertificate = cert;
+        document.getElementById('applied-certificate-id').value = cert.id;
+        document.getElementById('cert-balance').textContent = cert.currentBalance.toFixed(2);
+        
+        const remainingToPay = parseFloat(document.getElementById('payment-remaining').textContent);
+        const amountToUse = Math.min(cert.currentBalance, remainingToPay);
+        document.getElementById('cert-use-amount').value = amountToUse.toFixed(2);
+        document.getElementById('certificate-info').style.display = 'block';
+
+        // Оновлюємо суму доплати
+        const remainingAfterCert = remainingToPay - amountToUse;
+        document.getElementById('payment-amount').value = remainingAfterCert.toFixed(2);
+
+        showNotification('Сертифікат знайдено. Вкажіть суму для списання.', 'success');
+    };
+
+    // Повністю нова функція обробки платежу з транзакціями
     async function handleConfirmPayment(event) {
         event.preventDefault();
         const appointmentId = document.getElementById('payment-appointment-id').value;
-        const paymentType = document.getElementById('payment-modal-type').value;
-        const amountToPay = parseFloat(document.getElementById('payment-amount').value);
-        if (!appointmentId || !amountToPay || amountToPay <= 0) {
-            return showNotification('Будь ласка, введіть коректну суму.', "error");
-        }
+        const certId = appliedCertificate ? appliedCertificate.id : null;
+        const certAmountToUse = certId ? parseFloat(document.getElementById('cert-use-amount').value) : 0;
+        const topUpAmount = parseFloat(document.getElementById('payment-amount').value) || 0;
+        const topUpType = document.getElementById('payment-modal-type').value;
 
-        const appointmentRef = doc(db, 'appointments', appointmentId);
+        if (!appointmentId) return;
+        if (certAmountToUse < 0 || topUpAmount < 0) return showNotification('Суми не можуть бути від\'ємними.', 'error');
+        if (certAmountToUse === 0 && topUpAmount === 0) return showNotification('Введіть суму оплати або застосуйте сертифікат.', 'error');
+
+        const { runTransaction } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+
         try {
-            const appointmentSnap = await getDoc(appointmentRef);
-            if (!appointmentSnap.exists()) { throw new Error("Запис не знайдено"); }
-            const appointmentData = appointmentSnap.data();
-            const currentTotalPaid = appointmentData.totalPaid || 0;
-            const finalPrice = appointmentData.finalPrice;
-            const processPayment = async () => {
-                const newPayment = { amount: amountToPay, type: paymentType, date: Timestamp.now() };
-                const newTotalPaid = currentTotalPaid + amountToPay;
-                const newStatus = (newTotalPaid >= finalPrice - 0.001) ? 'completed' : 'partially_paid';
-                const action = () => updateDoc(appointmentRef, { payments: arrayUnion(newPayment), totalPaid: increment(amountToPay), status: newStatus, ...(newStatus === 'completed' && !appointmentData.completedAt && { completedAt: Timestamp.now() }) });
-                await logAndExecute('Проведено оплату', { appointmentId, clientName: appointmentData.clientName, amount: amountToPay, type: paymentType }, action);
-                document.getElementById('payment-modal').style.display = 'none';
-            };
-            if (amountToPay > (finalPrice - currentTotalPaid) + 0.01) { 
-                showConfirmModal(`Сума оплати (${amountToPay.toFixed(2)} zł) більша за залишок (${(finalPrice - currentTotalPaid).toFixed(2)} zł). Продовжити?`, processPayment);
-            } else {
-                await processPayment();
-            }
+            await runTransaction(db, async (transaction) => {
+                const appointmentRef = doc(db, 'appointments', appointmentId);
+                const appointmentSnap = await transaction.get(appointmentRef);
+                if (!appointmentSnap.exists()) {
+                    throw new Error("Запис не знайдено");
+                }
+                const appointmentData = appointmentSnap.data();
+
+                let certificateRef = null;
+                let certificateData = null;
+                if (certId) {
+                    certificateRef = doc(db, 'certificates', certId);
+                    const certSnap = await transaction.get(certificateRef);
+                    if (!certSnap.exists()) throw new Error("Сертифікат не знайдено");
+                    certificateData = certSnap.data();
+                    if (certAmountToUse > certificateData.currentBalance) {
+                        throw new Error("Сума списання перевищує баланс сертифіката.");
+                    }
+                }
+
+                const newPayments = [...appointmentData.payments];
+                let totalNewPaymentAmount = 0;
+
+                // Обробка сертифіката
+                if (certId && certAmountToUse > 0) {
+                    newPayments.push({ amount: certAmountToUse, type: 'certificate', date: Timestamp.now(), certificateNumber: certificateData.certificateNumber });
+                    totalNewPaymentAmount += certAmountToUse;
+                    
+                    const newCertBalance = certificateData.currentBalance - certAmountToUse;
+                    const newCertHistory = [...certificateData.history, { appointmentId, amountUsed: certAmountToUse, date: Timestamp.now() }];
+                    const newCertStatus = newCertBalance > 0.001 ? 'active' : 'used';
+                    
+                    transaction.update(certificateRef, { 
+                        currentBalance: newCertBalance,
+                        history: newCertHistory,
+                        status: newCertStatus
+                    });
+                }
+                
+                // Обробка доплати
+                if (topUpAmount > 0) {
+                    newPayments.push({ amount: topUpAmount, type: topUpType, date: Timestamp.now() });
+                    totalNewPaymentAmount += topUpAmount;
+                }
+
+                const newTotalPaid = (appointmentData.totalPaid || 0) + totalNewPaymentAmount;
+                const newStatus = (newTotalPaid >= appointmentData.finalPrice - 0.01) ? 'completed' : 'partially_paid';
+
+                transaction.update(appointmentRef, {
+                    payments: newPayments,
+                    totalPaid: newTotalPaid,
+                    status: newStatus
+                });
+            });
+
+            showNotification('Оплату успішно проведено!', 'success');
+            document.getElementById('payment-modal').style.display = 'none';
+
         } catch (e) {
-            showNotification('Не вдалося провести оплату. Помилка: ' + e.message, "error");
+            console.error("Помилка транзакції:", e);
+            showNotification('Не вдалося провести оплату. ' + e.message, "error");
         }
     }
-    // #endregion
+
+    // --- КІНЕЦЬ ОНОВЛЕНОГО БЛОКУ ОПЛАТИ ---
+
 
     // #region Masters View
     function renderMastersView(container) {
