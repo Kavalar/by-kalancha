@@ -3123,7 +3123,11 @@ async function renderDailySummary() {
     // #region Certificates View (Повна виправлена версія)
 function renderCertificatesView(container) {
     const salonOptions = state.salons.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
-    const certificatesHtml = state.certificates.sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate()).map(cert => {
+    const certificatesHtml = state.certificates.sort((a, b) => {
+        const timeA = a.createdAt ? a.createdAt.toDate().getTime() : 0;
+        const timeB = b.createdAt ? b.createdAt.toDate().getTime() : 0;
+        return timeB - timeA;
+    }).map(cert => {
         let statusBadge = '';
         if (cert.status === 'used') {
             statusBadge = '<span class="status-badge status-completed">Використаний</span>';
@@ -3133,6 +3137,12 @@ function renderCertificatesView(container) {
             statusBadge = '<span class="status-badge status-voided">Анульований</span>';
         }
 
+        // --- ВИПРАВЛЕННЯ САМЕ ТУТ ---
+        // Додаємо перевірки, щоб уникнути помилок на порожніх полях
+        const initialAmount = cert.initialAmount || 0;
+        const currentBalance = cert.currentBalance || 0;
+        const creationDate = cert.createdAt ? cert.createdAt.toDate().toLocaleDateString('uk-UA') : 'Невідома дата';
+
         const voidButton = cert.status === 'active' ?
             '<button class="btn btn-edit btn-delete-certificate" data-id="' + cert.id + '" data-number="' + cert.certificateNumber + '">Анулювати</button>' : '';
 
@@ -3140,17 +3150,18 @@ function renderCertificatesView(container) {
             '<button class="btn btn-delete btn-hard-delete-certificate" data-id="' + cert.id + '" data-number="' + cert.certificateNumber + '" style="margin-left: 0.5rem;">Видалити</button>' : '';
 
         return '<tr>' +
-            '<td>' + cert.certificateNumber + '</td>' +
-            '<td>' + cert.clientName + '</td>' +
-            '<td>' + cert.initialAmount.toFixed(2) + ' zł</td>' +
-            '<td><strong>' + cert.currentBalance.toFixed(2) + ' zł</strong></td>' +
-            '<td>' + cert.createdAt.toDate().toLocaleDateString('uk-UA') + '</td>' +
+            '<td>' + (cert.certificateNumber || 'N/A') + '</td>' +
+            '<td>' + (cert.clientName || 'N/A') + '</td>' +
+            '<td>' + initialAmount.toFixed(2) + ' zł</td>' +
+            '<td><strong>' + currentBalance.toFixed(2) + ' zł</strong></td>' +
+            '<td>' + creationDate + '</td>' +
             '<td>' + (cert.soldBySalonName || 'Невідомо') + '</td>' +
             '<td>' + statusBadge + '</td>' +
             '<td class="actions">' + voidButton + deleteButton + '</td>' +
             '</tr>';
     }).join('');
 
+    // Код, що генерує HTML, залишається без змін...
     container.innerHTML =
         '<div class="content-card">' +
             '<h2>Створити новий сертифікат</h2>' +
