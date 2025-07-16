@@ -116,6 +116,12 @@
         }
         #client-search-results div:hover, #service-search-results div:hover {
             background-color: var(--main-bg);
+        .report-table { width: 100%; border-collapse: collapse; font-size: 0.95em; }
+        .report-table th, .report-table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+        .report-table th { font-weight: 600; background-color: var(--main-bg); color: var(--primary-color); }
+        .report-table tbody tr:hover { background-color: #f8f9fa; }
+        .report-table td.actions { text-align: right; }
+        .status-badge.status-voided { background-color: var(--danger-color); }
         }
     </style>
 </head>
@@ -253,7 +259,7 @@
     const appContainer = document.getElementById('app');
 
     let state = {
-        user: null, salons: [], expenses: [], salonExpenses: [], productSales: [], 
+        user: null, certificates: [], salons: [], expenses: [], salonExpenses: [], productSales: [], 
         salaryGroups: [], notepadEntries: [], staff: [], auditLog: [], selectedCategoryId: null,
         categories: [], services: [], masters: [], appointments: [], clients: [],
         currentView: 'calendar', preselectedAppointment: null, calendarSelectedMasterId: 'all',
@@ -391,6 +397,7 @@
 
         const collections = { 
             salons: 'salons',
+            certificates: 'certificates',
             categories: 'serviceCategories', 
             services: 'services', 
             masters: 'masters',
@@ -489,7 +496,7 @@
         appContainer.innerHTML = `<div class="auth-bg"><div class="auth-card"><h1>Вхід у CRM</h1><div id="login-error" class="error-msg"></div><input id="email" type="email" placeholder="Email" autocomplete="username" autofocus><input id="password" type="password" placeholder="Пароль" autocomplete="current-password"><button id="login-btn">Увійти</button></div></div>`;
         document.getElementById('login-btn').onclick = handleLogin;
     }
-
+    
     function renderAppLayout(user) {
         let adminTabs = '';
         if (user.role === 'admin') {
@@ -525,6 +532,7 @@
                     <li data-view="clients">Клієнти</li>
                     <li data-view="services">Послуги</li>
                     <li data-view="masters">Майстри</li>
+                    <li data-view="certificates">Сертифікати</li>
                     ${shopTab}
                     ${allUserTabs}
                     ${adminTabs}
@@ -668,6 +676,7 @@
             case 'clients': renderClientsView(contentWrapper); break;
             case 'clientDetail': renderClientDetailView(contentWrapper); break;
             case 'services': renderServicesView(contentWrapper); break;
+            case 'certificates': renderCertificatesView(contentWrapper); break;
             case 'masters': renderMastersView(contentWrapper); break;
             case 'masterDetail': renderMasterDetailView(contentWrapper); break;
             case 'salary': renderSalaryView(contentWrapper); break;
@@ -3110,6 +3119,193 @@ async function renderDailySummary() {
         }
         listEl.onclick = (e) => { const deleteBtn = e.target.closest('.btn-delete'); if (deleteBtn) { handleDeleteExpense(deleteBtn.dataset.id, deleteBtn.dataset.description); } };
     }
+
+    // #region Certificates View (Повна виправлена версія)
+function renderCertificatesView(container) {
+    const salonOptions = state.salons.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
+    const certificatesHtml = state.certificates.sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate()).map(cert => {
+        let statusBadge = '';
+        if (cert.status === 'used') {
+            statusBadge = '<span class="status-badge status-completed">Використаний</span>';
+        } else if (cert.status === 'active') {
+            statusBadge = '<span class="status-badge status-partially-paid">Активний</span>';
+        } else if (cert.status === 'voided') {
+            statusBadge = '<span class="status-badge status-voided">Анульований</span>';
+        }
+
+        const voidButton = cert.status === 'active' ?
+            '<button class="btn btn-edit btn-delete-certificate" data-id="' + cert.id + '" data-number="' + cert.certificateNumber + '">Анулювати</button>' : '';
+
+        const deleteButton = state.user.role === 'admin' ?
+            '<button class="btn btn-delete btn-hard-delete-certificate" data-id="' + cert.id + '" data-number="' + cert.certificateNumber + '" style="margin-left: 0.5rem;">Видалити</button>' : '';
+
+        return '<tr>' +
+            '<td>' + cert.certificateNumber + '</td>' +
+            '<td>' + cert.clientName + '</td>' +
+            '<td>' + cert.initialAmount.toFixed(2) + ' zł</td>' +
+            '<td><strong>' + cert.currentBalance.toFixed(2) + ' zł</strong></td>' +
+            '<td>' + cert.createdAt.toDate().toLocaleDateString('uk-UA') + '</td>' +
+            '<td>' + (cert.soldBySalonName || 'Невідомо') + '</td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td class="actions">' + voidButton + deleteButton + '</td>' +
+            '</tr>';
+    }).join('');
+
+    container.innerHTML =
+        '<div class="content-card">' +
+            '<h2>Створити новий сертифікат</h2>' +
+            '<form id="add-certificate-form">' +
+                '<div class="form-row">' +
+                    '<div class="form-group" style="flex:1;">' +
+                        '<label for="cert-number">Номер сертифіката (введіть вручну)</label>' +
+                        '<input type="text" id="cert-number" required>' +
+                    '</div>' +
+                    '<div class="form-group" style="flex:2;">' +
+                        '<label for="cert-client-name">Ім\'я клієнта</label>' +
+                        '<input type="text" id="cert-client-name" required>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="form-row">' +
+                    '<div class="form-group" style="flex:1;">' +
+                        '<label for="cert-amount">Сума (zł)</label>' +
+                        '<input type="number" id="cert-amount" required min="1" step="0.01">' +
+                    '</div>' +
+                    '<div class="form-group" style="flex:1;">' +
+                        '<label for="cert-payment-type">Тип оплати продажу</label>' +
+                        '<select id="cert-payment-type" required>' +
+                            '<option value="cash">Готівка</option>' +
+                            '<option value="card">Картка</option>' +
+                            '<option value="blik">Blik</option>' +
+                        '</select>' +
+                    '</div>' +
+                    '<div class="form-group" style="flex:1;">' +
+                        '<label for="cert-salon">Салон продажу</label>' +
+                        '<select id="cert-salon" required>' +
+                            '<option value="">Оберіть салон</option>' +
+                            salonOptions +
+                        '</select>' +
+                    '</div>' +
+                '</div>' +
+                '<button type="submit" class="btn">Створити та продати</button>' +
+            '</form>' +
+        '</div>' +
+        '<div class="content-card" style="margin-top: 2rem;">' +
+            '<h2>Список сертифікатів</h2>' +
+            '<div style="max-height: 600px; overflow-y: auto;">' +
+                '<table class="report-table">' +
+                    '<thead>' +
+                        '<tr>' +
+                            '<th>Номер</th>' +
+                            '<th>Клієнт</th>' +
+                            '<th>Початкова сума</th>' +
+                            '<th>Залишок</th>' +
+                            '<th>Дата продажу</th>' +
+                            '<th>Салон продажу</th>' +
+                            '<th>Статус</th>' +
+                            '<th>Дії</th>' +
+                        '</tr>' +
+                    '</thead>' +
+                    '<tbody id="certificates-tbody">' +
+                        (certificatesHtml || '<tr><td colspan="8" style="text-align:center;">Сертифікати ще не створено.</td></tr>') +
+                    '</tbody>' +
+                '</table>' +
+            '</div>' +
+        '</div>';
+
+    document.getElementById('add-certificate-form').onsubmit = handleAddCertificate;
+    document.getElementById('certificates-tbody').onclick = (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+
+        if (btn.classList.contains('btn-delete-certificate')) {
+            handleDeleteCertificate(btn.dataset.id, btn.dataset.number);
+        } else if (btn.classList.contains('btn-hard-delete-certificate')) {
+            handleHardDeleteCertificate(btn.dataset.id, btn.dataset.number);
+        }
+    };
+}
+
+async function handleAddCertificate(event) {
+    event.preventDefault();
+    const number = document.getElementById('cert-number').value.trim();
+    const clientName = document.getElementById('cert-client-name').value.trim();
+    const amount = parseFloat(document.getElementById('cert-amount').value);
+    const paymentType = document.getElementById('cert-payment-type').value;
+    const salonId = document.getElementById('cert-salon').value;
+
+    if (!number || !clientName || !amount || !salonId) {
+        return showNotification('Будь ласка, заповніть усі поля.', 'error');
+    }
+
+    const q = query(collection(db, 'certificates'), where("certificateNumber", "==", number));
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+        return showNotification('Сертифікат з номером "' + number + '" вже існує.', 'error');
+    }
+    
+    const salon = state.salons.find(s => s.id === salonId);
+
+    const certificateData = {
+        certificateNumber: number,
+        clientName: clientName,
+        initialAmount: amount,
+        currentBalance: amount,
+        status: 'active',
+        createdAt: Timestamp.now(),
+        soldBySalonId: salonId,
+        soldBySalonName: salon.name,
+        history: []
+    };
+    const createCertAction = () => addDoc(collection(db, 'certificates'), certificateData);
+
+    const saleData = {
+        description: 'Продаж сертифіката №' + number,
+        amount: amount,
+        salonId: salonId,
+        paymentType: paymentType,
+        timestamp: Timestamp.now(),
+        authorEmail: state.user.email
+    };
+    const createSaleAction = () => addDoc(collection(db, 'productSales'), saleData);
+
+    try {
+        await logAndExecute('Створено сертифікат №' + number, { clientName, amount }, createCertAction);
+        await logAndExecute('Продаж сертифіката №' + number, { amount, paymentType, salon: salon.name }, createSaleAction);
+        
+        showNotification('Сертифікат успішно створено та продано!', 'success');
+        event.target.reset();
+    } catch (e) {
+        console.error("Помилка створення сертифіката:", e);
+        showNotification('Не вдалося створити сертифікат.', 'error');
+    }
+}
+
+async function handleDeleteCertificate(id, number) { // "М'яке" видалення (анулювання)
+    showConfirmWithReasonModal('Ви впевнені, що хочете анулювати сертифікат №' + number + '? Ця дія незворотня. Кошти НЕ будуть повернуті в касу автоматично.', async (reason) => {
+        const action = () => updateDoc(doc(db, 'certificates', id), { status: 'voided', currentBalance: 0 });
+        const logDetails = { certificateId: id, certificateNumber: number, reason };
+        try {
+            await logAndExecute('Анульовано сертифікат', logDetails, action);
+            showNotification('Сертифікат анульовано.');
+        } catch (e) {
+            showNotification('Не вдалося анулювати сертифікат.', 'error');
+        }
+    });
+}
+
+async function handleHardDeleteCertificate(id, number) { // Повне видалення для адміна
+    showConfirmWithReasonModal('Ви впевнені, що хочете НАЗАВЖДИ видалити сертифікат №' + number + '? Ця дія незворотня і видалить запис з бази даних.', async (reason) => {
+        const action = () => deleteDoc(doc(db, 'certificates', id));
+        const logDetails = { certificateId: id, certificateNumber: number, reason };
+        try {
+            await logAndExecute('Видалено сертифікат', logDetails, action);
+            showNotification('Сертифікат повністю видалено.');
+        } catch (e) {
+            showNotification('Не вдалося видалити сертифікат.', "error");
+        }
+    });
+}
+// #endregion
 
     async function handleAddExpense(event) {
         event.preventDefault();
