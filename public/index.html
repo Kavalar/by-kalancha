@@ -1334,7 +1334,7 @@ async function renderDailySummary() {
         if (app.payments && app.payments.length > 0) {
             servicesWithPayment++;
             app.payments.forEach(p => {
-                if (p.type !== 'settlement') {
+                if (p.type !== 'settlement' && p.type !== 'certificate') {
                     total += p.amount;
                     if(p.type === 'cash') cash += p.amount;
                     else if(p.type === 'card') card += p.amount;
