@@ -3254,7 +3254,10 @@ async function renderDailySummary() {
 
     // #region Certificates View (Повна виправлена версія)
 function renderCertificatesView(container) {
-    const salonOptions = state.salons.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
+    const isSalonAdmin = state.user.role === 'salon_admin';
+    const userSalonId = state.user.salonId;
+    const salonOptions = (isSalonAdmin ? state.salons.filter(s => s.id === userSalonId) : state.salons)
+        .map(s => `<option value="${s.id}">${s.name}</option>`).join('');
     const certificatesHtml = state.certificates.sort((a, b) => {
         const timeA = a.createdAt ? a.createdAt.toDate().getTime() : 0;
         const timeB = b.createdAt ? b.createdAt.toDate().getTime() : 0;
