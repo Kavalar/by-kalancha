@@ -115,25 +115,48 @@
             transition: background-color 0.2s;
         }
         #client-search-results div:hover, #service-search-results div:hover {
-            background-color: var(--main-bg);
-        .report-table { width: 100%; border-collapse: collapse; font-size: 0.95em; }
-        .report-table th, .report-table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color); }
-        .report-table th { font-weight: 600; background-color: var(--main-bg); color: var(--primary-color); }
-        .report-table tbody tr:hover { background-color: #f8f9fa; }
-        .report-table td.actions { text-align: right; }
-        .status-badge.status-voided { background-color: var(--danger-color); }
-        .report-table th {
-        white-space: normal; /* Гарантує, що текст заголовків буде переноситись */
-        text-align: left;
-    }
+    background-color: var(--main-bg);
+} /* <-- ОСЬ ЦЯ ДУЖКА ВИРІШУЄ ПРОБЛЕМУ */
 
-    .report-table .empty-row td {
-    text-align: center; /* Центрує текст повідомлення */
-    color: var(--gray-text); /* Робить текст сірим */
-    padding: 2rem; /* Додає більше простору */
+.report-table { 
+    width: 100%; 
+    border-collapse: collapse; 
+    font-size: 0.95em; 
+}
+
+.report-table th, .report-table td { 
+    padding: 0.75rem; 
+    text-align: left; 
+    border-bottom: 1px solid var(--border-color); 
+}
+
+.report-table th { 
+    font-weight: 600; 
+    background-color: var(--main-bg); 
+    color: var(--primary-color); 
+    white-space: normal; 
+    text-align: left;
+}
+
+.report-table tbody tr:hover { 
+    background-color: #f8f9fa; 
+}
+
+.report-table td.actions { 
+    text-align: right; 
+}
+
+.report-table .empty-row td {
+    text-align: center;
+    color: var(--gray-text);
+    padding: 2rem;
     font-style: italic;
 }
-        }
+
+.status-badge.status-voided { 
+    background-color: var(--danger-color); 
+}
+
     </style>
 </head>
 <body>
