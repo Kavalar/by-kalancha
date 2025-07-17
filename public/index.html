@@ -122,6 +122,17 @@
         .report-table tbody tr:hover { background-color: #f8f9fa; }
         .report-table td.actions { text-align: right; }
         .status-badge.status-voided { background-color: var(--danger-color); }
+        .report-table th {
+        white-space: normal; /* Гарантує, що текст заголовків буде переноситись */
+        text-align: left;
+    }
+
+    .report-table .empty-row td {
+    text-align: center; /* Центрує текст повідомлення */
+    color: var(--gray-text); /* Робить текст сірим */
+    padding: 2rem; /* Додає більше простору */
+    font-style: italic;
+}
         }
     </style>
 </head>
@@ -3500,7 +3511,7 @@ function renderCertificatesView(container) {
                         '</tr>' +
                     '</thead>' +
                     '<tbody id="certificates-tbody">' +
-                        (certificatesHtml || '<tr><td colspan="8" style="text-align:center;">Сертифікати ще не створено.</td></tr>') +
+                        (certificatesHtml || '<tr class="empty-row"><td colspan="8">Сертифікати ще не створено.</td></tr>') +
                     '</tbody>' +
                 '</table>' +
             '</div>' +
