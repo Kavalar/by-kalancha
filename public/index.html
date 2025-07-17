@@ -3419,6 +3419,7 @@ async function handleCalculateSalary(event) {
 }
 
     // #region Certificates View (Повна виправлена версія)
+// #region Certificates View (Повна виправлена версія)
 function renderCertificatesView(container) {
     const isSalonAdmin = state.user.role === 'salon_admin';
     const userSalonId = state.user.salonId;
@@ -3443,13 +3444,10 @@ function renderCertificatesView(container) {
         const initialAmount = cert.initialAmount || 0;
         const currentBalance = cert.currentBalance || 0;
         const creationDate = cert.createdAt ? cert.createdAt.toDate().toLocaleDateString('uk-UA') : 'Невідома дата';
-
         const voidButton = cert.status === 'active' ?
             '<button class="btn btn-edit btn-delete-certificate" data-id="' + cert.id + '" data-number="' + cert.certificateNumber + '">Анулювати</button>' : '';
-
         const deleteButton = state.user.role === 'admin' ?
             '<button class="btn btn-delete btn-hard-delete-certificate" data-id="' + cert.id + '" data-number="' + cert.certificateNumber + '" style="margin-left: 0.5rem;">Видалити</button>' : '';
-
         return '<tr>' +
             '<td>' + (cert.certificateNumber || 'N/A') + '</td>' +
             '<td>' + (cert.clientName || 'N/A') + '</td>' +
@@ -3469,52 +3467,52 @@ function renderCertificatesView(container) {
             '<form id="add-certificate-form">' +
                 '<div class="form-row">' +
                     '<div class="form-group" style="flex:1;">' +
-                        '<label for="cert-number">Номер сертифіката (введіть вручну)</label>' +
+                         '<label for="cert-number">Номер сертифіката (введіть вручну)</label>' +
                         '<input type="text" id="cert-number" required>' +
                     '</div>' +
                     '<div class="form-group" style="flex:2;">' +
-                        '<label for="cert-client-name">Ім\'я клієнта</label>' +
+                         '<label for="cert-client-name">Ім\'я клієнта</label>' +
                         '<input type="text" id="cert-client-name" required>' +
                     '</div>' +
                 '</div>' +
-                '<div class="form-row">' +
+                 '<div class="form-row">' +
                     '<div class="form-group" style="flex:1;">' +
                         '<label for="cert-amount">Сума (zł)</label>' +
                         '<input type="number" id="cert-amount" required min="1" step="0.01">' +
-                    '</div>' +
+                     '</div>' +
                     '<div class="form-group" style="flex:1;">' +
                         '<label for="cert-payment-type">Тип оплати продажу</label>' +
                         '<select id="cert-payment-type" required>' +
-                            '<option value="cash">Готівка</option>' +
+                             '<option value="cash">Готівка</option>' +
                             '<option value="card">Картка</option>' +
                             '<option value="blik">Blik</option>' +
                         '</select>' +
-                    '</div>' +
+                     '</div>' +
                     '<div class="form-group" style="flex:1;">' +
                         '<label for="cert-salon">Салон продажу</label>' +
                         '<select id="cert-salon" required>' +
-                            '<option value="">Оберіть салон</option>' +
+                             '<option value="">Оберіть салон</option>' +
                             salonOptions +
                         '</select>' +
-                    '</div>' +
+                     '</div>' +
                 '</div>' +
                 '<button type="submit" class="btn">Створити та продати</button>' +
             '</form>' +
         '</div>' +
         '<div class="content-card" style="margin-top: 2rem;">' +
             '<h2>Список сертифікатів</h2>' +
-            '<div style="max-height: 600px; overflow-y: auto;">' +
+             '<div style="max-height: 600px; overflow-y: auto;">' +
                 '<table class="report-table">' +
                     '<thead>' +
                         '<tr>' +
                             '<th>Номер</th>' +
-                            '<th>Клієнт</th>' +
+                             '<th>Клієнт</th>' +
                             '<th>Початкова сума</th>' +
                             '<th>Залишок</th>' +
-                            '<th>Дата продажу</th>' +
+                             '<th>Дата продажу</th>' +
                             '<th>Салон продажу</th>' +
                             '<th>Статус</th>' +
-                            '<th>Дії</th>' +
+                             '<th>Дії</th>' +
                         '</tr>' +
                     '</thead>' +
                     '<tbody id="certificates-tbody">' +
