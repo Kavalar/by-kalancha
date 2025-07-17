@@ -2665,7 +2665,6 @@ async function renderDailySummary() {
     const today = new Date();
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
     const todayStr = today.toISOString().split('T')[0];
-
     container.innerHTML = `
         <div class="content-card">
             <button id="detail-view-back-btn" class="btn" style="margin-bottom: 2rem; width: auto; background-color: var(--gray-text);">&larr; Назад до списку майстрів</button>
@@ -2682,7 +2681,7 @@ async function renderDailySummary() {
                 </div>
                 <div class="form-group" id="advance-salon-selector-group">
                 <label for="advance-salon-id">Салон, з каси якого видається аванс</label>
-                <select id="advance-salon-id" required></select>
+                 <select id="advance-salon-id" required></select>
                 </div>
                 <div class="form-group"><label for="advance-description">Опис (необов'язково)</label><textarea id="advance-description" rows="2"></textarea></div>
                 <button type="submit" class="btn">Видати аванс</button>
@@ -2691,21 +2690,21 @@ async function renderDailySummary() {
 
         <div class="content-card"><h3>Історія авансів</h3><ul id="master-advances-list" class="item-list"><li>Завантаження...</li></ul></div>
 
-        <div class="content-card">
+         <div class="content-card">
             <h3>Нарахувати премію</h3>
             <form id="add-bonus-form">
                 <div class="form-row">
                     <div class="form-group" style="flex:2;">
                         <label for="bonus-amount">Сума премії (zł)</label>
-                        <input type="number" id="bonus-amount" min="1" required>
+                         <input type="number" id="bonus-amount" min="1" required>
                     </div>
                     <div class="form-group" style="flex:1;">
                         <label for="bonus-payment-type">Тип оплати</label>
-                        <select id="bonus-payment-type" required>
+                         <select id="bonus-payment-type" required>
                             <option value="cash">Готівка</option>
                             <option value="card">Картка</option>
                         </select>
-                    </div>
+                     </div>
                 </div>
                 <div class="form-group" id="bonus-salon-selector-group">
                     <label for="bonus-salon-id">Салон, з каси якого видається премія</label>
@@ -2715,7 +2714,7 @@ async function renderDailySummary() {
                     <label for="bonus-description">Опис (необов'язково)</label>
                     <textarea id="bonus-description" rows="2"></textarea>
                 </div>
-                <button type="submit" class="btn">Нарахувати премію</button>
+                 <button type="submit" class="btn">Нарахувати премію</button>
             </form>
         </div>
 
@@ -2725,19 +2724,19 @@ async function renderDailySummary() {
         </div>
         
         <div class="content-card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h2>Історія робіт</h2>
                 <button id="send-master-report-btn" class="btn">Надіслати звіт на пошту</button>
             </div>
             
             <div class="form-row" style="margin-bottom: 1.5rem;">
                 <div class="form-group" style="flex:1;">
-                    <label for="work-history-start">Період З</label>
+                     <label for="work-history-start">Період З</label>
                     <input type="date" id="work-history-start" value="${firstDayOfMonth}">
                 </div>
                 <div class="form-group" style="flex:1;">
                     <label for="work-history-end">Період По</label>
-                    <input type="date" id="work-history-end" value="${todayStr}">
+                     <input type="date" id="work-history-end" value="${todayStr}">
                 </div>
             </div>
 
@@ -2750,34 +2749,31 @@ async function renderDailySummary() {
         </div>
     `;
 
-    // --- Логіка для сторінки ---
-
     // Кнопка "Назад"
     document.getElementById('detail-view-back-btn').onclick = () => renderView('masters');
     
-    // Форма авансів
+    // --- ВИПРАВЛЕНО: Логіка для форми авансів ---
     document.getElementById('add-advance-form').onsubmit = handleAddAdvance;
-
-    // Обробники для нової форми премій
-    // Логіка для форми авансів
-    const advanceSalonGroup = document.getElementById('advance-salon-selector-group');
-    const advanceSalonSelect = document.getElementById('advance-salon-id');
-
-        if (state.user.role === 'admin') {
     const advanceSalonGroup = document.getElementById('advance-salon-selector-group');
     const advanceSalonSelect = document.getElementById('advance-salon-id');
 
     if (state.user.role === 'admin') {
-    const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-    advanceSalonSelect.innerHTML = `<option value="">Оберіть салон</option>${salonOptions}`;
-    advanceSalonGroup.style.display = 'block';
-    advanceSalonSelect.disabled = false; // Робимо активним для адміна
-} else if (state.user.role === 'salon_admin') {
-    advanceSalonGroup.style.display = 'none';
-    advanceSalonSelect.disabled = true; // Вимикаємо поле для адміна салону
-}
-    document.getElementById('add-bonus-form').onsubmit = handleAddBonus;
+        const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+        advanceSalonSelect.innerHTML = `<option value="">Оберіть салон</option>${salonOptions}`;
+        advanceSalonGroup.style.display = 'block';
+        advanceSalonSelect.disabled = false;
+        advanceSalonSelect.required = true;
+    } else if (state.user.role === 'salon_admin') {
+        const userSalon = state.salons.find(s => s.id === state.user.salonId);
+        // Показуємо поле, але робимо його неактивним, щоб адмін салону бачив, звідки списуються кошти
+        advanceSalonSelect.innerHTML = userSalon ? `<option value="${userSalon.id}">${userSalon.name}</option>` : '';
+        advanceSalonGroup.style.display = 'block';
+        advanceSalonSelect.disabled = true;
+        advanceSalonSelect.required = false; // Поле не є обов'язковим, бо значення береться з state
+    }
 
+    // --- ВИПРАВЛЕНО: Логіка для форми премій ---
+    document.getElementById('add-bonus-form').onsubmit = handleAddBonus;
     const bonusSalonGroup = document.getElementById('bonus-salon-selector-group');
     const bonusSalonSelect = document.getElementById('bonus-salon-id');
 
@@ -2785,8 +2781,15 @@ async function renderDailySummary() {
         const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
         bonusSalonSelect.innerHTML = `<option value="">Оберіть салон</option>${salonOptions}`;
         bonusSalonGroup.style.display = 'block';
+        bonusSalonSelect.disabled = false;
+        bonusSalonSelect.required = true;
     } else if (state.user.role === 'salon_admin') {
-        bonusSalonGroup.style.display = 'none';
+        const userSalon = state.salons.find(s => s.id === state.user.salonId);
+        // Показуємо поле, але робимо його неактивним
+        bonusSalonSelect.innerHTML = userSalon ? `<option value="${userSalon.id}">${userSalon.name}</option>` : '';
+        bonusSalonGroup.style.display = 'block';
+        bonusSalonSelect.disabled = true;
+        bonusSalonSelect.required = false;
     }
 
     // Логіка для таблиці з історією робіт
@@ -2794,14 +2797,13 @@ async function renderDailySummary() {
     const endDateInput = document.getElementById('work-history-end');
     const tableBody = document.getElementById('work-history-tbody');
     const sendReportBtn = document.getElementById('send-master-report-btn');
-
     const updateWorkHistoryTable = () => {
-        const start = new Date(startDateInput.value); start.setHours(0, 0, 0, 0);
+        const start = new Date(startDateInput.value);
+        start.setHours(0, 0, 0, 0);
         const end = new Date(endDateInput.value); end.setHours(23, 59, 59, 999);
         const masterAppointments = state.appointments
             .filter(app => app.masterId === masterId && app.dateTime.toDate() >= start && app.dateTime.toDate() <= end)
             .sort((a, b) => b.dateTime.toDate() - a.dateTime.toDate());
-        
         let appointmentsHtml = masterAppointments.map(app => {
             const service = state.services.find(s => s.id === app.serviceId);
             const salon = state.salons.find(s => s.id === app.salonId);
@@ -2813,17 +2815,16 @@ async function renderDailySummary() {
                     let type = p.type;
                     if (p.type === 'cash') type = 'Готівка';
                     if (p.type === 'card') type = 'Картка';
-                    if (p.type === 'blik') type = 'Blik';
+                     if (p.type === 'blik') type = 'Blik';
                     if (p.type === 'settlement') type = 'Взаєморозрахунок';
                     return `<strong>${p.amount.toFixed(0)} zł</strong> (${type})`;
                 }).join('<br>');
-            } else if (app.status === 'completed') {
+             } else if (app.status === 'completed') {
                 paymentDetails = `<span class="status-badge status-completed">Оплачено</span>`;
             }
 
             return `<tr><td>${appDate}</td><td>${app.clientName}</td><td>${service?.name || ''}</td><td>${salon?.name || ''}</td><td><strong>${app.finalPrice.toFixed(0)} zł</strong></td><td>${paymentDetails}</td></tr>`;
         }).join('');
-        
         tableBody.innerHTML = appointmentsHtml || `<tr><td colspan="6" style="text-align:center;">Історія порожня.</td></tr>`;
     };
     
@@ -2845,7 +2846,6 @@ async function renderDailySummary() {
             advancesListEl.onclick = (e) => { if (e.target.closest('.btn-delete-advance')) handleDeleteAdvance(e.target.closest('.btn-delete-advance').dataset.id); };
         }
     });
-
     // Слухач для історії премій
     if(masterBonusesUnsubscribe) masterBonusesUnsubscribe();
     const bonusesCollectionRef = collection(db, 'masters', masterId, 'bonuses');
@@ -2855,13 +2855,12 @@ async function renderDailySummary() {
             const bonuses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             bonusesListEl.innerHTML = bonuses.length === 0 ? '<li>Премій ще не було.</li>' : bonuses.map(bonus => {
                 const salonName = state.salons.find(s => s.id === bonus.salonId)?.name || 'Невідомо';
-                return `<li><div><span>${bonus.date.toDate().toLocaleString('uk-UA')}</span><br><small>Салон: ${salonName}${bonus.description ? ` | ${bonus.description}` : ''}</small></div><div class="actions"><strong>+${bonus.amount.toFixed(2)} zł</strong><button class="btn btn-delete btn-delete-bonus" data-id="${bonus.id}">Видалити</button></div></li>`;
+                 return `<li><div><span>${bonus.date.toDate().toLocaleString('uk-UA')}</span><br><small>Салон: ${salonName}${bonus.description ? ` | ${bonus.description}` : ''}</small></div><div class="actions"><strong>+${bonus.amount.toFixed(2)} zł</strong><button class="btn btn-delete btn-delete-bonus" data-id="${bonus.id}">Видалити</button></div></li>`;
             }).join('');
             bonusesListEl.onclick = (e) => { if (e.target.closest('.btn-delete-bonus')) handleDeleteBonus(e.target.closest('.btn-delete-bonus').dataset.id); };
         }
     });
-    }
-    }
+[cite_start]} // [cite: 905, 906, 907, 908, 909, 910, 911, 912, 913, 914, 915, 916, 917, 918, 919, 920, 921, 922, 923, 924, 925, 926, 927, 928, 929, 930, 931, 932, 933, 934, 935, 936, 937, 938, 939, 940, 941, 942, 943, 944, 945, 946, 947, 948, 949]
 
     async function handleAddAdvance(event) {
     event.preventDefault();
@@ -2900,7 +2899,7 @@ async function renderDailySummary() {
         showNotification("Помилка при видачі авансу.", "error");
         console.error(e);
     }
-}
+[cite_start]} // [cite: 950, 951, 952, 953, 954, 955, 956, 957, 958]
 
     async function handleDeleteAdvance(advanceId, masterName, amount, description) {
         const masterId = state.viewingMasterId;
@@ -2922,7 +2921,6 @@ async function renderDailySummary() {
     const amount = parseFloat(document.getElementById('bonus-amount').value);
     const description = document.getElementById('bonus-description').value.trim();
     const paymentType = document.getElementById('bonus-payment-type').value;
-
     let salonId;
     if (state.user.role === 'admin') {
         salonId = document.getElementById('bonus-salon-id').value;
@@ -2950,7 +2948,7 @@ async function renderDailySummary() {
     } catch (e) {
         showNotification("Помилка при нарахуванні премії.", "error");
     }
-}
+[cite_start]} // [cite: 961, 962, 963, 964, 965, 966, 967, 968, 969, 970]
 
 async function handleDeleteBonus(bonusId) {
     const masterId = state.viewingMasterId;
