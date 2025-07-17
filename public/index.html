@@ -3412,6 +3412,94 @@ async function handleDeleteBonus(bonusId) {
     }
 
     // #region Certificates View (Повна виправлена версія)
+async function handleCalculateSalary(event) {
+    event.preventDefault();
+    const reportContainer = document.getElementById('salary-report');
+    reportContainer.innerHTML = '<p>Розрахунок...</p>';
+    const startDate = document.getElementById('salary-start-date').value;
+    const endDate = document.getElementById('salary-end-date').value;
+    const selectedMasterId = document.getElementById('salary-master-filter').value;
+    const selectedSalonId = document.getElementById('salary-salon-filter').value;
+    try {
+        const generateReport = httpsCallable(functions, 'generateAndSendReport');
+        const result = await generateReport({ startDate, endDate, salonId: selectedSalonId, isManualCalculation: true });
+        const reportText = result.data.reportBody;
+        const masterReports = reportText.split('--- ДЕТАЛІЗАЦІЯ ПО ЗАРПЛАТІ МАЙСТРІВ ---')[1].split('--- ДЕТАЛІЗАЦІЯ ПО ЗАРПЛАТІ ПЕРСОНАЛУ ---')[0];
+        const masterReportParts = masterReports.split('----------------------------').filter(part => part.trim() !== '');
+        let reportHtml = '';
+        masterReportParts.forEach(part => {
+            if (!part.includes('Майстер:')) return;
+            const nameMatch = part.match(/Майстер: (.*)/);
+            if(!nameMatch) return;
+            const name = nameMatch[1];
+            const group = part.match(/\(Група: (.*)\)/)?.[1] || 'Н/Д';
+            const base = part.match(/База для .*?: (.*) zł/)?.[1] || '0';
+            const rate = part.match(/Ставка: (.*)%/)?.[1] || '0';
+            const salaryFromBase = part.match(/Нараховано ЗП .*?: (.*) zł/)?.[1] || '0';
+            const internalBonus = part.match(/Нарахування \(внутр. послуги\): \+(.*) zł/)?.[1] || '0';
+            
+            // --- ОСНОВНЕ ВИПРАВЛЕННЯ ТУТ ---
+            const premiumBonus = part.match(/Премії: \+(.*) zł/)?.[1] || '0'; // Новий рядок для зчитування премій
+            
+            const advances = part.match(/Аванси: -(.*) zł/)?.[1] || '0';
+            const settlements = part.match(/Взаєморозрахунок .*?: -(.*) zł/)?.[1] || '0';
+            const toPay = part.match(/ДО ВИПЛАТИ: (.*) zł/)?.[1] || '0';
+            
+            if (selectedMasterId === 'all' || state.masters.find(m => m.name === name)?.id === selectedMasterId) {
+                 reportHtml += `
+                    <div class="salary-report-card">
+                        <h3>${name}</h3>
+                        <p><span>Група зарплати:</span> <strong>${group}</strong></p>
+                        <p><span>База для нарахування ЗП:</span> <strong>${base} zł</strong></p>
+                        <p><span>Ставка:</span> <strong>${rate}%</strong></p>
+                        <p><span>Нарахована ЗП (від бази):</span> <span>${salaryFromBase} zł</span></p>
+                        <p><span>Нарахування (внутр. послуги):</span> <span style="color: var(--success-color);">+${internalBonus} zł</span></p>
+                        
+                        <p><span>Премії:</span> <span style="color: var(--success-color);">+${premiumBonus} zł</span></p>
+
+                        <p><span>Видано авансів:</span> <span style="color: var(--danger-color);">- ${advances} zł</span></p>
+                        <p><span>Взаєморозрахунок (списання):</span> <span style="color: var(--danger-color);">- ${settlements} zł</span></p>
+                        <p class="total-salary"><span>До виплати:</span> <strong>${toPay} zł</strong></p>
+                    </div>`;
+            }
+        });
+        reportContainer.innerHTML = reportHtml || '<p>За обраними фільтрами немає даних для розрахунку.</p>';
+    } catch (error) {
+        console.error("Помилка розрахунку ЗП:", error);
+        reportContainer.innerHTML = `<p style="color: var(--danger-color);">Помилка: ${error.message}</p>`;
+    }
+}
+
+    function renderExpensesView(container) {
+        container.innerHTML = `
+            <div class="content-card">
+                <h2>Додати загальну витрату</h2>
+                <form id="add-expense-form">
+                    <div class="form-row">
+                        <div class="form-group" style="flex:2;"><label for="expense-description">Опис</label><input type="text" id="expense-description" required></div>
+                        <div class="form-group" style="flex:1;"><label for="expense-amount">Сума (zł)</label><input type="number" id="expense-amount" required min="0" step="0.01"></div>
+                        <div class="form-group" style="flex:1;"><label for="expense-date">Дата</label><input type="date" id="expense-date" required></div>
+                    </div>
+                    <button type="submit" class="btn">Додати витрату</button>
+                </form>
+            </div>
+            <div class="content-card" style="margin-top:2rem;"><h2>Історія загальних витрат</h2><ul id="expenses-list" class="item-list"></ul></div>`;
+        document.getElementById('add-expense-form').onsubmit = handleAddExpense;
+        document.getElementById('expense-date').valueAsDate = new Date();
+        const listEl = document.getElementById('expenses-list');
+        listEl.innerHTML = '';
+        if (state.expenses.length === 0) { listEl.innerHTML = '<li>Витрат ще не було.</li>'; } 
+        else {
+            state.expenses.forEach(expense => {
+                const li = document.createElement('li');
+                li.innerHTML = `<div><strong>${expense.description}</strong><br><small>${expense.timestamp.toDate().toLocaleDateString('uk-UA')}</small></div><div class="actions"><strong>${expense.amount.toFixed(2)} zł</strong><button class="btn btn-delete" data-id="${expense.id}" data-description="${expense.description}">🗑️</button></div>`;
+                listEl.appendChild(li);
+            });
+        }
+        listEl.onclick = (e) => { const deleteBtn = e.target.closest('.btn-delete'); if (deleteBtn) { handleDeleteExpense(deleteBtn.dataset.id, deleteBtn.dataset.description); } };
+    }
+
+    // #region Certificates View (Повна виправлена версія)
 function renderCertificatesView(container) {
     const isSalonAdmin = state.user.role === 'salon_admin';
     const userSalonId = state.user.salonId;
