@@ -2860,8 +2860,8 @@ async function renderDailySummary() {
             bonusesListEl.onclick = (e) => { if (e.target.closest('.btn-delete-bonus')) handleDeleteBonus(e.target.closest('.btn-delete-bonus').dataset.id); };
         }
     });
-    }
 
+    }
     async function handleAddAdvance(event) {
     event.preventDefault();
     const masterId = state.viewingMasterId;
@@ -2899,6 +2899,7 @@ async function renderDailySummary() {
         showNotification("Помилка при видачі авансу.", "error");
         console.error(e);
     }
+}
 
     async function handleDeleteAdvance(advanceId, masterName, amount, description) {
         const masterId = state.viewingMasterId;
@@ -2947,6 +2948,7 @@ async function renderDailySummary() {
     } catch (e) {
         showNotification("Помилка при нарахуванні премії.", "error");
     }
+}
 
 async function handleDeleteBonus(bonusId) {
     const masterId = state.viewingMasterId;
