@@ -3810,37 +3810,78 @@ async function handleHardDeleteCertificate(id, number) { // Повне вида�
     }
     
     function renderShopView(container) {
-        const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-        const paymentTypes = { cash: '💵', card: '💳', blik: '📱' };
-        const recentSalesHtml = state.productSales.slice(0, 10).map(sale => {
+    const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+
+    container.innerHTML = `
+        <div class="content-card">
+            <h2>Продаж товару</h2>
+            <form id="add-product-sale-form">
+                <div class="form-group"><label for="product-sale-description">Назва або опис товару</label><input type="text" id="product-sale-description" required></div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;"><label for="product-sale-amount">Сума продажу (zł)</label><input type="number" id="product-sale-amount" required min="0" step="0.01"></div>
+                    <div class="form-group" style="flex:1;"><label for="product-sale-payment-type">Тип оплати</label><select id="product-sale-payment-type" required><option value="cash">Готівка</option><option value="card">Картка</option><option value="blik">Blik</option></select></div>
+                    <div class="form-group" style="flex:1;"><label for="product-sale-salon">Салон</label><select id="product-sale-salon" required><option value="">Оберіть салон</option>${salonOptions}</select></div>
+                </div>
+                <button type="submit" class="btn">Зареєструвати продаж</button>
+            </form>
+        </div>
+        <div class="content-card" style="margin-top:2rem;">
+            <h2>Останні продажі</h2>
+            <div style="max-height: 600px; overflow-y: auto;">
+              <table class="report-table">
+                  <thead>
+                      <tr>
+                          <th>Опис</th>
+                          <th>Дата</th>
+                          <th>Салон</th>
+                          <th>Сума</th>
+                          <th>Тип оплати</th>
+                          <th>Дії</th>
+                      </tr>
+                  </thead>
+                  <tbody id="product-sales-tbody">
+                  </tbody>
+              </table>
+            </div>
+        </div>`;
+
+    document.getElementById('add-product-sale-form').onsubmit = handleAddProductSale;
+    
+    const salesTbody = document.getElementById('product-sales-tbody');
+    if (!salesTbody) return;
+
+    const sales = state.productSales;
+    
+    if (sales.length === 0) {
+        salesTbody.innerHTML = '<tr class="empty-row"><td colspan="6">Продажів ще не було.</td></tr>';
+    } else {
+        const paymentTypes = { cash: 'Готівка', card: 'Картка', blik: 'Blik' };
+        const salesHtml = sales.map(sale => {
             const salon = state.salons.find(s => s.id === sale.salonId);
             const saleDate = sale.timestamp ? sale.timestamp.toDate().toLocaleString('uk-UA') : 'Дата невідома';
+            const deleteButton = state.user.role === 'admin' ? `<button class="btn btn-delete btn-delete-sale" data-id="${sale.id}" data-description="${sale.description}">🗑️</button>` : '';
+
             return `
-                <li>
-                    <div><strong>${sale.description}</strong><br><small>${saleDate} (${salon ? salon.name : 'Невідомий салон'})</small></div>
-                    <div class="actions"><strong>${sale.amount.toFixed(2)} zł</strong><small>(${paymentTypes[sale.paymentType] || 'Н/Д'})</small>${state.user.role === 'admin' ? `<button class="btn btn-delete btn-delete-sale" data-id="${sale.id}" data-description="${sale.description}">🗑️</button>` : ''}</div>
-                </li>`;
+                <tr>
+                    <td>${sale.description}</td>
+                    <td>${saleDate}</td>
+                    <td>${salon ? salon.name : 'Невідомий салон'}</td>
+                    <td><strong>${sale.amount.toFixed(2)} zł</strong></td>
+                    <td>${paymentTypes[sale.paymentType] || 'Н/Д'}</td>
+                    <td class="actions">${deleteButton}</td>
+                </tr>
+            `;
         }).join('');
-        container.innerHTML = `
-            <div class="content-card">
-                <h2>Продаж товару</h2>
-                <form id="add-product-sale-form">
-                    <div class="form-group"><label for="product-sale-description">Назва або опис товару</label><input type="text" id="product-sale-description" required></div>
-                    <div class="form-row">
-                        <div class="form-group" style="flex:1;"><label for="product-sale-amount">Сума продажу (zł)</label><input type="number" id="product-sale-amount" required min="0" step="0.01"></div>
-                        <div class="form-group" style="flex:1;"><label for="product-sale-payment-type">Тип оплати</label><select id="product-sale-payment-type" required><option value="cash">Готівка</option><option value="card">Картка</option><option value="blik">Blik</option></select></div>
-                        <div class="form-group" style="flex:1;"><label for="product-sale-salon">Салон</label><select id="product-sale-salon" required><option value="">Оберіть салон</option>${salonOptions}</select></div>
-                    </div>
-                    <button type="submit" class="btn">Зареєструвати продаж</button>
-                </form>
-            </div>
-            <div class="content-card" style="margin-top:2rem;"><h2>Останні продажі</h2><ul id="product-sales-list" class="item-list">${recentSalesHtml || '<li>Продажів ще не було.</li>'}</ul></div>`;
-        document.getElementById('add-product-sale-form').onsubmit = handleAddProductSale;
-        const salesList = document.getElementById('product-sales-list');
-        if(salesList) {
-            salesList.onclick = (event) => { const deleteBtn = event.target.closest('.btn-delete-sale'); if(deleteBtn) { handleDeleteProductSale(deleteBtn.dataset.id, deleteBtn.dataset.description); } };
-        }
+        salesTbody.innerHTML = salesHtml;
     }
+
+    salesTbody.onclick = (event) => {
+        const deleteBtn = event.target.closest('.btn-delete-sale');
+        if(deleteBtn) {
+            handleDeleteProductSale(deleteBtn.dataset.id, deleteBtn.dataset.description);
+        }
+    };
+}
 
     async function handleAddProductSale(event) {
         event.preventDefault();
