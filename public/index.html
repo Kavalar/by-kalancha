@@ -2352,6 +2352,22 @@ async function renderDailySummary() {
     if (!salonId) {
         return showNotification("Будь ласка, оберіть салон.", "error");
     }
+
+    // --- ДОДАНО ПЕРЕВІРКУ ДАТИ ДЛЯ SALON_ADMIN ---
+    if (state.user.role === 'salon_admin') {
+        const selectedDate = new Date(dateTimeString);
+        const now = new Date();
+
+        // Порівнюємо вибрану дату з початком поточної доби, щоб дозволити записи на сьогодні
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+
+        if (selectedDate < startOfToday) {
+            showNotification("Адміністратор салону не може створювати або редагувати записи заднім числом.", "error");
+            return; // Зупиняємо виконання функції
+        }
+    }
+    // --- КІНЕЦЬ ПЕРЕВІРКИ ---
     
     const isInternal = document.getElementById('internal-service-checkbox').checked;
     const master = state.masters.find(m => m.id === masterId);
@@ -2359,11 +2375,11 @@ async function renderDailySummary() {
         return showNotification("Помилка: не знайдено майстра!", "error");
     }
 
-    // --- ВИПРАВЛЕНИЙ БЛОК ---
     const additionalChargeAmount = parseFloat(document.getElementById('additional-charge-amount').value) || 0;
     const additionalChargeDescription = document.getElementById('additional-charge-description').value.trim();
     const priceModifier = master.priceModifier || 0;
     const finalPrice = updateFinalPrice();
+    const salaryBase = (service.price * (1 + priceModifier / 100)) + additionalChargeAmount;
 
     let appointmentData = { 
         dateTime: Timestamp.fromDate(new Date(dateTimeString)), 
@@ -2373,10 +2389,10 @@ async function renderDailySummary() {
         duration: service.duration || 60, 
         manualDiscount: { value: parseFloat(document.getElementById('manual-discount-value').value) || 0, type: document.getElementById('manual-discount-type').value }, 
         additionalCharge: { amount: additionalChargeAmount, description: additionalChargeDescription }, 
-        finalPrice,  
+        finalPrice, 
+        salaryBase, 
         isInternal: isInternal 
     };
-    // --- КІНЕЦЬ ВИПРАВЛЕНОГО БЛОКУ ---
 
     let logDetails = { service: service.name, master: master.name };
 
