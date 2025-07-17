@@ -2363,7 +2363,7 @@ async function renderDailySummary() {
         }
 
         const priceModifier = master.priceModifier || 0;
-        const salaryBase = service.price * (1 + priceModifier / 100);
+        const salaryBase = (service.price * (1 + priceModifier / 100)) + additionalChargeAmount;
         const finalPrice = updateFinalPrice();
         const additionalChargeAmount = parseFloat(document.getElementById('additional-charge-amount').value) || 0;
         const additionalChargeDescription = document.getElementById('additional-charge-description').value.trim();
