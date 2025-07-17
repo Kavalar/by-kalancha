@@ -3729,6 +3729,9 @@ async function handleHardDeleteCertificate(id, number) { // Повне вида�
             const dateField = expense.date || expense.timestamp;
             const expenseDate = dateField ? dateField.toDate().toLocaleDateString('uk-UA') : 'Дата невідома';
             const deleteButton = state.user.role === 'admin' ? `<button class="btn btn-delete" data-id="${expense.id}" data-description="${expense.description}">🗑️</button>` : '';
+            
+            // ########## ОСНОВНЕ ВИПРАВЛЕННЯ ТУТ ##########
+            const paymentTypeDisplay = paymentTypes[expense.paymentType] || 'Готівка'; // За замовчуванням 'Готівка'
 
             return `
                 <tr>
@@ -3736,7 +3739,7 @@ async function handleHardDeleteCertificate(id, number) { // Повне вида�
                     <td>${expenseDate}</td>
                     <td>${salon ? salon.name : 'Невідомий салон'}</td>
                     <td><strong>${expense.amount.toFixed(2)} zł</strong></td>
-                    <td>${paymentTypes[expense.paymentType] || 'Н/Д'}</td>
+                    <td>${paymentTypeDisplay}</td>
                     <td class="actions">${deleteButton}</td>
                 </tr>
             `;
