@@ -2362,9 +2362,8 @@ async function renderDailySummary() {
     // ########## ВИПРАВЛЕНИЙ ПОРЯДОК РЯДКІВ ##########
     const priceModifier = master.priceModifier || 0;
     const finalPrice = updateFinalPrice();
-    const additionalChargeAmount = parseFloat(document.getElementById('additional-charge-amount').value) || 0;
     const additionalChargeDescription = document.getElementById('additional-charge-description').value.trim();
-    
+    const additionalChargeAmount = parseFloat(document.getElementById('additional-charge-amount').value) || 0;
     // Розраховуємо базу для ЗП ПІСЛЯ того, як отримали additionalChargeAmount
     const salaryBase = (service.price * (1 + priceModifier / 100)) + additionalChargeAmount;
     
