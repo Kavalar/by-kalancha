@@ -2901,18 +2901,39 @@ async function renderDailySummary() {
     }
 }
 
-    async function handleDeleteAdvance(advanceId, masterName, amount, description) {
-        const masterId = state.viewingMasterId;
-        if (!masterId || !advanceId) return;
+    async function handleDeleteAdvance(advanceId) {
+    const masterId = state.viewingMasterId;
+    if (!masterId || !advanceId) return;
 
-        showConfirmWithReasonModal('Ви впевнені, що хочете видалити цей аванс?', async (reason) => {
-            const action = () => deleteDoc(doc(db, 'masters', masterId, 'advances', advanceId));
-            const logDetails = { masterId, name: masterName, amount: parseFloat(amount), description };
-            if (reason) logDetails.reason = reason;
-            try { await logAndExecute('Видалено аванс майстра', logDetails, action); } 
-            catch (e) { showNotification("Помилка при видаленні авансу.", "error"); }
-        });
+    // Спочатку отримуємо дані про аванс, щоб коректно записати їх у лог
+    const advanceRef = doc(db, 'masters', masterId, 'advances', advanceId);
+    const advanceSnap = await getDoc(advanceRef);
+    if (!advanceSnap.exists()) {
+        return showNotification("Помилка: аванс не знайдено!", "error");
     }
+    const advanceData = advanceSnap.data();
+    const master = state.masters.find(m => m.id === masterId);
+
+    showConfirmWithReasonModal('Ви впевнені, що хочете видалити цей аванс?', async (reason) => {
+        const action = () => deleteDoc(advanceRef);
+        
+        // Формуємо деталі для логу з отриманих даних
+        const logDetails = { 
+            masterId: masterId, 
+            name: master?.name || 'Невідомий майстер', 
+            amount: advanceData.amount, 
+            description: advanceData.description || '' 
+        };
+        if (reason) logDetails.reason = reason;
+
+        try {
+            await logAndExecute('Видалено аванс майстра', logDetails, action);
+        } catch (e) {
+            showNotification("Помилка при видаленні авансу.", "error");
+            console.error(e);
+        }
+    });
+}
     async function handleAddBonus(event) {
     event.preventDefault();
     const masterId = state.viewingMasterId;
@@ -2954,13 +2975,31 @@ async function handleDeleteBonus(bonusId) {
     const masterId = state.viewingMasterId;
     if (!masterId || !bonusId) return;
 
+    // Аналогічно отримуємо дані про премію перед видаленням
+    const bonusRef = doc(db, 'masters', masterId, 'bonuses', bonusId);
+    const bonusSnap = await getDoc(bonusRef);
+    if (!bonusSnap.exists()) {
+        return showNotification("Помилка: премію не знайдено!", "error");
+    }
+    const bonusData = bonusSnap.data();
+    const master = state.masters.find(m => m.id === masterId);
+
     showConfirmWithReasonModal('Ви впевнені, що хочете видалити цю премію?', async (reason) => {
-        const action = () => deleteDoc(doc(db, 'masters', masterId, 'bonuses', bonusId));
-        const logDetails = { masterId, bonusId, reason: reason || 'Причину не вказано' };
-        try { 
+        const action = () => deleteDoc(bonusRef);
+        
+        const logDetails = { 
+            masterId: masterId, 
+            name: master?.name || 'Невідомий майстер', 
+            amount: bonusData.amount, 
+            description: bonusData.description || '' 
+        };
+        if (reason) logDetails.reason = reason;
+
+        try {
             await logAndExecute('Видалено премію майстра', logDetails, action);
-        } catch (e) { 
+        } catch (e) {
             showNotification("Помилка при видаленні премії.", "error");
+            console.error(e);
         }
     });
 }
