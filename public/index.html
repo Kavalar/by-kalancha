@@ -2359,14 +2359,14 @@ async function renderDailySummary() {
         return showNotification("Помилка: не знайдено майстра!", "error");
     }
 
-    // ########## ВИПРАВЛЕНИЙ ПОРЯДОК РЯДКІВ ##########
+    // --- ВИПРАВЛЕНИЙ БЛОК ---
+    const additionalChargeAmount = parseFloat(document.getElementById('additional-charge-amount').value) || 0;
+    const additionalChargeDescription = document.getElementById('additional-charge-description').value.trim();
     const priceModifier = master.priceModifier || 0;
     const finalPrice = updateFinalPrice();
-    const additionalChargeDescription = document.getElementById('additional-charge-description').value.trim();
-    const additionalChargeAmount = parseFloat(document.getElementById('additional-charge-amount').value) || 0;
-    // Розраховуємо базу для ЗП ПІСЛЯ того, як отримали additionalChargeAmount
+    // База для ЗП тепер розраховується ПІСЛЯ того, як additionalChargeAmount визначено
     const salaryBase = (service.price * (1 + priceModifier / 100)) + additionalChargeAmount;
-    
+
     let appointmentData = { 
         dateTime: Timestamp.fromDate(new Date(dateTimeString)), 
         serviceId: service.id, 
@@ -2379,6 +2379,8 @@ async function renderDailySummary() {
         salaryBase, 
         isInternal: isInternal 
     };
+    // --- КІНЕЦЬ ВИПРАВЛЕНОГО БЛОКУ ---
+
     let logDetails = { service: service.name, master: master.name };
 
     try {
