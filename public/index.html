@@ -2677,8 +2677,12 @@ async function renderDailySummary() {
             <h3>Видача авансу</h3>
             <form id="add-advance-form">
                 <div class="form-row">
-                    <div class="form-group" style="flex:2;"><label for="advance-amount">Сума авансу (zł)</label><input type="number" id="advance-amount" min="1" required></div>
-                    <div class="form-group" style="flex:1;"><label for="advance-payment-type">Тип оплати</label><select id="advance-payment-type" required><option value="cash">Готівка</option><option value="card">Картка</option></select></div>
+                <div class="form-group" style="flex:2;"><label for="advance-amount">Сума авансу (zł)</label><input type="number" id="advance-amount" min="1" required></div>
+                <div class="form-group" style="flex:1;"><label for="advance-payment-type">Тип оплати</label><select id="advance-payment-type" required><option value="cash">Готівка</option><option value="card">Картка</option></select></div>
+                </div>
+                <div class="form-group" id="advance-salon-selector-group">
+                <label for="advance-salon-id">Салон, з каси якого видається аванс</label>
+                <select id="advance-salon-id" required></select>
                 </div>
                 <div class="form-group"><label for="advance-description">Опис (необов'язково)</label><textarea id="advance-description" rows="2"></textarea></div>
                 <button type="submit" class="btn">Видати аванс</button>
@@ -2755,6 +2759,17 @@ async function renderDailySummary() {
     document.getElementById('add-advance-form').onsubmit = handleAddAdvance;
 
     // Обробники для нової форми премій
+    // Логіка для форми авансів
+    const advanceSalonGroup = document.getElementById('advance-salon-selector-group');
+    const advanceSalonSelect = document.getElementById('advance-salon-id');
+
+        if (state.user.role === 'admin') {
+    const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+    advanceSalonSelect.innerHTML = `<option value="">Оберіть салон</option>${salonOptions}`;
+    advanceSalonGroup.style.display = 'block';
+} else if (state.user.role === 'salon_admin') {
+    advanceSalonGroup.style.display = 'none';
+}
     document.getElementById('add-bonus-form').onsubmit = handleAddBonus;
 
     const bonusSalonGroup = document.getElementById('bonus-salon-selector-group');
@@ -2842,29 +2857,43 @@ async function renderDailySummary() {
 }
 
     async function handleAddAdvance(event) {
-        event.preventDefault();
-        const masterId = state.viewingMasterId;
-        const master = state.masters.find(m => m.id === masterId);
-        const amountInput = document.getElementById('advance-amount');
-        const descriptionInput = document.getElementById('advance-description');
-        const amount = parseFloat(amountInput.value);
-        const description = descriptionInput.value.trim();
-        
-        if (!masterId || !amount || amount <= 0) { return showNotification('Будь ласка, введіть коректну суму.', "error"); }
-        
-        const paymentType = document.getElementById('advance-payment-type').value;
-        const data = { amount: amount, date: Timestamp.now(), paymentType: paymentType };
-        if (description) { data.description = description; }
-        
-        const action = () => addDoc(collection(db, 'masters', masterId, 'advances'), data);
-        try {
-            await logAndExecute('Видано аванс майстру', { masterId, name: master.name, amount, description }, action);
-            amountInput.value = '';
-            descriptionInput.value = '';
-        } catch (e) {
-            showNotification("Помилка при видачі авансу.", "error");
-        }
+    event.preventDefault();
+    const masterId = state.viewingMasterId;
+    const master = state.masters.find(m => m.id === masterId);
+    
+    const amount = parseFloat(document.getElementById('advance-amount').value);
+    const description = document.getElementById('advance-description').value.trim();
+    const paymentType = document.getElementById('advance-payment-type').value;
+
+    let salonId;
+    if (state.user.role === 'admin') {
+        salonId = document.getElementById('advance-salon-id').value;
+    } else if (state.user.role === 'salon_admin') {
+        salonId = state.user.salonId;
     }
+
+    if (!masterId || !amount || amount <= 0 || !salonId) {
+        return showNotification("Будь ласка, заповніть усі поля коректно.", "error");
+    }
+    
+    const data = {
+        amount,
+        date: Timestamp.now(),
+        paymentType,
+        salonId, // ОБОВ'ЯЗКОВО додаємо ID салону
+        description: description || ''
+    };
+    
+    const action = () => addDoc(collection(db, 'masters', masterId, 'advances'), data);
+    try {
+        await logAndExecute('Видано аванс майстру', { masterId, name: master.name, amount, salonId }, action);
+        event.target.reset();
+        showNotification("Аванс успішно видано!", "success");
+    } catch (e) {
+        showNotification("Помилка при видачі авансу.", "error");
+        console.error(e);
+    }
+}
 
     async function handleDeleteAdvance(advanceId, masterName, amount, description) {
         const masterId = state.viewingMasterId;
