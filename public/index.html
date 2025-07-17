@@ -2364,8 +2364,6 @@ async function renderDailySummary() {
     const additionalChargeDescription = document.getElementById('additional-charge-description').value.trim();
     const priceModifier = master.priceModifier || 0;
     const finalPrice = updateFinalPrice();
-    // База для ЗП тепер розраховується ПІСЛЯ того, як additionalChargeAmount визначено
-    const salaryBase = (service.price * (1 + priceModifier / 100)) + additionalChargeAmount;
 
     let appointmentData = { 
         dateTime: Timestamp.fromDate(new Date(dateTimeString)), 
@@ -2375,8 +2373,7 @@ async function renderDailySummary() {
         duration: service.duration || 60, 
         manualDiscount: { value: parseFloat(document.getElementById('manual-discount-value').value) || 0, type: document.getElementById('manual-discount-type').value }, 
         additionalCharge: { amount: additionalChargeAmount, description: additionalChargeDescription }, 
-        finalPrice, 
-        salaryBase, 
+        finalPrice,  
         isInternal: isInternal 
     };
     // --- КІНЕЦЬ ВИПРАВЛЕНОГО БЛОКУ ---
