@@ -3361,16 +3361,16 @@ async function handleDeleteBonus(bonusId) {
                  reportHtml += `
                     <div class="salary-report-card">
                         <h3>${name}</h3>
-                        <p><span>Група зарплати:</span> <strong>${group}</strong></p>
+                         <p><span>Група зарплати:</span> <strong>${group}</strong></p>
                         <p><span>База для нарахування ЗП:</span> <strong>${base} zł</strong></p>
                         <p><span>Ставка:</span> <strong>${rate}%</strong></p>
                         <p><span>Нарахована ЗП (від бази):</span> <span>${salaryFromBase} zł</span></p>
-                        <p><span>Нарахування (внутр. послуги):</span> <span style="color: var(--success-color);">+${internalBonus} zł</span></p>
+                         <p><span>Нарахування (внутр. послуги):</span> <span style="color: var(--success-color);">+${internalBonus} zł</span></p>
                         
                         <p><span>Премії:</span> <span style="color: var(--success-color);">+${premiumBonus} zł</span></p>
 
                         <p><span>Видано авансів:</span> <span style="color: var(--danger-color);">- ${advances} zł</span></p>
-                        <p><span>Взаєморозрахунок (списання):</span> <span style="color: var(--danger-color);">- ${settlements} zł</span></p>
+                         <p><span>Взаєморозрахунок (списання):</span> <span style="color: var(--danger-color);">- ${settlements} zł</span></p>
                         <p class="total-salary"><span>До виплати:</span> <strong>${toPay} zł</strong></p>
                     </div>`;
             }
