@@ -3665,60 +3665,92 @@ async function handleHardDeleteCertificate(id, number) { // Повне вида�
     }
 
     function renderSalonExpensesView(container) {
-        const isSalonAdmin = state.user.role === 'salon_admin';
-        const userSalonId = state.user.salonId;
-        const salonOptions = (isSalonAdmin ? state.salons.filter(s => s.id === userSalonId) : state.salons)
-            .map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-        container.innerHTML = `
-            <div class="content-card">
-                <h2>Додати витрату в салоні</h2>
-                <form id="add-salon-expense-form">
-                    <div class="form-row">
-                        <div class="form-group" style="flex:2;"><label for="salon-expense-description">Опис</label><input type="text" id="salon-expense-description" required></div>
-                        <div class="form-group" style="flex:1;"><label for="salon-expense-amount">Сума (zł)</label><input type="number" id="salon-expense-amount" required min="0" step="0.01"></div>
-                        <div class="form-group" style="flex:1;"><label for="salon-expense-payment-type">Тип оплати</label><select id="salon-expense-payment-type" required><option value="cash">Готівка</option><option value="card">Картка</option></select></div>
-                        <div class="form-group" style="flex:1;"><label for="salon-expense-date">Дата</label><input type="date" id="salon-expense-date" required></div>
-                    </div>
-                    <div class="form-group">
-                        <label for="salon-expense-salon">Салон</label>
-                        <select id="salon-expense-salon" required ${isSalonAdmin ? 'disabled' : ''}>
-                            ${!isSalonAdmin ? '<option value="">Оберіть салон</option>' : ''}
-                            ${salonOptions}
-                        </select>
-                    </div>
-                    <button type="submit" class="btn">Додати витрату</button>
-                </form>
+    const isSalonAdmin = state.user.role === 'salon_admin';
+    const userSalonId = state.user.salonId;
+    const salonOptions = (isSalonAdmin ? state.salons.filter(s => s.id === userSalonId) : state.salons)
+        .map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+
+    container.innerHTML = `
+        <div class="content-card">
+            <h2>Додати витрату в салоні</h2>
+            <form id="add-salon-expense-form">
+                <div class="form-row">
+                    <div class="form-group" style="flex:2;"><label for="salon-expense-description">Опис</label><input type="text" id="salon-expense-description" required></div>
+                    <div class="form-group" style="flex:1;"><label for="salon-expense-amount">Сума (zł)</label><input type="number" id="salon-expense-amount" required min="0" step="0.01"></div>
+                    <div class="form-group" style="flex:1;"><label for="salon-expense-payment-type">Тип оплати</label><select id="salon-expense-payment-type" required><option value="cash">Готівка</option><option value="card">Картка</option></select></div>
+                    <div class="form-group" style="flex:1;"><label for="salon-expense-date">Дата</label><input type="date" id="salon-expense-date" required></div>
+                </div>
+                <div class="form-group">
+                    <label for="salon-expense-salon">Салон</label>
+                    <select id="salon-expense-salon" required ${isSalonAdmin ? 'disabled' : ''}>
+                        ${!isSalonAdmin ? '<option value="">Оберіть салон</option>' : ''}
+                        ${salonOptions}
+                    </select>
+                </div>
+                <button type="submit" class="btn">Додати витрату</button>
+            </form>
+        </div>
+        <div class="content-card" style="margin-top:2rem;">
+            <h2>Історія витрат в салонах</h2>
+            <div style="max-height: 600px; overflow-y: auto;">
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>Опис</th>
+                            <th>Дата</th>
+                            <th>Салон</th>
+                            <th>Сума</th>
+                            <th>Тип оплати</th>
+                            <th>Дії</th>
+                        </tr>
+                    </thead>
+                    <tbody id="salon-expenses-tbody">
+                    </tbody>
+                </table>
             </div>
-            <div class="content-card" style="margin-top:2rem;"><h2>Історія витрат в салонах</h2><ul id="salon-expenses-list" class="item-list"></ul></div>`;
-        document.getElementById('add-salon-expense-form').onsubmit = handleAddSalonExpense;
-        document.getElementById('salon-expense-date').valueAsDate = new Date();
-        
-        if (isSalonAdmin) {
-            document.getElementById('salon-expense-salon').value = userSalonId;
-        }
+        </div>`;
 
-        const listEl = document.getElementById('salon-expenses-list');
-        listEl.innerHTML = '';
-        if (state.salonExpenses.length === 0) {
-            listEl.innerHTML = '<li>Витрат ще не було.</li>';
-        } else {
-            state.salonExpenses.forEach(expense => {
-                const salon = state.salons.find(s => s.id === expense.salonId);
-                const li = document.createElement('li');
-                const dateField = expense.date || expense.timestamp;
-                const expenseDate = dateField ? dateField.toDate().toLocaleDateString('uk-UA') : 'Дата невідома';
-                li.innerHTML = `<div><strong>${expense.description}</strong><br><small>${expenseDate} (${salon ? salon.name : 'Невідомий салон'})</small></div><div class="actions"><strong>${expense.amount.toFixed(2)} zł</strong>${state.user.role === 'admin' ? `<button class="btn btn-delete" data-id="${expense.id}" data-description="${expense.description}">🗑️</button>` : ''}</div>`;
-                listEl.appendChild(li);
-            });
-        }
-
-        listEl.onclick = (e) => {
-            const deleteBtn = e.target.closest('.btn-delete');
-            if (deleteBtn) {
-                handleDeleteSalonExpense(deleteBtn.dataset.id, deleteBtn.dataset.description);
-            }
-        };
+    document.getElementById('add-salon-expense-form').onsubmit = handleAddSalonExpense;
+    document.getElementById('salon-expense-date').valueAsDate = new Date();
+    
+    if (isSalonAdmin) {
+        document.getElementById('salon-expense-salon').value = userSalonId;
     }
+
+    const expensesTbody = document.getElementById('salon-expenses-tbody');
+    if (!expensesTbody) return;
+
+    if (state.salonExpenses.length === 0) {
+        expensesTbody.innerHTML = '<tr class="empty-row"><td colspan="6">Витрат ще не було.</td></tr>';
+    } else {
+        const paymentTypes = { cash: 'Готівка', card: 'Картка' };
+        const expensesHtml = state.salonExpenses.map(expense => {
+            const salon = state.salons.find(s => s.id === expense.salonId);
+            const dateField = expense.date || expense.timestamp;
+            const expenseDate = dateField ? dateField.toDate().toLocaleDateString('uk-UA') : 'Дата невідома';
+            const deleteButton = state.user.role === 'admin' ? `<button class="btn btn-delete" data-id="${expense.id}" data-description="${expense.description}">🗑️</button>` : '';
+
+            return `
+                <tr>
+                    <td>${expense.description}</td>
+                    <td>${expenseDate}</td>
+                    <td>${salon ? salon.name : 'Невідомий салон'}</td>
+                    <td><strong>${expense.amount.toFixed(2)} zł</strong></td>
+                    <td>${paymentTypes[expense.paymentType] || 'Н/Д'}</td>
+                    <td class="actions">${deleteButton}</td>
+                </tr>
+            `;
+        }).join('');
+        expensesTbody.innerHTML = expensesHtml;
+    }
+
+    expensesTbody.onclick = (e) => {
+        const deleteBtn = e.target.closest('.btn-delete');
+        if (deleteBtn) {
+            handleDeleteSalonExpense(deleteBtn.dataset.id, deleteBtn.dataset.description);
+        }
+    };
+}
 
     async function handleAddSalonExpense(event) {
         event.preventDefault();
