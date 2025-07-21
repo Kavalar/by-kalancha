@@ -295,6 +295,14 @@
                 <label for="salary-group-name">Назва групи</label>
                 <input type="text" id="salary-group-name" required>
             </div>
+
+            <div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem; border: 1px solid #e9ecef; margin-bottom: 1rem;">
+                <label style="justify-content: flex-start; margin-bottom: 0;">
+                    <input type="checkbox" id="salary-group-deduct-discounts" style="width: auto; height: auto; margin-right: 10px; appearance: auto; -webkit-appearance: auto;">
+                    Розраховувати ЗП з суми після знижки
+                </label>
+            </div>
+
             <h3>Рівні зарплат</h3>
             <div id="salary-group-tiers-table"></div>
             <button type="button" id="add-tier-to-group-btn" class="btn btn-edit" style="margin-bottom: 2rem;">+ Додати рівень</button>
@@ -3964,6 +3972,7 @@ async function handleHardDeleteCertificate(id, number) { // Повне вида�
     const groupsListHtml = state.salaryGroups.map(group => `<li data-group-id="${group.id}"><span><strong>${group.name}</strong></span><div class="actions"><button class="btn btn-edit btn-edit-group">Редагувати</button><button class="btn btn-delete btn-delete-group" data-name="${group.name}">Видалити</button></div></li>`).join('');
     const masterAssignmentHtml = state.masters.map(master => `<li data-master-id="${master.id}"><span>${master.name}</span><div class="actions"><select class="master-group-select"><option value="">Не призначено</option>${salaryGroupOptions}</select></div></li>`).join('');
     
+    // В цьому блоці більше немає HTML-коду для модального вікна
     container.innerHTML = `
         <div class="content-card">
             <h2>Керування групами зарплат</h2><ul id="salary-groups-list" class="item-list">${groupsListHtml || "<li>Немає створених груп</li>"}</ul>
@@ -3990,33 +3999,6 @@ async function handleHardDeleteCertificate(id, number) { // Повне вида�
                 <p id="password-change-status" style="margin-top: 1rem; color: var(--gray-text);"></p>
             </form>
         </div>
-        
-        <div class="modal-overlay" id="salary-group-modal">
-            <div class="modal-panel">
-                <div class="modal-header">
-                    <h2 id="salary-group-modal-title">Група зарплат</h2>
-                    <button class="close-btn">&times;</button>
-                </div>
-                <form id="salary-group-form">
-                    <input type="hidden" id="edit-salary-group-id">
-                    <div class="form-group">
-                        <label for="salary-group-name">Назва групи</label>
-                        <input type="text" id="salary-group-name" required>
-                    </div>
-
-                    <div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem; border: 1px solid #e9ecef; margin-bottom: 1rem;">
-                        <label style="justify-content: flex-start; margin-bottom: 0;">
-                            <input type="checkbox" id="salary-group-deduct-discounts" style="width: auto; height: auto; margin-right: 10px; appearance: auto; -webkit-appearance: auto;">
-                            Розраховувати ЗП з суми після знижки
-                        </label>
-                    </div>
-                    <h3>Рівні зарплат</h3>
-                    <div id="salary-group-tiers-table"></div>
-                    <button type="button" id="add-tier-to-group-btn" class="btn btn-edit" style="margin-bottom: 2rem;">+ Додати рівень</button>
-                    <button type="submit" class="btn" style="width: 100%;">Зберегти групу</button>
-                </form>
-            </div>
-        </div>
     `;
     
     document.getElementById('add-new-group-btn').onclick = () => showSalaryGroupModal();
@@ -4031,7 +4013,7 @@ async function handleHardDeleteCertificate(id, number) { // Повне вида�
     document.getElementById('manual-report-form').onsubmit = handleManualReport;
     document.getElementById('change-password-form').onsubmit = handleChangePassword;
 
-    // Налаштування для модального вікна, яке тепер входить до складу цього view
+    // Цей код тепер буде працювати з єдиним правильним модальним вікном
     const salaryGroupModal = document.getElementById('salary-group-modal');
     if (salaryGroupModal) {
         salaryGroupModal.querySelector('.close-btn').onclick = () => {
