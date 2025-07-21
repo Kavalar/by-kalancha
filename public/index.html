@@ -3959,65 +3959,112 @@ async function handleHardDeleteCertificate(id, number) { // Повне вида�
     }
     
     function renderSettingsView(container) {
-        const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-        const salaryGroupOptions = state.salaryGroups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
-        const groupsListHtml = state.salaryGroups.map(group => `<li data-group-id="${group.id}"><span><strong>${group.name}</strong></span><div class="actions"><button class="btn btn-edit btn-edit-group">Редагувати</button><button class="btn btn-delete btn-delete-group" data-name="${group.name}">Видалити</button></div></li>`).join('');
-        const masterAssignmentHtml = state.masters.map(master => `<li data-master-id="${master.id}"><span>${master.name}</span><div class="actions"><select class="master-group-select"><option value="">Не призначено</option>${salaryGroupOptions}</select></div></li>`).join('');
-        container.innerHTML = `
-            <div class="content-card">
-                <h2>Керування групами зарплат</h2><ul id="salary-groups-list" class="item-list">${groupsListHtml || "<li>Немає створених груп</li>"}</ul>
-                <button id="add-new-group-btn" class="btn" style="margin-top: 1rem;">Створити нову групу</button>
-            </div>
-            <div class="content-card"><h2>Призначення груп майстрам</h2><ul id="master-group-assignment-list" class="item-list">${masterAssignmentHtml}</ul></div>
-            <div class="content-card">
-                <h2>Ручна відправка звіту</h2>
-                <form id="manual-report-form">
-                    <div class="form-row">
-                        <div class="form-group" style="flex:1;"><label for="report-start-date">Дата початку</label><input type="date" id="report-start-date" required></div>
-                        <div class="form-group" style="flex:1;"><label for="report-end-date">Дата кінця</label><input type="date" id="report-end-date" required></div>
-                    </div>
-                    <div class="form-group"><label for="report-salon-filter">Салон</label><select id="report-salon-filter"><option value="all">Всі салони (Разом)</option>${salonOptions}</select></div>
-                    <button type="submit" class="btn">Відправити звіт</button>
-                </form>
-            </div>
-            <div class="content-card">
-                <h2>Зміна паролю</h2>
-                <form id="change-password-form">
-                    <div class="form-group"><label for="new-password">Новий пароль</label><input type="password" id="new-password" required minlength="6" autocomplete="new-password"></div>
-                    <div class="form-group"><label for="confirm-password">Підтвердіть новий пароль</label><input type="password" id="confirm-password" required minlength="6" autocomplete="new-password"></div>
-                    <button type="submit" class="btn">Змінити пароль</button>
-                    <p id="password-change-status" style="margin-top: 1rem; color: var(--gray-text);"></p>
-                </form>
-            </div>`;
+    const salonOptions = state.salons.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+    const salaryGroupOptions = state.salaryGroups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+    const groupsListHtml = state.salaryGroups.map(group => `<li data-group-id="${group.id}"><span><strong>${group.name}</strong></span><div class="actions"><button class="btn btn-edit btn-edit-group">Редагувати</button><button class="btn btn-delete btn-delete-group" data-name="${group.name}">Видалити</button></div></li>`).join('');
+    const masterAssignmentHtml = state.masters.map(master => `<li data-master-id="${master.id}"><span>${master.name}</span><div class="actions"><select class="master-group-select"><option value="">Не призначено</option>${salaryGroupOptions}</select></div></li>`).join('');
+    
+    container.innerHTML = `
+        <div class="content-card">
+            <h2>Керування групами зарплат</h2><ul id="salary-groups-list" class="item-list">${groupsListHtml || "<li>Немає створених груп</li>"}</ul>
+            <button id="add-new-group-btn" class="btn" style="margin-top: 1rem;">Створити нову групу</button>
+        </div>
+        <div class="content-card"><h2>Призначення груп майстрам</h2><ul id="master-group-assignment-list" class="item-list">${masterAssignmentHtml}</ul></div>
+        <div class="content-card">
+            <h2>Ручна відправка звіту</h2>
+            <form id="manual-report-form">
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;"><label for="report-start-date">Дата початку</label><input type="date" id="report-start-date" required></div>
+                    <div class="form-group" style="flex:1;"><label for="report-end-date">Дата кінця</label><input type="date" id="report-end-date" required></div>
+                </div>
+                <div class="form-group"><label for="report-salon-filter">Салон</label><select id="report-salon-filter"><option value="all">Всі салони (Разом)</option>${salonOptions}</select></div>
+                <button type="submit" class="btn">Відправити звіт</button>
+            </form>
+        </div>
+        <div class="content-card">
+            <h2>Зміна паролю</h2>
+            <form id="change-password-form">
+                <div class="form-group"><label for="new-password">Новий пароль</label><input type="password" id="new-password" required minlength="6" autocomplete="new-password"></div>
+                <div class="form-group"><label for="confirm-password">Підтвердіть новий пароль</label><input type="password" id="confirm-password" required minlength="6" autocomplete="new-password"></div>
+                <button type="submit" class="btn">Змінити пароль</button>
+                <p id="password-change-status" style="margin-top: 1rem; color: var(--gray-text);"></p>
+            </form>
+        </div>
         
-        document.getElementById('add-new-group-btn').onclick = () => showSalaryGroupModal();
-        document.querySelectorAll('.btn-edit-group').forEach(btn => { btn.onclick = () => showSalaryGroupModal(btn.closest('li').dataset.groupId); });
-        document.querySelectorAll('.btn-delete-group').forEach(btn => { btn.onclick = () => handleDeleteSalaryGroup(btn.closest('li').dataset.groupId, btn.dataset.name); });
-        document.querySelectorAll('.master-group-select').forEach(select => {
-            const masterId = select.closest('li').dataset.masterId;
-            const master = state.masters.find(m => m.id === masterId);
-            if (master && master.salaryGroupId) { select.value = master.salaryGroupId; }
-            select.onchange = (e) => handleAssignGroupToMaster(masterId, e.target.value);
-        });
-        document.getElementById('manual-report-form').onsubmit = handleManualReport;
-        document.getElementById('change-password-form').onsubmit = handleChangePassword;
+        <div class="modal-overlay" id="salary-group-modal">
+            <div class="modal-panel">
+                <div class="modal-header">
+                    <h2 id="salary-group-modal-title">Група зарплат</h2>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <form id="salary-group-form">
+                    <input type="hidden" id="edit-salary-group-id">
+                    <div class="form-group">
+                        <label for="salary-group-name">Назва групи</label>
+                        <input type="text" id="salary-group-name" required>
+                    </div>
+
+                    <div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem; border: 1px solid #e9ecef; margin-bottom: 1rem;">
+                        <label style="justify-content: flex-start; margin-bottom: 0;">
+                            <input type="checkbox" id="salary-group-deduct-discounts" style="width: auto; height: auto; margin-right: 10px; appearance: auto; -webkit-appearance: auto;">
+                            Розраховувати ЗП з суми після знижки
+                        </label>
+                    </div>
+                    <h3>Рівні зарплат</h3>
+                    <div id="salary-group-tiers-table"></div>
+                    <button type="button" id="add-tier-to-group-btn" class="btn btn-edit" style="margin-bottom: 2rem;">+ Додати рівень</button>
+                    <button type="submit" class="btn" style="width: 100%;">Зберегти групу</button>
+                </form>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('add-new-group-btn').onclick = () => showSalaryGroupModal();
+    document.querySelectorAll('.btn-edit-group').forEach(btn => { btn.onclick = () => showSalaryGroupModal(btn.closest('li').dataset.groupId); });
+    document.querySelectorAll('.btn-delete-group').forEach(btn => { btn.onclick = () => handleDeleteSalaryGroup(btn.closest('li').dataset.groupId, btn.dataset.name); });
+    document.querySelectorAll('.master-group-select').forEach(select => {
+        const masterId = select.closest('li').dataset.masterId;
+        const master = state.masters.find(m => m.id === masterId);
+        if (master && master.salaryGroupId) { select.value = master.salaryGroupId; }
+        select.onchange = (e) => handleAssignGroupToMaster(masterId, e.target.value);
+    });
+    document.getElementById('manual-report-form').onsubmit = handleManualReport;
+    document.getElementById('change-password-form').onsubmit = handleChangePassword;
+
+    // Налаштування для модального вікна, яке тепер входить до складу цього view
+    const salaryGroupModal = document.getElementById('salary-group-modal');
+    if (salaryGroupModal) {
+        salaryGroupModal.querySelector('.close-btn').onclick = () => {
+            salaryGroupModal.style.display = 'none';
+        };
     }
+}
 
     function showSalaryGroupModal(groupId = null) {
-        const modal = document.getElementById('salary-group-modal');
-        if(!modal) return;
-        const form = document.getElementById('salary-group-form');
-        const title = document.getElementById('salary-group-modal-title');
-        form.reset();
-        const group = groupId ? state.salaryGroups.find(g => g.id === groupId) : null;
-        title.textContent = group ? 'Редагувати групу' : 'Створити нову групу';
-        document.getElementById('edit-salary-group-id').value = groupId || '';
-        document.getElementById('salary-group-name').value = group ? group.name : '';
-        renderSalaryGroupTiersInModal(group ? group.tiers : [{ threshold: 0, rate: 0 }]);
-        document.getElementById('add-tier-to-group-btn').onclick = handleAddTierRowToModal;
-        form.onsubmit = handleSaveSalaryGroup;
-        modal.style.display = 'flex';
+    const modal = document.getElementById('salary-group-modal');
+    if(!modal) return;
+    const form = document.getElementById('salary-group-form');
+    const title = document.getElementById('salary-group-modal-title');
+    form.reset();
+    
+    const group = groupId ? state.salaryGroups.find(g => g.id === groupId) : null;
+    
+    title.textContent = group ? 'Редагувати групу' : 'Створити нову групу';
+    document.getElementById('edit-salary-group-id').value = groupId || '';
+    document.getElementById('salary-group-name').value = group ? group.name : '';
+
+    // ОНОВЛЕННЯ: Встановлюємо стан прапорця при редагуванні
+    const deductDiscountsCheckbox = document.getElementById('salary-group-deduct-discounts');
+    if (deductDiscountsCheckbox) {
+        deductDiscountsCheckbox.checked = group ? group.deductDiscounts === true : false;
     }
+    // КІНЕЦЬ ОНОВЛЕННЯ
+
+    renderSalaryGroupTiersInModal(group ? group.tiers : [{ threshold: 0, rate: 0 }]);
+    document.getElementById('add-tier-to-group-btn').onclick = handleAddTierRowToModal;
+    form.onsubmit = handleSaveSalaryGroup;
+    modal.style.display = 'flex';
+}
 
     function renderSalaryGroupTiersInModal(tiers = []) {
         const container = document.getElementById('salary-group-tiers-table');
@@ -4049,40 +4096,42 @@ async function handleHardDeleteCertificate(id, number) { // Повне вида�
     }
 
     async function handleSaveSalaryGroup(event) {
-        event.preventDefault();
-        const groupId = document.getElementById('edit-salary-group-id').value;
-        const name = document.getElementById('salary-group-name').value.trim();
-        if (!name) { return showNotification('Назва групи не може бути порожньою.', "error"); }
-        const tiers = [];
-        document.querySelectorAll('#salary-group-tiers-table .form-row').forEach(row => {
-            const threshold = parseFloat(row.querySelector('.tier-threshold').value);
-            const rate = parseFloat(row.querySelector('.tier-rate').value);
-            if (!isNaN(threshold) && !isNaN(rate)) { tiers.push({ threshold, rate }); }
-        });
-        const data = { name, tiers: tiers.sort((a,b) => a.threshold - b.threshold) };
-        try {
-            if (groupId) {
-                const action = () => updateDoc(doc(db, 'salaryGroups', groupId), data);
-                await logAndExecute('Оновлено групу зарплат', { groupId, name }, action);
-            } else {
-                const action = () => addDoc(collection(db, 'salaryGroups'), data);
-                await logAndExecute('Створено групу зарплат', { name }, action);
-            }
-            const modal = document.getElementById('salary-group-modal');
-            if(modal) modal.style.display = 'none';
-        } catch (e) { showNotification('Не вдалося зберегти групу.', "error"); }
-    }
+    event.preventDefault();
+    const groupId = document.getElementById('edit-salary-group-id').value;
+    const name = document.getElementById('salary-group-name').value.trim();
+    if (!name) { return showNotification('Назва групи не може бути порожньою.', "error"); }
+    
+    const tiers = [];
+    document.querySelectorAll('#salary-group-tiers-table .form-row').forEach(row => {
+        const threshold = parseFloat(row.querySelector('.tier-threshold').value);
+        const rate = parseFloat(row.querySelector('.tier-rate').value);
+        if (!isNaN(threshold) && !isNaN(rate)) { tiers.push({ threshold, rate }); }
+    });
 
-    async function handleDeleteSalaryGroup(groupId, name) {
-        showConfirmWithReasonModal(`Ви впевнені, що хочете видалити групу "${name}"? Майстри, призначені до неї, залишаться без групи.`, async (reason) => {
-            const action = () => deleteDoc(doc(db, 'salaryGroups', groupId));
-            const logDetails = { groupId, name };
-            if (reason) logDetails.reason = reason;
- 
-            try { await logAndExecute('Видалено групу зарплат', logDetails, action); } 
-            catch(e) { showNotification('Не вдалося видалити групу.', "error"); }
-        });
+    // ОНОВЛЕННЯ: Отримуємо та зберігаємо значення прапорця
+    const deductDiscounts = document.getElementById('salary-group-deduct-discounts').checked;
+
+    const data = { 
+        name, 
+        tiers: tiers.sort((a,b) => a.threshold - b.threshold),
+        deductDiscounts: deductDiscounts 
+    };
+    // КІНЕЦЬ ОНОВЛЕННЯ
+    
+    try {
+        if (groupId) {
+            const action = () => updateDoc(doc(db, 'salaryGroups', groupId), data);
+            await logAndExecute('Оновлено групу зарплат', { groupId, name }, action);
+        } else {
+            const action = () => addDoc(collection(db, 'salaryGroups'), data);
+            await logAndExecute('Створено групу зарплат', { name }, action);
+        }
+        const modal = document.getElementById('salary-group-modal');
+        if(modal) modal.style.display = 'none';
+    } catch (e) { 
+        showNotification('Не вдалося зберегти групу.', "error");
     }
+}
     
     async function handleAssignGroupToMaster(masterId, groupId) {
         const master = state.masters.find(m => m.id === masterId);
