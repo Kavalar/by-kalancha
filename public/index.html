@@ -1340,7 +1340,6 @@
 
     // --- ПОЧАТОК ВИПРАВЛЕНОГО КОДУ ---
 async function renderDailySummary() {
-    // Отримуємо всі необхідні елементи на самому початку
     const dateInput = document.getElementById('summary-date-picker');
     const salonInput = document.getElementById('summary-salon-filter');
     const advancesEl = document.getElementById('summary-advances');
@@ -1351,133 +1350,78 @@ async function renderDailySummary() {
     const cardEl = document.getElementById('summary-card');
     const blikEl = document.getElementById('summary-blik');
     const servicesCountEl = document.getElementById('summary-services-count');
-
-    // Надійна перевірка: якщо хоча б одного елемента немає, виходимо з функції
+    
     if (!dateInput || !salonInput || !advancesEl || !salonExpensesEl || !productSalesEl || !totalEl || !cashEl || !cardEl || !blikEl || !servicesCountEl) {
         return;
     }
 
-    const selectedDate = new Date(dateInput.value);
+    const selectedDateStr = dateInput.value;
     const selectedSalonId = salonInput.value;
-    const startOfDay = new Date(selectedDate);
+    const startOfDay = new Date(selectedDateStr);
     startOfDay.setHours(0, 0, 0, 0);
-    
-    const endOfDay = new Date(selectedDate);
+    const endOfDay = new Date(selectedDateStr);
     endOfDay.setHours(23, 59, 59, 999);
 
-    let relevantAppointments = state.appointments.filter(app => {
-        if (!app.dateTime) return false;
-        const appointmentDate = app.dateTime.toDate();
-        return appointmentDate >= startOfDay && appointmentDate <= endOfDay;
-    });
-    if (selectedSalonId !== 'all') {
-        relevantAppointments = relevantAppointments.filter(app => app.salonId === selectedSalonId);
-    }
+    // Показуємо завантаження
+    totalEl.textContent = '...';
+    cashEl.textContent = '...';
+    cardEl.textContent = '...';
+    blikEl.textContent = '...';
+    productSalesEl.textContent = '...';
+    servicesCountEl.textContent = '...';
 
-    let total = 0, cash = 0, card = 0, blik = 0;
-    let servicesWithPayment = 0;
-
-    relevantAppointments.forEach(app => {
-        if (app.payments && app.payments.length > 0) {
-            servicesWithPayment++;
-            app.payments.forEach(p => {
-                if (p.type !== 'settlement' && p.type !== 'certificate') {
-                    total += p.amount;
-                    if(p.type === 'cash') cash += p.amount;
-                    else if(p.type === 'card') card += p.amount;
-                    else if(p.type === 'blik') blik += p.amount;
-                }
-            });
-         }
-    });
-    
-    let productSalesCash = 0, productSalesCard = 0, productSalesBlik = 0;
-    let filteredProductSales = state.productSales.filter(s => {
-        if (!s.timestamp && !s.date) return false;
-        const saleDate = (s.timestamp || s.date).toDate();
-        return saleDate >= startOfDay && saleDate <= endOfDay;
-    });
-    if (selectedSalonId !== 'all') {
-        filteredProductSales = filteredProductSales.filter(s => s.salonId === selectedSalonId);
-    }
-
-    filteredProductSales.forEach(sale => {
-        if (sale.paymentType === 'cash') productSalesCash += sale.amount;
-        else if (sale.paymentType === 'card') productSalesCard += sale.amount;
-        else if (sale.paymentType === 'blik') productSalesBlik += sale.amount;
-    });
-    const totalProductSales = productSalesCash + productSalesCard + productSalesBlik;
-    total += totalProductSales;
-    cash += productSalesCash;
-    card += productSalesCard;
-    blik += productSalesBlik;
-    
-    // --- ОСНОВНЕ ВИПРАВЛЕННЯ ЛОГІКИ АВАНСІВ ---
-    let totalAdvances = 0;
     try {
-        const masterAdvancePromises = [];
-        const staffAdvancePromises = [];
+        // Викликаємо нову хмарну функцію для точного розрахунку доходу
+        const calculateSummary = httpsCallable(functions, 'calculateDailySummary');
+        const summaryResult = await calculateSummary({ date: selectedDateStr, salonId: selectedSalonId });
+        const summary = summaryResult.data;
 
-        // 1. Отримуємо аванси для майстрів
-        // Спочатку фільтруємо майстрів, щоб не робити зайвих запитів
-        const relevantMasters = state.masters.filter(m => selectedSalonId === 'all' || m.salonIds?.includes(selectedSalonId));
-        relevantMasters.forEach(master => {
-            const q = query(collection(db, 'masters', master.id, 'advances'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
-            masterAdvancePromises.push(getDocs(q));
-        });
+        totalEl.textContent = `${summary.total.toFixed(0)} zł`;
+        cashEl.textContent = `${summary.cash.toFixed(0)} zł`;
+        cardEl.textContent = `${summary.card.toFixed(0)} zł`;
+        blikEl.textContent = `${summary.blik.toFixed(0)} zł`;
+        productSalesEl.textContent = `${summary.productSales.toFixed(0)} zł`;
+        servicesCountEl.textContent = summary.servicesCount;
 
-        const masterAdvanceSnapshots = await Promise.all(masterAdvancePromises);
-        masterAdvanceSnapshots.forEach(snap => {
+        // --- Розрахунок витрат і авансів залишається на фронтенді, оскільки їх небагато ---
+        let totalAdvances = 0;
+        const masterAdvancePromises = state.masters
+            .filter(m => selectedSalonId === 'all' || m.salonIds?.includes(selectedSalonId))
+            .map(master => getDocs(query(collection(db, 'masters', master.id, 'advances'), where('date', '>=', startOfDay), where('date', '<=', endOfDay))));
+        
+        const staffAdvancePromises = state.staff
+            .filter(p => selectedSalonId === 'all' || p.salonId === selectedSalonId)
+            .map(person => getDocs(query(collection(db, 'staff', person.id, 'advances'), where('date', '>=', startOfDay), where('date', '<=', endOfDay))));
+
+        const allAdvanceSnapshots = await Promise.all([...masterAdvancePromises, ...staffAdvancePromises]);
+        allAdvanceSnapshots.forEach(snap => {
             snap.forEach(doc => {
                 const advanceData = doc.data();
-                // Критична перевірка: додаємо суму, тільки якщо salonId авансу співпадає з обраним у фільтрі
-                if (selectedSalonId === 'all' || advanceData.salonId === selectedSalonId) {
+                if (selectedSalonId === 'all' || advanceData.salonId === selectedSalonId || !doc.ref.path.includes('masters/')) {
                     totalAdvances += advanceData.amount;
                 }
             });
         });
+        advancesEl.textContent = `-${totalAdvances.toFixed(0)} zł`;
 
-        // 2. Отримуємо аванси для персоналу
-        // Для персоналу логіка простіша, оскільки вони прив'язані до одного салону
-        const relevantStaff = state.staff.filter(p => selectedSalonId === 'all' || p.salonId === selectedSalonId);
-        relevantStaff.forEach(person => {
-            const q = query(collection(db, 'staff', person.id, 'advances'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
-            staffAdvancePromises.push(getDocs(q));
+        let totalSalonExpenses = 0;
+        let filteredSalonExpenses = state.salonExpenses.filter(e => {
+            const expenseDate = (e.timestamp || e.date)?.toDate();
+            return expenseDate && expenseDate >= startOfDay && expenseDate <= endOfDay;
         });
-        
-        const staffAdvanceSnapshots = await Promise.all(staffAdvancePromises);
-        staffAdvanceSnapshots.forEach(snap => {
-            snap.forEach(doc => {
-                totalAdvances += doc.data().amount;
-            });
+        if (selectedSalonId !== 'all') {
+            filteredSalonExpenses = filteredSalonExpenses.filter(e => e.salonId === selectedSalonId);
+        }
+        filteredSalonExpenses.forEach(expense => {
+            totalSalonExpenses += expense.amount;
         });
+        salonExpensesEl.textContent = `-${totalSalonExpenses.toFixed(0)} zł`;
 
-    } catch (e) {
-        console.error("Помилка завантаження авансів для підсумку:", e);
+    } catch (error) {
+        console.error("Помилка розрахунку підсумку за день:", error);
+        totalEl.textContent = `Помилка`;
+        showNotification(`Не вдалося завантажити підсумок: ${error.message}`, 'error');
     }
-    // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
-
-    let totalSalonExpenses = 0;
-    let filteredSalonExpenses = state.salonExpenses.filter(e => {
-        if (!e.timestamp && !e.date) return false;
-        const expenseDate = (e.timestamp || e.date).toDate();
-        return expenseDate >= startOfDay && expenseDate <= endOfDay;
-    });
-    if (selectedSalonId !== 'all') {
-        filteredSalonExpenses = filteredSalonExpenses.filter(e => e.salonId === selectedSalonId);
-    }
-    
-    filteredSalonExpenses.forEach(expense => {
-        totalSalonExpenses += expense.amount;
-    });
-    totalEl.textContent = `${total.toFixed(0)} zł`;
-    cashEl.textContent = `${cash.toFixed(0)} zł`;
-    cardEl.textContent = `${card.toFixed(0)} zł`;
-    blikEl.textContent = `${blik.toFixed(0)} zł`;
-    advancesEl.textContent = `-${totalAdvances.toFixed(0)} zł`;
-    salonExpensesEl.textContent = `-${totalSalonExpenses.toFixed(0)} zł`;
-    productSalesEl.textContent = `${totalProductSales.toFixed(0)} zł`;
-    servicesCountEl.textContent = servicesWithPayment;
 }
 
     // #region Calendar View & Modals
