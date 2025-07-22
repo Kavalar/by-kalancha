@@ -1410,42 +1410,32 @@ async function renderDailySummary() {
     let totalAdvances = 0;
 const advancesEl = document.getElementById('summary-advances');
 try {
-    const advancePromises = [];
-    const salonIdForFilter = state.user.role === 'salon_admin' ? state.user.salonId : selectedSalonId;
+        let advancesQuery = query(collectionGroup(db, 'advances'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
 
-    if (salonIdForFilter === 'all') {
-        advancesEl.textContent = '- zł';
-        return; 
-    }
+        // Визначаємо ID салону для фільтрації
+        const salonIdForFilter = selectedSalonId === 'all' && state.user.role === 'admin' 
+            ? 'all' 
+            : (state.user.role === 'salon_admin' ? state.user.salonId : selectedSalonId);
 
-    const mastersForSalon = state.masters.filter(m => m.salonIds && m.salonIds.includes(salonIdForFilter));
-    const staffForSalon = state.staff.filter(p => p.salonId === salonIdForFilter);
-
-    mastersForSalon.forEach(master => {
-        const q = query(collection(db, 'masters', master.id, 'advances'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
-        advancePromises.push(getDocs(q));
-    });
-
-    staffForSalon.forEach(person => {
-        const q = query(collection(db, 'staff', person.id, 'advances'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
-        advancePromises.push(getDocs(q));
-    });
-
-    const querySnapshots = await Promise.all(advancePromises);
-    querySnapshots.forEach(snap => {
-        snap.forEach(doc => {
-            if (doc.data().salonId === salonIdForFilter) {
-                totalAdvances += doc.data().amount;
-            }
+        // Якщо ми не дивимось "Всі салони", додаємо фільтр
+        if (salonIdForFilter !== 'all') {
+            advancesQuery = query(advancesQuery, where('salonId', '==', salonIdForFilter));
+        }
+        
+        const advancesSnap = await getDocs(advancesQuery);
+        let totalAdvances = 0; // Перемістив ініціалізацію сюди
+        advancesSnap.forEach(doc => {
+            totalAdvances += doc.data().amount;
         });
-    });
 
-    advancesEl.textContent = `-${totalAdvances.toFixed(0)} zł`;
+        // 'advancesEl' вже існує, тому просто використовуємо його
+        advancesEl.textContent = `-${totalAdvances.toFixed(0)} zł`;
 
-} catch (e) {
-    console.error("Помилка завантаження авансів для підсумку:", e);
-    if(advancesEl) advancesEl.textContent = 'Помилка';
-}
+    } catch (e) {
+        console.error("Помилка завантаження авансів для підсумку:", e);
+        const advancesEl = document.getElementById('summary-advances');
+        if(advancesEl) advancesEl.textContent = 'Помилка';
+    }
 
     let totalSalonExpenses = 0;
     let filteredSalonExpenses = state.salonExpenses.filter(e => {
