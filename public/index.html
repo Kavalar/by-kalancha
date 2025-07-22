@@ -1335,6 +1335,7 @@ async function renderDailySummary() {
     // Отримуємо всі необхідні елементи на самому початку
     const dateInput = document.getElementById('summary-date-picker');
     const salonInput = document.getElementById('summary-salon-filter');
+    const advancesEl = document.getElementById('summary-advances');
     const salonExpensesEl = document.getElementById('summary-salon-expenses');
     const productSalesEl = document.getElementById('summary-product-sales');
     const totalEl = document.getElementById('summary-total');
@@ -1407,8 +1408,7 @@ async function renderDailySummary() {
     blik += productSalesBlik;
     
     let totalAdvances = 0;
-const advancesEl = document.getElementById('summary-advances');
-try {
+    try {
         let advancesQuery = query(collectionGroup(db, 'advances'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
 
         const salonIdForFilter = selectedSalonId === 'all' && state.user.role === 'admin' 
