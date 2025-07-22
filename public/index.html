@@ -590,6 +590,7 @@
                 <h1>Lashroom CRM</h1>
                 <ul>
                     <li data-view="calendar">Календар</li>
+                    <li data-view="detailedReport">Детальний звіт</li>
                     <li data-view="appointments">Запис</li>
                     <li data-view="clients">Клієнти</li>
                     <li data-view="services">Послуги</li>
@@ -739,6 +740,7 @@
         if(!contentWrapper) return;
         switch (viewName) {
             case 'calendar': renderCalendarView(contentWrapper); break;
+            case 'detailedReport': renderDetailedReportView(contentWrapper); break;
             case 'appointments': renderAppointmentsView(contentWrapper); break;
             case 'clients': renderClientsView(contentWrapper); break;
             case 'clientDetail': renderClientDetailView(contentWrapper); break;
@@ -1570,6 +1572,149 @@ async function renderDailySummary() {
         summarySalonFilter.onchange = () => renderDailySummary();
         renderDailySummary();
         
+    }
+    // --- НОВИЙ РОЗДІЛ: ДЕТАЛЬНИЙ ЗВІТ ПО ЗАПИСАХ ---
+    function renderDetailedReportView(container) {
+        const today = new Date().toISOString().split('T')[0];
+        container.innerHTML = `
+            <div class="content-card">
+                <h2>Детальний звіт по записах</h2>
+                <p>Оберіть період для перегляду всіх оплат по процедурах.</p>
+                <div class="form-row" style="margin-bottom: 2rem;">
+                    <div class="form-group" style="flex:1;">
+                        <label for="report-start-date">З</label>
+                        <input type="date" id="report-start-date" value="${today}">
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label for="report-end-date">По</label>
+                        <input type="date" id="report-end-date" value="${today}">
+                    </div>
+                </div>
+                <div id="report-summary" class="summary-grid" style="margin-bottom: 2rem;"></div>
+                <div style="max-height: 600px; overflow-y: auto;">
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>Дата</th>
+                                <th>Клієнт</th>
+                                <th>Послуга</th>
+                                <th>Майстер</th>
+                                <th>Сума</th>
+                                <th>Деталі оплати</th>
+                            </tr>
+                        </thead>
+                        <tbody id="report-table-body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        const startDateInput = document.getElementById('report-start-date');
+        const endDateInput = document.getElementById('report-end-date');
+
+        const generateReport = () => {
+            const start = new Date(startDateInput.value + 'T00:00:00.000Z');
+            const end = new Date(endDateInput.value + 'T23:59:59.999Z');
+
+            const filteredAppointments = state.appointments.filter(app => {
+                if (!app.dateTime || !app.payments || app.payments.length === 0) return false;
+                const appDate = app.dateTime.toDate();
+                return appDate >= start && appDate <= end;
+            });
+
+            let totalCash = 0, totalCard = 0, totalBlik = 0, totalCertificate = 0, totalSettlement = 0;
+            let cashCount = 0, cardCount = 0, blikCount = 0, mixedCount = 0, certCount = 0;
+
+            const tableBody = document.getElementById('report-table-body');
+            if (filteredAppointments.length === 0) {
+                tableBody.innerHTML = '<tr class="empty-row"><td colspan="6">За обраний період немає оплат.</td></tr>';
+                document.getElementById('report-summary').innerHTML = '';
+                return;
+            }
+
+            const tableHtml = filteredAppointments.sort((a,b) => b.dateTime.toDate() - a.dateTime.toDate()).map(app => {
+                const service = state.services.find(s => s.id === app.serviceId)?.name || 'Н/Д';
+                const master = state.masters.find(m => m.id === app.masterId)?.name || 'Н/Д';
+                const date = app.dateTime.toDate().toLocaleString('uk-UA');
+
+                let paymentDetails = [];
+                let paymentTypesInApp = new Set();
+
+                app.payments.forEach(p => {
+                    let typeStr = '';
+                    switch (p.type) {
+                        case 'cash':
+                            totalCash += p.amount;
+                            typeStr = 'Готівка';
+                            paymentTypesInApp.add('cash');
+                            break;
+                        case 'card':
+                            totalCard += p.amount;
+                            typeStr = 'Картка';
+                            paymentTypesInApp.add('card');
+                            break;
+                        case 'blik':
+                            totalBlik += p.amount;
+                            typeStr = 'Blik';
+                            paymentTypesInApp.add('blik');
+                            break;
+                        case 'certificate':
+                            totalCertificate += p.amount;
+                            typeStr = 'Сертифікат';
+                            paymentTypesInApp.add('certificate');
+                            break;
+                        case 'settlement':
+                            totalSettlement += p.amount;
+                            typeStr = 'Взаєморозрахунок';
+                            break;
+                    }
+                    if (typeStr) {
+                        paymentDetails.push(`${p.amount.toFixed(2)} zł (${typeStr})`);
+                    }
+                });
+                
+                if (paymentTypesInApp.size > 1) {
+                    mixedCount++;
+                } else if (paymentTypesInApp.has('cash')) {
+                    cashCount++;
+                } else if (paymentTypesInApp.has('card')) {
+                    cardCount++;
+                } else if (paymentTypesInApp.has('blik')) {
+                    blikCount++;
+                } else if (paymentTypesInApp.has('certificate')) {
+                    certCount++;
+                }
+
+
+                return `
+                    <tr>
+                        <td>${date}</td>
+                        <td>${app.clientName}</td>
+                        <td>${service}</td>
+                        <td>${master}</td>
+                        <td><strong>${app.totalPaid.toFixed(2)} zł</strong></td>
+                        <td>${paymentDetails.join('<br>')}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            tableBody.innerHTML = tableHtml;
+
+            const summaryHtml = `
+                <div class="summary-card"><div class="value">${totalCash.toFixed(2)} zł</div><div class="label">💵 Готівкою (${cashCount} оплат)</div></div>
+                <div class="summary-card"><div class="value">${totalCard.toFixed(2)} zł</div><div class="label">💳 Карткою (${cardCount} оплат)</div></div>
+                <div class="summary-card"><div class="value">${totalBlik.toFixed(2)} zł</div><div class="label">📱 Blik (${blikCount} оплат)</div></div>
+                <div class="summary-card"><div class="value">${mixedCount}</div><div class="label">🔄️ Змішаних оплат</div></div>
+                <div class="summary-card"><div class="value">${totalCertificate.toFixed(2)} zł</div><div class="label">🎁 Сертифікатами (${certCount} оплат)</div></div>
+                <div class="summary-card"><div class="value">${totalSettlement.toFixed(2)} zł</div><div class="label">🤝 Взаєморозрахунок</div></div>
+            `;
+            document.getElementById('report-summary').innerHTML = summaryHtml;
+        };
+
+        startDateInput.onchange = generateReport;
+        endDateInput.onchange = generateReport;
+        generateReport(); // Запустити звіт для сьогоднішньої дати одразу
     }
 
     function showActionModal(appointment) {
