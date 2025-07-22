@@ -1412,18 +1412,16 @@ const advancesEl = document.getElementById('summary-advances');
 try {
         let advancesQuery = query(collectionGroup(db, 'advances'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
 
-        // Визначаємо ID салону для фільтрації
         const salonIdForFilter = selectedSalonId === 'all' && state.user.role === 'admin' 
             ? 'all' 
             : (state.user.role === 'salon_admin' ? state.user.salonId : selectedSalonId);
 
-        // Якщо ми не дивимось "Всі салони", додаємо фільтр
         if (salonIdForFilter !== 'all') {
             advancesQuery = query(advancesQuery, where('salonId', '==', salonIdForFilter));
         }
         
         const advancesSnap = await getDocs(advancesQuery);
-        let totalAdvances = 0; // Перемістив ініціалізацію сюди
+        let totalAdvances = 0;
         advancesSnap.forEach(doc => {
             totalAdvances += doc.data().amount;
         });
@@ -1433,7 +1431,7 @@ try {
 
     } catch (e) {
         console.error("Помилка завантаження авансів для підсумку:", e);
-        const advancesEl = document.getElementById('summary-advances');
+        // 'advancesEl' вже існує, НЕ оголошуємо його знову
         if(advancesEl) advancesEl.textContent = 'Помилка';
     }
 
