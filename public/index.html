@@ -1574,13 +1574,21 @@ async function renderDailySummary() {
         
     }
     // --- НОВИЙ РОЗДІЛ: ДЕТАЛЬНИЙ ЗВІТ ПО ЗАПИСАХ ---
+    // --- ОНОВЛЕНА ВЕРСІЯ: ДЕТАЛЬНИЙ ЗВІТ ПО ЗАПИСАХ З ФІЛЬТРОМ САЛОНІВ ---
     function renderDetailedReportView(container) {
         const today = new Date().toISOString().split('T')[0];
+        
+        // Готуємо HTML для випадаючого списку салонів
+        let salonOptionsHtml = '<option value="all">Всі салони</option>';
+        state.salons.forEach(s => {
+            salonOptionsHtml += `<option value="${s.id}">${s.name}</option>`;
+        });
+
         container.innerHTML = `
             <div class="content-card">
                 <h2>Детальний звіт по записах</h2>
-                <p>Оберіть період для перегляду всіх оплат по процедурах.</p>
-                <div class="form-row" style="margin-bottom: 2rem;">
+                <p>Оберіть період та салон для перегляду всіх оплат по процедурах.</p>
+                <div class="form-row" style="margin-bottom: 2rem; align-items: flex-end;">
                     <div class="form-group" style="flex:1;">
                         <label for="report-start-date">З</label>
                         <input type="date" id="report-start-date" value="${today}">
@@ -1588,6 +1596,10 @@ async function renderDailySummary() {
                     <div class="form-group" style="flex:1;">
                         <label for="report-end-date">По</label>
                         <input type="date" id="report-end-date" value="${today}">
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label for="report-salon-filter">Салон</label>
+                        <select id="report-salon-filter">${salonOptionsHtml}</select>
                     </div>
                 </div>
                 <div id="report-summary" class="summary-grid" style="margin-bottom: 2rem;"></div>
@@ -1612,23 +1624,37 @@ async function renderDailySummary() {
 
         const startDateInput = document.getElementById('report-start-date');
         const endDateInput = document.getElementById('report-end-date');
+        const salonFilter = document.getElementById('report-salon-filter');
+
+        // Логіка для обмеження доступу адміністратора салону
+        if (state.user.role === 'salon_admin') {
+            salonFilter.value = state.user.salonId;
+            salonFilter.disabled = true;
+        }
 
         const generateReport = () => {
             const start = new Date(startDateInput.value + 'T00:00:00.000Z');
             const end = new Date(endDateInput.value + 'T23:59:59.999Z');
+            const selectedSalonId = salonFilter.value;
 
-            const filteredAppointments = state.appointments.filter(app => {
+            // Початкова фільтрація по даті та наявності оплат
+            let filteredAppointments = state.appointments.filter(app => {
                 if (!app.dateTime || !app.payments || app.payments.length === 0) return false;
                 const appDate = app.dateTime.toDate();
                 return appDate >= start && appDate <= end;
             });
+
+            // Додаткова фільтрація по салону
+            if (selectedSalonId !== 'all') {
+                filteredAppointments = filteredAppointments.filter(app => app.salonId === selectedSalonId);
+            }
 
             let totalCash = 0, totalCard = 0, totalBlik = 0, totalCertificate = 0, totalSettlement = 0;
             let cashCount = 0, cardCount = 0, blikCount = 0, mixedCount = 0, certCount = 0;
 
             const tableBody = document.getElementById('report-table-body');
             if (filteredAppointments.length === 0) {
-                tableBody.innerHTML = '<tr class="empty-row"><td colspan="6">За обраний період немає оплат.</td></tr>';
+                tableBody.innerHTML = '<tr class="empty-row"><td colspan="6">За обраними фільтрами немає оплат.</td></tr>';
                 document.getElementById('report-summary').innerHTML = '';
                 return;
             }
@@ -1686,7 +1712,6 @@ async function renderDailySummary() {
                     certCount++;
                 }
 
-
                 return `
                     <tr>
                         <td>${date}</td>
@@ -1714,7 +1739,9 @@ async function renderDailySummary() {
 
         startDateInput.onchange = generateReport;
         endDateInput.onchange = generateReport;
-        generateReport(); // Запустити звіт для сьогоднішньої дати одразу
+        salonFilter.onchange = generateReport; // Додаємо обробник для нового фільтра
+        
+        generateReport(); // Запустити звіт одразу при завантаженні сторінки
     }
 
     function showActionModal(appointment) {
