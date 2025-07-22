@@ -297,8 +297,16 @@
             </div>
             <h3>Рівні зарплат</h3>
             <div id="salary-group-tiers-table"></div>
-            <button type="button" id="add-tier-to-group-btn" class="btn btn-edit" style="margin-bottom: 2rem;">+ Додати рівень</button>
-            <button type="submit" class="btn" style="width: 100%;">Зберегти групу</button>
+            <button type="button" id="add-tier-to-group-btn" class="btn btn-edit" style="margin-bottom: 1rem;">+ Додати рівень</button>
+            
+            <div class="form-group category-checkbox-group" style="max-height: none; padding: 0.5rem; margin-top: 1rem;">
+                <label>
+                    <input type="checkbox" id="salary-group-from-final-price"> 
+                    Розрахунок від фінальної ціни (після знижок)
+                </label>
+            </div>
+
+            <button type="submit" class="btn" style="width: 100%; margin-top: 1rem;">Зберегти групу</button>
         </form>
     </div>
 </div>
@@ -4173,6 +4181,10 @@ async function handleHardDeleteCertificate(id, number) { // Повне вида�
         title.textContent = group ? 'Редагувати групу' : 'Створити нову групу';
         document.getElementById('edit-salary-group-id').value = groupId || '';
         document.getElementById('salary-group-name').value = group ? group.name : '';
+        
+        // Встановлюємо стан галочки при відкритті вікна
+        document.getElementById('salary-group-from-final-price').checked = group ? group.calculateFromFinalPrice || false : false;
+        
         renderSalaryGroupTiersInModal(group ? group.tiers : [{ threshold: 0, rate: 0 }]);
         document.getElementById('add-tier-to-group-btn').onclick = handleAddTierRowToModal;
         form.onsubmit = handleSaveSalaryGroup;
@@ -4213,13 +4225,23 @@ async function handleHardDeleteCertificate(id, number) { // Повне вида�
         const groupId = document.getElementById('edit-salary-group-id').value;
         const name = document.getElementById('salary-group-name').value.trim();
         if (!name) { return showNotification('Назва групи не може бути порожньою.', "error"); }
+        
         const tiers = [];
         document.querySelectorAll('#salary-group-tiers-table .form-row').forEach(row => {
             const threshold = parseFloat(row.querySelector('.tier-threshold').value);
             const rate = parseFloat(row.querySelector('.tier-rate').value);
             if (!isNaN(threshold) && !isNaN(rate)) { tiers.push({ threshold, rate }); }
         });
-        const data = { name, tiers: tiers.sort((a,b) => a.threshold - b.threshold) };
+
+        // Отримуємо значення з нової галочки
+        const calculateFromFinalPrice = document.getElementById('salary-group-from-final-price').checked;
+        
+        const data = { 
+            name, 
+            tiers: tiers.sort((a,b) => a.threshold - b.threshold),
+            calculateFromFinalPrice // Додаємо нове поле
+        };
+
         try {
             if (groupId) {
                 const action = () => updateDoc(doc(db, 'salaryGroups', groupId), data);
