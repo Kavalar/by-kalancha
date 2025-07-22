@@ -1408,26 +1408,44 @@ async function renderDailySummary() {
     blik += productSalesBlik;
     
     let totalAdvances = 0;
-    try {
-        // Єдиний, правильний collectionGroup-запит для 'advances'
-        let advancesQuery = query(collectionGroup(db, 'advances'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
+const advancesEl = document.getElementById('summary-advances');
+try {
+    const advancePromises = [];
+    const salonIdForFilter = state.user.role === 'salon_admin' ? state.user.salonId : selectedSalonId;
 
-        // Якщо обрано конкретний салон, додаємо фільтр по salonId
-        if (selectedSalonId && selectedSalonId !== 'all') {
-            advancesQuery = query(advancesQuery, where('salonId', '==', selectedSalonId));
-        }
-
-        const advancesSnap = await getDocs(advancesQuery);
-
-        advancesSnap.forEach(doc => {
-            totalAdvances += doc.data().amount;
-        });
-
-    } catch (e) {
-        console.error("Помилка завантаження авансів для підсумку:", e);
-        // Можна також оновити UI, щоб показати помилку
-        advancesEl.textContent = 'Помилка';
+    if (salonIdForFilter === 'all') {
+        advancesEl.textContent = '- zł';
+        return; 
     }
+
+    const mastersForSalon = state.masters.filter(m => m.salonIds && m.salonIds.includes(salonIdForFilter));
+    const staffForSalon = state.staff.filter(p => p.salonId === salonIdForFilter);
+
+    mastersForSalon.forEach(master => {
+        const q = query(collection(db, 'masters', master.id, 'advances'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
+        advancePromises.push(getDocs(q));
+    });
+
+    staffForSalon.forEach(person => {
+        const q = query(collection(db, 'staff', person.id, 'advances'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
+        advancePromises.push(getDocs(q));
+    });
+
+    const querySnapshots = await Promise.all(advancePromises);
+    querySnapshots.forEach(snap => {
+        snap.forEach(doc => {
+            if (doc.data().salonId === salonIdForFilter) {
+                totalAdvances += doc.data().amount;
+            }
+        });
+    });
+
+    advancesEl.textContent = `-${totalAdvances.toFixed(0)} zł`;
+
+} catch (e) {
+    console.error("Помилка завантаження авансів для підсумку:", e);
+    if(advancesEl) advancesEl.textContent = 'Помилка';
+}
 
     let totalSalonExpenses = 0;
     let filteredSalonExpenses = state.salonExpenses.filter(e => {
