@@ -1575,10 +1575,10 @@ async function renderDailySummary() {
     }
     // --- НОВИЙ РОЗДІЛ: ДЕТАЛЬНИЙ ЗВІТ ПО ЗАПИСАХ ---
     // --- ОНОВЛЕНА ВЕРСІЯ: ДЕТАЛЬНИЙ ЗВІТ ПО ЗАПИСАХ З ФІЛЬТРОМ САЛОНІВ ---
+    // --- ФІНАЛЬНА ВЕРСІЯ: Детальний звіт по дню процедури (локальний час) ---
     function renderDetailedReportView(container) {
         const today = new Date().toISOString().split('T')[0];
         
-        // Готуємо HTML для випадаючого списку салонів
         let salonOptionsHtml = '<option value="all">Всі салони</option>';
         state.salons.forEach(s => {
             salonOptionsHtml += `<option value="${s.id}">${s.name}</option>`;
@@ -1601,13 +1601,24 @@ async function renderDailySummary() {
                         <label for="report-salon-filter">Салон</label>
                         <select id="report-salon-filter">${salonOptionsHtml}</select>
                     </div>
+                    <div class="form-group" style="flex:1;">
+                        <label for="report-payment-filter">Тип оплати</label>
+                        <select id="report-payment-filter">
+                            <option value="all">Всі типи</option>
+                            <option value="cash">Готівка</option>
+                            <option value="card">Картка</option>
+                            <option value="blik">Blik</option>
+                            <option value="mixed">Змішані</option>
+                            <option value="certificate">Сертифікат</option>
+                        </select>
+                    </div>
                 </div>
                 <div id="report-summary" class="summary-grid" style="margin-bottom: 2rem;"></div>
                 <div style="max-height: 600px; overflow-y: auto;">
                     <table class="report-table">
                         <thead>
                             <tr>
-                                <th>Дата</th>
+                                <th>Дата процедури</th>
                                 <th>Клієнт</th>
                                 <th>Послуга</th>
                                 <th>Майстер</th>
@@ -1625,106 +1636,92 @@ async function renderDailySummary() {
         const startDateInput = document.getElementById('report-start-date');
         const endDateInput = document.getElementById('report-end-date');
         const salonFilter = document.getElementById('report-salon-filter');
+        const paymentFilter = document.getElementById('report-payment-filter');
 
-        // Логіка для обмеження доступу адміністратора салону
         if (state.user.role === 'salon_admin') {
             salonFilter.value = state.user.salonId;
             salonFilter.disabled = true;
         }
 
         const generateReport = () => {
-            const start = new Date(startDateInput.value + 'T00:00:00.000Z');
-            const end = new Date(endDateInput.value + 'T23:59:59.999Z');
-            const selectedSalonId = salonFilter.value;
+            // Створюємо дати для фільтра на основі локального часу браузера
+            const start = new Date(startDateInput.value);
+            start.setHours(0, 0, 0, 0);
 
-            // Початкова фільтрація по даті та наявності оплат
+            const end = new Date(endDateInput.value);
+            end.setHours(23, 59, 59, 999);
+
+            const selectedSalonId = salonFilter.value;
+            const selectedPaymentType = paymentFilter.value;
+
+            // Фільтруємо записи за ДАТОЮ ПРОЦЕДУРИ
             let filteredAppointments = state.appointments.filter(app => {
-                if (!app.dateTime || !app.payments || app.payments.length === 0) return false;
+                if (!app.dateTime) return false; // Пропускаємо записи без дати
                 const appDate = app.dateTime.toDate();
                 return appDate >= start && appDate <= end;
             });
 
-            // Додаткова фільтрація по салону
+            // Додаткові фільтри
             if (selectedSalonId !== 'all') {
                 filteredAppointments = filteredAppointments.filter(app => app.salonId === selectedSalonId);
             }
+            
+            // Фільтруємо по оплатах ТІЛЬКИ для відображення, а не для підрахунку
+            let finalAppointmentsToShow = filteredAppointments.filter(app => app.payments && app.payments.length > 0);
 
-            let totalCash = 0, totalCard = 0, totalBlik = 0, totalCertificate = 0, totalSettlement = 0;
-            let cashCount = 0, cardCount = 0, blikCount = 0, mixedCount = 0, certCount = 0;
-
-            const tableBody = document.getElementById('report-table-body');
-            if (filteredAppointments.length === 0) {
-                tableBody.innerHTML = '<tr class="empty-row"><td colspan="6">За обраними фільтрами немає оплат.</td></tr>';
-                document.getElementById('report-summary').innerHTML = '';
-                return;
+            if (selectedPaymentType !== 'all') {
+                finalAppointmentsToShow = finalAppointmentsToShow.filter(app => {
+                    const paymentTypes = new Set(app.payments.map(p => p.type));
+                    if (selectedPaymentType === 'mixed') {
+                        return paymentTypes.size > 1;
+                    }
+                    return paymentTypes.has(selectedPaymentType);
+                });
             }
 
-            const tableHtml = filteredAppointments.sort((a,b) => b.dateTime.toDate() - a.dateTime.toDate()).map(app => {
-                const service = state.services.find(s => s.id === app.serviceId)?.name || 'Н/Д';
-                const master = state.masters.find(m => m.id === app.masterId)?.name || 'Н/Д';
-                const date = app.dateTime.toDate().toLocaleString('uk-UA');
+            // Підрахунок підсумків ведеться по всіх відфільтрованих по даті записах
+            let totalCash = 0, totalCard = 0, totalBlik = 0, totalCertificate = 0, totalSettlement = 0;
+            let cashCount = 0, cardCount = 0, blikCount = 0, mixedCount = 0, certCount = 0;
+            
+            filteredAppointments.forEach(app => {
+                if(app.payments && app.payments.length > 0) {
+                    const paymentTypesForCount = new Set(app.payments.map(p => p.type).filter(t => t !== 'settlement'));
+                    if (paymentTypesForCount.size > 1) mixedCount++;
+                    else if (paymentTypesForCount.has('cash')) cashCount++;
+                    else if (paymentTypesForCount.has('card')) cardCount++;
+                    else if (paymentTypesForCount.has('blik')) blikCount++;
+                    else if (paymentTypesForCount.has('certificate')) certCount++;
 
-                let paymentDetails = [];
-                let paymentTypesInApp = new Set();
-
-                app.payments.forEach(p => {
-                    let typeStr = '';
-                    switch (p.type) {
-                        case 'cash':
-                            totalCash += p.amount;
-                            typeStr = 'Готівка';
-                            paymentTypesInApp.add('cash');
-                            break;
-                        case 'card':
-                            totalCard += p.amount;
-                            typeStr = 'Картка';
-                            paymentTypesInApp.add('card');
-                            break;
-                        case 'blik':
-                            totalBlik += p.amount;
-                            typeStr = 'Blik';
-                            paymentTypesInApp.add('blik');
-                            break;
-                        case 'certificate':
-                            totalCertificate += p.amount;
-                            typeStr = 'Сертифікат';
-                            paymentTypesInApp.add('certificate');
-                            break;
-                        case 'settlement':
-                            totalSettlement += p.amount;
-                            typeStr = 'Взаєморозрахунок';
-                            break;
-                    }
-                    if (typeStr) {
-                        paymentDetails.push(`${p.amount.toFixed(2)} zł (${typeStr})`);
-                    }
-                });
-                
-                if (paymentTypesInApp.size > 1) {
-                    mixedCount++;
-                } else if (paymentTypesInApp.has('cash')) {
-                    cashCount++;
-                } else if (paymentTypesInApp.has('card')) {
-                    cardCount++;
-                } else if (paymentTypesInApp.has('blik')) {
-                    blikCount++;
-                } else if (paymentTypesInApp.has('certificate')) {
-                    certCount++;
+                    app.payments.forEach(p => {
+                        switch (p.type) {
+                            case 'cash': totalCash += p.amount; break;
+                            case 'card': totalCard += p.amount; break;
+                            case 'blik': totalBlik += p.amount; break;
+                            case 'certificate': totalCertificate += p.amount; break;
+                            case 'settlement': totalSettlement += p.amount; break;
+                        }
+                    });
                 }
+            });
 
-                return `
-                    <tr>
-                        <td>${date}</td>
-                        <td>${app.clientName}</td>
-                        <td>${service}</td>
-                        <td>${master}</td>
-                        <td><strong>${app.totalPaid.toFixed(2)} zł</strong></td>
-                        <td>${paymentDetails.join('<br>')}</td>
-                    </tr>
-                `;
-            }).join('');
+            const tableBody = document.getElementById('report-table-body');
+            if (finalAppointmentsToShow.length === 0) {
+                tableBody.innerHTML = '<tr class="empty-row"><td colspan="6">За обраними фільтрами немає оплат.</td></tr>';
+            } else {
+                 tableBody.innerHTML = finalAppointmentsToShow.sort((a,b) => b.dateTime.toDate() - a.dateTime.toDate()).map(app => {
+                    const service = state.services.find(s => s.id === app.serviceId)?.name || 'Н/Д';
+                    const master = state.masters.find(m => m.id === app.masterId)?.name || 'Н/Д';
+                    const date = app.dateTime.toDate().toLocaleString('uk-UA');
+                    const paymentDetails = app.payments.map(p => {
+                        let typeStr = p.type.charAt(0).toUpperCase() + p.type.slice(1);
+                        if (p.type === 'cash') typeStr = 'Готівка';
+                        if (p.type === 'card') typeStr = 'Картка';
+                        return `${p.amount.toFixed(2)} zł (${typeStr})`;
+                    }).join('<br>');
 
-            tableBody.innerHTML = tableHtml;
+                    return `<tr><td>${date}</td><td>${app.clientName}</td><td>${service}</td><td>${master}</td><td><strong>${(app.totalPaid || 0).toFixed(2)} zł</strong></td><td>${paymentDetails}</td></tr>`;
+                }).join('');
+            }
 
             const summaryHtml = `
                 <div class="summary-card"><div class="value">${totalCash.toFixed(2)} zł</div><div class="label">💵 Готівкою (${cashCount} оплат)</div></div>
@@ -1739,9 +1736,10 @@ async function renderDailySummary() {
 
         startDateInput.onchange = generateReport;
         endDateInput.onchange = generateReport;
-        salonFilter.onchange = generateReport; // Додаємо обробник для нового фільтра
+        salonFilter.onchange = generateReport;
+        paymentFilter.onchange = generateReport;
         
-        generateReport(); // Запустити звіт одразу при завантаженні сторінки
+        generateReport();
     }
 
     function showActionModal(appointment) {
@@ -4257,18 +4255,35 @@ async function handleHardDeleteCertificate(id, number) { // Повне вида�
         event.preventDefault();
         const btn = event.target.querySelector('button[type="submit"]');
         btn.disabled = true; btn.textContent = 'Відправка...';
-        const startDate = document.getElementById('report-start-date').value;
-        const endDate = document.getElementById('report-end-date').value;
-        const salonId = document.getElementById('report-salon-filter').value;
-        if (!startDate || !endDate) {
+        
+        // *** ВИПРАВЛЕНО: Створюємо точні дати на основі локального часу ***
+        const startDateString = document.getElementById('report-start-date').value;
+        const endDateString = document.getElementById('report-end-date').value;
+        
+        if (!startDateString || !endDateString) {
             showNotification('Будь ласка, оберіть обидві дати.', "error");
             btn.disabled = false; btn.textContent = 'Відправити звіт';
             return;
         }
+
+        const localStart = new Date(startDateString);
+        localStart.setHours(0, 0, 0, 0);
+
+        const localEnd = new Date(endDateString);
+        localEnd.setHours(23, 59, 59, 999);
+        // *** КІНЕЦЬ ВИПРАВЛЕННЯ ***
+        
+        const salonId = document.getElementById('report-salon-filter').value;
+
         try {
             const generateReport = httpsCallable(functions, 'generateAndSendReport');
-            const result = await generateReport({ startDate, endDate, salonId });
-            await logAndExecute('Сформовано ручний звіт', { period: `${startDate} - ${endDate}` }, () => Promise.resolve());
+            // Передаємо повні дати в ISO форматі
+            const result = await generateReport({ 
+                startDate: localStart.toISOString(), 
+                endDate: localEnd.toISOString(), 
+                salonId 
+            });
+            await logAndExecute('Сформовано ручний звіт', { period: `${startDateString} - ${endDateString}` }, () => Promise.resolve());
             showNotification(result.data.message);
         } catch (error) {
             console.error("Помилка виклику хмарної функції:", error);
