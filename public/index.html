@@ -1417,7 +1417,7 @@ async function renderDailySummary() {
         const advancesSnap = await getDocs(advancesQuery);
         // !!! FIX: The line "let totalAdvances = 0;" was removed from here.
         advancesSnap.forEach(doc => {
-            totalAdvances += doc.data().amount; [cite: 378]
+            totalAdvances += doc.data().amount;
         });
         advancesEl.textContent = `-${totalAdvances.toFixed(0)} zł`;
     } catch (e) {
