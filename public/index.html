@@ -1343,7 +1343,6 @@ async function renderDailySummary() {
     const cardEl = document.getElementById('summary-card');
     const blikEl = document.getElementById('summary-blik');
     const servicesCountEl = document.getElementById('summary-services-count');
-
     // Надійна перевірка: якщо хоча б одного елемента немає, виходимо з функції
     if (!dateInput || !salonInput || !advancesEl || !salonExpensesEl || !productSalesEl || !totalEl || !cashEl || !cardEl || !blikEl || !servicesCountEl) {
         return;
@@ -1356,13 +1355,11 @@ async function renderDailySummary() {
     
     const endOfDay = new Date(selectedDate);
     endOfDay.setHours(23, 59, 59, 999);
-    
     let relevantAppointments = state.appointments.filter(app => {
         if (!app.dateTime) return false;
         const appointmentDate = app.dateTime.toDate();
         return appointmentDate >= startOfDay && appointmentDate <= endOfDay;
     });
-
     if (selectedSalonId !== 'all') {
         relevantAppointments = relevantAppointments.filter(app => app.salonId === selectedSalonId);
     }
@@ -1376,12 +1373,14 @@ async function renderDailySummary() {
             app.payments.forEach(p => {
                 if (p.type !== 'settlement' && p.type !== 'certificate') {
                     total += p.amount;
+        
                     if(p.type === 'cash') cash += p.amount;
                     else if(p.type === 'card') card += p.amount;
                     else if(p.type === 'blik') blik += p.amount;
                 }
             });
-        }
+   
+         }
     });
     
     let productSalesCash = 0, productSalesCard = 0, productSalesBlik = 0;
@@ -1390,7 +1389,6 @@ async function renderDailySummary() {
         const saleDate = (s.timestamp || s.date).toDate();
         return saleDate >= startOfDay && saleDate <= endOfDay;
     });
-
     if (selectedSalonId !== 'all') {
         filteredProductSales = filteredProductSales.filter(s => s.salonId === selectedSalonId);
     }
@@ -1400,37 +1398,30 @@ async function renderDailySummary() {
         else if (sale.paymentType === 'card') productSalesCard += sale.amount;
         else if (sale.paymentType === 'blik') productSalesBlik += sale.amount;
     });
-
     const totalProductSales = productSalesCash + productSalesCard + productSalesBlik;
     total += totalProductSales;
     cash += productSalesCash;
     card += productSalesCard;
     blik += productSalesBlik;
-    
     let totalAdvances = 0;
     try {
         let advancesQuery = query(collectionGroup(db, 'advances'), where('date', '>=', startOfDay), where('date', '<=', endOfDay));
-
         const salonIdForFilter = selectedSalonId === 'all' && state.user.role === 'admin' 
-            ? 'all' 
+            ?
+            'all' 
             : (state.user.role === 'salon_admin' ? state.user.salonId : selectedSalonId);
-
         if (salonIdForFilter !== 'all') {
             advancesQuery = query(advancesQuery, where('salonId', '==', salonIdForFilter));
         }
         
         const advancesSnap = await getDocs(advancesQuery);
-        let totalAdvances = 0;
+        // !!! FIX: The line "let totalAdvances = 0;" was removed from here.
         advancesSnap.forEach(doc => {
-            totalAdvances += doc.data().amount;
+            totalAdvances += doc.data().amount; [cite: 378]
         });
-
-        // 'advancesEl' вже існує, тому просто використовуємо його
         advancesEl.textContent = `-${totalAdvances.toFixed(0)} zł`;
-
     } catch (e) {
         console.error("Помилка завантаження авансів для підсумку:", e);
-        // 'advancesEl' вже існує, НЕ оголошуємо його знову
         if(advancesEl) advancesEl.textContent = 'Помилка';
     }
 
@@ -1440,7 +1431,6 @@ async function renderDailySummary() {
         const expenseDate = (e.timestamp || e.date).toDate();
         return expenseDate >= startOfDay && expenseDate <= endOfDay;
     });
-
     if (selectedSalonId !== 'all') {
         filteredSalonExpenses = filteredSalonExpenses.filter(e => e.salonId === selectedSalonId);
     }
@@ -1448,7 +1438,6 @@ async function renderDailySummary() {
     filteredSalonExpenses.forEach(expense => {
         totalSalonExpenses += expense.amount;
     });
-
     totalEl.textContent = `${total.toFixed(0)} zł`;
     cashEl.textContent = `${cash.toFixed(0)} zł`;
     cardEl.textContent = `${card.toFixed(0)} zł`;
