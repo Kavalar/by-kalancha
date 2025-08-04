@@ -2197,6 +2197,7 @@ async function renderDailySummary() {
             const internalCheckbox = document.getElementById('internal-service-checkbox');
             internalCheckbox.checked = appointmentToEdit.isInternal || false;
             internalCheckbox.dispatchEvent(new Event('change'));
+
             if(appointmentToEdit.isInternal) {
                 document.getElementById('master-as-client-select').value = appointmentToEdit.clientId;
             } else {
@@ -2205,13 +2206,22 @@ async function renderDailySummary() {
                 document.getElementById('client-phone-input').value = client?.phone || '';
                 document.getElementById('client-phone-group').style.display = 'block';
             }
+            
             const service = state.services.find(s => s.id === appointmentToEdit.serviceId);
             if (service) {
-                state.selectedServiceForAppointment = service;
-                document.getElementById('appointment-service-search').value = service.name;
+                // ----- ПОЧАТОК ВИПРАВЛЕННЯ -----
+                // Крок 1: Встановлюємо категорію і викликаємо подію, щоб оновити список майстрів.
+                // Поле послуги в цей момент тимчасово очиститься, і це нормально.
                 const categorySelect = document.getElementById('appointment-category');
                 categorySelect.value = service.categoryId;
                 categorySelect.dispatchEvent(new Event('change'));
+
+                // Крок 2: Тепер, коли залежні поля оновилися, ПОВЕРТАЄМО НА МІСЦЕ дані про послугу.
+                // Це перезапише помилкове очищення.
+                state.selectedServiceForAppointment = service;
+                document.getElementById('appointment-service-search').value = service.name;
+                
+                // Крок 3: Решту полів встановлюємо з невеликою затримкою, щоб гарантувати оновлення DOM.
                 setTimeout(() => {
                     document.getElementById('appointment-master').value = appointmentToEdit.masterId;
                     if (appointmentToEdit.salonId) {
@@ -2219,6 +2229,7 @@ async function renderDailySummary() {
                     }
                     updateFinalPrice();
                 }, 100);
+                // ----- КІНЕЦЬ ВИПРАВЛЕННЯ -----
             }
         } else if (!isEditMode && state.selectedClientForAppointment) {
             const clientSearchInput = document.getElementById('client-search-input');
