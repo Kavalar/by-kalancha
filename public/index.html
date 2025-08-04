@@ -3020,6 +3020,11 @@ async function renderDailySummary() {
                 totalSalaryCalculated += salaryForApp;
 
                 const tr = document.createElement('tr');
+                // Додаємо ID запису, курсор і підказку до рядка
+                tr.setAttribute('data-appointment-id', app.id);
+                tr.style.cursor = 'pointer';
+                tr.title = 'Натисніть, щоб редагувати цей запис';
+
                 tr.innerHTML = `
                     <td>${app.dateTime.toDate().toLocaleString('uk-UA')}</td>
                     <td>${app.clientName}</td>
@@ -3045,7 +3050,20 @@ async function renderDailySummary() {
         startDateInput.onchange = updateWorkHistoryTable;
         endDateInput.onchange = updateWorkHistoryTable;
         updateWorkHistoryTable();
-        
+        // ----- ПОЧАТОК НОВОГО КОДУ -----
+        // Додаємо обробник кліків для всієї таблиці
+        const workHistoryTableBody = document.getElementById('work-history-tbody');
+        if (workHistoryTableBody) {
+            workHistoryTableBody.onclick = (event) => {
+                const row = event.target.closest('tr'); // Знаходимо рядок, по якому клікнули
+                if (row && row.dataset.appointmentId) {
+                    const appointmentId = row.dataset.appointmentId;
+                    // Використовуємо існуючу функцію для переходу до редагування
+                    handleEditAppointment(appointmentId); 
+                }
+            };
+        }
+        // ----- КІНЕЦЬ НОВОГО КОДУ -----
         const masterOperationsList = document.getElementById('master-operations-list');
         const renderMasterOperations = () => {
             const allItems = [
