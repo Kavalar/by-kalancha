@@ -2501,67 +2501,77 @@ async function renderDailySummary() {
         return;
     }
 
+    // --- Перевірка полів форми (без змін) ---
     const dateTimeString = document.getElementById('appointment-datetime').value;
     const service = state.selectedServiceForAppointment;
     const masterId = document.getElementById('appointment-master').value;
-    const salonId = (state.user.role === 'salon_admin')
-        ? state.user.salonId
-        : document.getElementById('appointment-salon').value;
-
-    if (!dateTimeString) {
-        return showNotification("Будь ласка, вкажіть дату і час.", "error");
-    }
-    if (!service) {
-        return showNotification("Будь ласка, оберіть послугу зі списку результатів пошуку.", "error");
-    }
-    if (!masterId) {
-        return showNotification("Будь ласка, оберіть майстра.", "error");
-    }
-    if (!salonId) {
-        return showNotification("Будь ласка, оберіть салон.", "error");
+    const salonId = (state.user.role === 'salon_admin') ? state.user.salonId : document.getElementById('appointment-salon').value;
+    if (!dateTimeString || !service || !masterId || !salonId) {
+        return showNotification("Будь ласка, заповніть усі обов'язкові поля.", "error");
     }
 
-    // --- ДОДАНО ПЕРЕВІРКУ ДАТИ ДЛЯ SALON_ADMIN ---
+    // --- Перевірка дати для Адміністратора салону (без змін) ---
     if (state.user.role === 'salon_admin') {
         const selectedDate = new Date(dateTimeString);
-        const now = new Date();
-
-        // Порівнюємо вибрану дату з початком поточної доби, щоб дозволити записи на сьогодні
         const startOfToday = new Date();
         startOfToday.setHours(0, 0, 0, 0);
-
-        if (selectedDate < startOfToday) {
-            showNotification("Адміністратор салону не може створювати або редагувати записи заднім числом.", "error");
-            return; // Зупиняємо виконання функції
+        if (selectedDate < startOfToday && !isEditMode) { // Дозволяємо редагувати старі записи, але не створювати
+            showNotification("Адміністратор салону не може створювати записи заднім числом.", "error");
+            return;
         }
     }
-    // --- КІНЕЦЬ ПЕРЕВІРКИ ---
-    
-    const isInternal = document.getElementById('internal-service-checkbox').checked;
+
+    // --- ПОЧАТОК НОВОЇ ЛОГІКИ РОЗРАХУНКУ ---
+
     const master = state.masters.find(m => m.id === masterId);
     if (!master) {
         return showNotification("Помилка: не знайдено майстра!", "error");
     }
 
+    // 1. Знаходимо групу зарплати майстра та перевіряємо прапорець
+    const salaryGroup = master.salaryGroupId ? state.salaryGroups.find(g => g.id === master.salaryGroupId) : null;
+    const useFinalPriceForBase = salaryGroup ? (salaryGroup.calculateFromFinalPrice || false) : false;
+
+    // 2. Розраховуємо фінальну ціну для клієнта (вона завжди однакова)
+    // Ця функція вже правильно враховує знижки та дод. плати
+    const finalPrice = updateFinalPrice(); 
+    
+    let salaryBase; // Оголошуємо змінну для бази ЗП
+
+    // 3. Умовно розраховуємо базу для ЗП
+    if (useFinalPriceForBase) {
+        // ВИПАДОК 1: Галочка "Розрахунок від фінальної ціни" увімкнена
+        // База для ЗП = сума, яку заплатив клієнт (після всіх знижок, але з дод. платою)
+        salaryBase = finalPrice;
+    } else {
+        // ВИПАДОК 2: Галочка вимкнена або група не призначена
+        // База для ЗП = початкова ціна послуги (з націнкою майстра) + дод. плата. Знижки ігноруються.
+        const originalServicePrice = service.price * (1 + (master.priceModifier || 0) / 100);
+        const additionalCharge = parseFloat(document.getElementById('additional-charge-amount').value) || 0;
+        salaryBase = originalServicePrice + additionalCharge;
+    }
+
+    // --- КІНЕЦЬ НОВОЇ ЛОГІКИ РОЗРАХУНКУ ---
+
+    const isInternal = document.getElementById('internal-service-checkbox').checked;
+    const manualDiscountValue = parseFloat(document.getElementById('manual-discount-value').value) || 0;
+    const manualDiscountType = document.getElementById('manual-discount-type').value;
     const additionalChargeAmount = parseFloat(document.getElementById('additional-charge-amount').value) || 0;
     const additionalChargeDescription = document.getElementById('additional-charge-description').value.trim();
-    const priceModifier = master.priceModifier || 0;
-    const finalPrice = updateFinalPrice();
-    const salaryBase = (service.price * (1 + priceModifier / 100)) + additionalChargeAmount;
 
-    let appointmentData = { 
-        dateTime: Timestamp.fromDate(new Date(dateTimeString)), 
-        serviceId: service.id, 
-        masterId, 
-        salonId, 
-        duration: service.duration || 60, 
-        manualDiscount: { value: parseFloat(document.getElementById('manual-discount-value').value) || 0, type: document.getElementById('manual-discount-type').value }, 
-        additionalCharge: { amount: additionalChargeAmount, description: additionalChargeDescription }, 
-        finalPrice, 
-        salaryBase, 
-        isInternal: isInternal 
+    let appointmentData = {
+        dateTime: Timestamp.fromDate(new Date(dateTimeString)),
+        serviceId: service.id,
+        masterId,
+        salonId,
+        duration: service.duration || 60,
+        manualDiscount: { value: manualDiscountValue, type: manualDiscountType },
+        additionalCharge: { amount: additionalChargeAmount, description: additionalChargeDescription },
+        finalPrice: finalPrice, // Зберігаємо фінальну ціну для клієнта
+        salaryBase: salaryBase, // Зберігаємо коректно розраховану базу для ЗП
+        isInternal: isInternal
     };
-
+    
     let logDetails = { service: service.name, master: master.name };
 
     try {
@@ -2584,8 +2594,9 @@ async function renderDailySummary() {
                 if (!clientPhone) return showNotification("Для нового клієнта необхідно вказати номер телефону.", "error");
                 const normalizedPhone = clientPhone.replace(/[\s-()]/g, '');
                 const existingClient = state.clients.find(c => c.name.toLowerCase() === clientName.toLowerCase() && c.phone.replace(/[\s-()]/g, '') === normalizedPhone);
-                if (existingClient) { clientId = existingClient.id; }
-                else {
+                if (existingClient) { 
+                    clientId = existingClient.id; 
+                } else {
                      const newClientAction = () => addDoc(collection(db, 'clients'), { name: clientName, phone: clientPhone, createdAt: Timestamp.now() });
                      const newClientRef = await logAndExecute('Створено клієнта', { name: clientName, phone: clientPhone }, newClientAction);
                      clientId = newClientRef.id;
@@ -2617,7 +2628,8 @@ async function renderDailySummary() {
             updateFinalPrice();
         }
     } catch (e) {
-        showNotification('Не вдалося зберегти запис.', "error");
+        showNotification('Не вдалося зберегти запис. ' + e.message, "error");
+        console.error("Помилка збереження запису:", e);
     }
 }
     
