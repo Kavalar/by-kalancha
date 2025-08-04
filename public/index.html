@@ -3065,6 +3065,48 @@ async function renderDailySummary() {
 
         document.getElementById('send-master-report-btn').onclick = async () => { /* ... (цей код залишається без змін) ... */ };
     }
+    async function handleAddMasterOperation(event) {
+        event.preventDefault();
+        const masterId = state.viewingMasterId;
+        const master = state.masters.find(m => m.id === masterId);
+
+        const type = document.getElementById('operation-type').value; // 'advance' or 'bonus'
+        const amount = parseFloat(document.getElementById('operation-amount').value);
+        const description = document.getElementById('operation-description').value.trim();
+        const paymentType = document.getElementById('operation-payment-type').value;
+        
+        let salonId;
+        if (state.user.role === 'admin') {
+            salonId = document.getElementById('operation-salon-id').value;
+        } else if (state.user.role === 'salon_admin') {
+            salonId = state.user.salonId;
+        }
+
+        if (!masterId || !amount || amount <= 0 || !salonId) {
+            return showNotification("Будь ласка, заповніть усі поля коректно.", "error");
+        }
+        
+        const data = {
+            amount,
+            date: Timestamp.now(),
+            paymentType,
+            salonId,
+            description: description || ''
+        };
+        
+        const subcollectionName = type === 'advance' ? 'advances' : 'bonuses';
+        const logActionText = type === 'advance' ? 'Видано аванс майстру' : 'Нараховано премію майстру';
+
+        const action = () => addDoc(collection(db, 'masters', masterId, subcollectionName), data);
+        try {
+            await logAndExecute(logActionText, { masterId, name: master.name, amount, salonId }, action);
+            event.target.reset();
+            showNotification("Операцію успішно проведено!", "success");
+        } catch (e) {
+            showNotification("Помилка при проведенні операції.", "error");
+            console.error(e);
+        }
+    }
     async function handleAddAdvance(event) {
     event.preventDefault();
     const masterId = state.viewingMasterId;
