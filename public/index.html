@@ -3025,10 +3025,14 @@ async function renderDailySummary() {
                 tr.style.cursor = 'pointer';
                 tr.title = 'Натисніть, щоб редагувати цей запис';
 
+                const chargeIndicator = (app.additionalCharge && app.additionalCharge.amount > 0)
+                    ? `<span style="color: var(--success-color); font-weight: bold; margin-left: 8px;" title="Додаткова плата: ${app.additionalCharge.description || 'без опису'}">+${app.additionalCharge.amount.toFixed(0)} zł</span>`
+                    : '';
+
                 tr.innerHTML = `
                     <td>${app.dateTime.toDate().toLocaleString('uk-UA')}</td>
                     <td>${app.clientName}</td>
-                    <td>${service.name}</td>
+                    <td>${service.name}${chargeIndicator}</td> 
                     <td>${app.finalPrice.toFixed(2)} zł</td>
                     <td style="background-color: #fffbe6;"><strong>${salaryBaseForApp.toFixed(2)} zł</strong></td>
                     <td><strong>${salaryForApp.toFixed(2)} zł</strong></td>
