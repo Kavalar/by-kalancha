@@ -2922,8 +2922,8 @@ async function renderDailySummary() {
                         <thead>
                             <tr>
                                 <th>Дата</th>
+                                <th>Клієнт</th>
                                 <th>Послуга</th>
-                                <th>Ціна послуги</th>
                                 <th>Фінальна ціна</th>
                                 <th>База для ЗП</th>
                                 <th>Нараховано (zł)</th>
@@ -2972,7 +2972,11 @@ async function renderDailySummary() {
             // Спочатку розрахуємо загальну базу за весь період, щоб визначити правильну ставку
             let totalBaseForRateCalculation = 0;
             masterAppointments.forEach(app => {
-                totalBaseForRateCalculation += app.salaryBase || 0;
+                 if (salaryGroup && salaryGroup.calculateFromFinalPrice) {
+                    totalBaseForRateCalculation += app.finalPrice || 0;
+                } else {
+                    totalBaseForRateCalculation += app.salaryBase || 0;
+                }
             });
             const applicableTier = tiers.find(tier => totalBaseForRateCalculation >= tier.threshold) || { rate: 0 };
             const rate = applicableTier.rate;
@@ -2981,7 +2985,12 @@ async function renderDailySummary() {
                 const service = state.services.find(s => s.id === app.serviceId);
                 if (!service) return;
 
-                const salaryBaseForApp = app.salaryBase || 0;
+                let salaryBaseForApp = 0;
+                if (salaryGroup && salaryGroup.calculateFromFinalPrice) {
+                    salaryBaseForApp = app.finalPrice || 0;
+                } else {
+                    salaryBaseForApp = app.salaryBase || 0;
+                }
                 cumulativeSalaryBase += salaryBaseForApp;
 
                 const salaryForApp = salaryBaseForApp * (rate / 100);
@@ -3014,7 +3023,6 @@ async function renderDailySummary() {
         endDateInput.onchange = updateWorkHistoryTable;
         updateWorkHistoryTable();
         
-        // Об'єднуємо обробники для авансів та премій
         const masterOperationsList = document.getElementById('master-operations-list');
         const renderMasterOperations = () => {
             const allItems = [
@@ -3063,7 +3071,36 @@ async function renderDailySummary() {
             }
         };
 
-        document.getElementById('send-master-report-btn').onclick = async () => { /* ... (цей код залишається без змін) ... */ };
+        document.getElementById('send-master-report-btn').onclick = async () => {
+             const masterId = state.viewingMasterId;
+            const startDate = document.getElementById('work-history-start').value;
+            const endDate = document.getElementById('work-history-end').value;
+
+            if (!masterId || !startDate || !endDate) {
+                return showNotification('Будь ласка, оберіть період.', 'error');
+            }
+
+            const btn = document.getElementById('send-master-report-btn');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Відправка...';
+
+            try {
+                const sendReport = httpsCallable(functions, 'sendMasterWorkReport');
+                const result = await sendReport({ 
+                    masterId, 
+                    startDate: new Date(startDate).toISOString(), 
+                    endDate: new Date(endDate).toISOString() 
+                });
+                showNotification(result.data.message || 'Звіт успішно надіслано!', 'success');
+            } catch (error) {
+                console.error("Помилка відправки звіту майстра:", error);
+                showNotification(`Помилка: ${error.message}`, "error");
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        };
     }
     async function handleAddMasterOperation(event) {
         event.preventDefault();
