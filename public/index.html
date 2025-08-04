@@ -3600,17 +3600,48 @@ async function handleCalculateSalary(event) {
     event.preventDefault();
     const reportContainer = document.getElementById('salary-report');
     reportContainer.innerHTML = '<p>Розрахунок...</p>';
-    const startDate = document.getElementById('salary-start-date').value;
-    const endDate = document.getElementById('salary-end-date').value;
+
+    // --- ПОЧАТОК ЗМІН ---
+    // Отримуємо дати як рядки
+    const startDateString = document.getElementById('salary-start-date').value;
+    const endDateString = document.getElementById('salary-end-date').value;
+    // --- КІНЕЦЬ ЗМІН ---
+
     const selectedMasterId = document.getElementById('salary-master-filter').value;
     const selectedSalonId = document.getElementById('salary-salon-filter').value;
+
+    // --- ПОЧАТОК ЗМІН ---
+    // Перевірка, чи дати вибрано
+    if (!startDateString || !endDateString) {
+        return showNotification('Будь ласка, оберіть обидві дати.', "error");
+    }
+
+    // Створюємо об'єкти Date та встановлюємо час для повного діапазону
+    const localStart = new Date(startDateString);
+    localStart.setHours(0, 0, 0, 0);
+
+    const localEnd = new Date(endDateString);
+    localEnd.setHours(23, 59, 59, 999);
+    // --- КІНЕЦЬ ЗМІН ---
+
     try {
         const generateReport = httpsCallable(functions, 'generateAndSendReport');
-        const result = await generateReport({ startDate, endDate, salonId: selectedSalonId, isManualCalculation: true });
+        
+        // --- ПОЧАТОК ЗМІН ---
+        // Передаємо на сервер дати у форматі ISO, щоб уникнути проблем з часовими зонами
+        const result = await generateReport({ 
+            startDate: localStart.toISOString(), 
+            endDate: localEnd.toISOString(), 
+            salonId: selectedSalonId, 
+            isManualCalculation: true 
+        });
+        // --- КІНЕЦЬ ЗМІН ---
+
         const reportText = result.data.reportBody;
         const masterReports = reportText.split('--- ДЕТАЛІЗАЦІЯ ПО ЗАРПЛАТІ МАЙСТРІВ ---')[1].split('--- ДЕТАЛІЗАЦІЯ ПО ЗАРПЛАТІ ПЕРСОНАЛУ ---')[0];
         const masterReportParts = masterReports.split('----------------------------').filter(part => part.trim() !== '');
         let reportHtml = '';
+        
         masterReportParts.forEach(part => {
             if (!part.includes('Майстер:')) return;
             const nameMatch = part.match(/Майстер: (.*)/);
@@ -3621,10 +3652,7 @@ async function handleCalculateSalary(event) {
             const rate = part.match(/Ставка: (.*)%/)?.[1] || '0';
             const salaryFromBase = part.match(/Нараховано ЗП .*?: (.*) zł/)?.[1] || '0';
             const internalBonus = part.match(/Нарахування \(внутр. послуги\): \+(.*) zł/)?.[1] || '0';
-            
-            // --- ОСНОВНЕ ВИПРАВЛЕННЯ ТУТ ---
-            const premiumBonus = part.match(/Премії: \+(.*) zł/)?.[1] || '0'; // Новий рядок для зчитування премій
-            
+            const premiumBonus = part.match(/Премії: \+(.*) zł/)?.[1] || '0';
             const advances = part.match(/Аванси: -(.*) zł/)?.[1] || '0';
             const settlements = part.match(/Взаєморозрахунок .*?: -(.*) zł/)?.[1] || '0';
             const toPay = part.match(/ДО ВИПЛАТИ: (.*) zł/)?.[1] || '0';
@@ -3638,9 +3666,7 @@ async function handleCalculateSalary(event) {
                         <p><span>Ставка:</span> <strong>${rate}%</strong></p>
                         <p><span>Нарахована ЗП (від бази):</span> <span>${salaryFromBase} zł</span></p>
                         <p><span>Нарахування (внутр. послуги):</span> <span style="color: var(--success-color);">+${internalBonus} zł</span></p>
-                        
                         <p><span>Премії:</span> <span style="color: var(--success-color);">+${premiumBonus} zł</span></p>
-
                         <p><span>Видано авансів:</span> <span style="color: var(--danger-color);">- ${advances} zł</span></p>
                         <p><span>Взаєморозрахунок (списання):</span> <span style="color: var(--danger-color);">- ${settlements} zł</span></p>
                         <p class="total-salary"><span>До виплати:</span> <strong>${toPay} zł</strong></p>
