@@ -838,19 +838,17 @@
     }
 
     try {
-        // Викликаємо нову, більш структуровану функцію для розрахунку
         const calculateSalaries = httpsCallable(functions, 'calculateSalariesForPayout');
-        const result = await calculateSalaries({ 
-            startDate: new Date(startDate).toISOString(), 
+        const result = await calculateSalaries({
+            startDate: new Date(startDate).toISOString(),
             endDate: new Date(endDate).toISOString(),
-            salonId: 'all' // Завжди рахуємо по всіх салонах на цій сторінці
+            salonId: 'all'
         });
         
         const masterReports = result.data.masters;
         let html = '';
 
         for (const master of masterReports) {
-            // Отримуємо суму, яка вже була виплачена в цьому періоді
             const payoutsQuery = query(
                 collection(db, 'masters', master.masterId, 'payouts'),
                 where("periodStart", "==", startDate),
@@ -864,9 +862,9 @@
 
             const balance = master.totalDue - alreadyPaid;
 
-            // Створюємо нову, більш детальну картку
+            // --- ОСНОВНЕ ВИПРАВЛЕННЯ ТУТ: `class.` замінено на `class=` ---
             html += `
-                <div class.="payout-card">
+                <div class="payout-card">
                     <h3>
                         <span>${master.name}</span>
                         <button class="btn btn-edit btn-payout-history"
@@ -875,7 +873,7 @@
                                 data-period-start="${startDate}"
                                 data-period-end="${endDate}">Історія</button>
                     </h3>
-                    <div class.="payout-card-details">
+                    <div class="payout-card-details">
                         <p><span>Нараховано (від бази):</span> <strong>${master.calculatedSalary.toFixed(2)} zł</strong></p>
                         <p><span>Нараховано (внутр. послуги):</span> <strong style="color: var(--success-color);">+${master.internalServicesBonus.toFixed(2)} zł</strong></p>
                         <p><span>(+) Премії:</span> <strong style="color: var(--success-color);">+${master.bonuses.toFixed(2)} zł</strong></p>
@@ -885,13 +883,13 @@
                            <span>Всього до виплати за період:</span> <strong>${master.totalDue.toFixed(2)} zł</strong>
                         </p>
                         <p><span>Вже виплачено за цей період:</span> <strong>${alreadyPaid.toFixed(2)} zł</strong></p>
-                        <p class.="balance-due"><span>Залишок до виплати:</span> <strong>${balance.toFixed(2)} zł</strong></p>
+                        <p class="balance-due"><span>Залишок до виплати:</span> <strong>${balance.toFixed(2)} zł</strong></p>
                     </div>
-                    <div class.="payout-action-form form-row">
-                        <div class.="form-group" style="flex: 2; margin-bottom: 0;">
+                    <div class="payout-action-form form-row">
+                        <div class="form-group" style="flex: 2; margin-bottom: 0;">
                             <input type="number" class="payout-amount-input" placeholder="Сума до видачі" min="0.01" step="any" max="${balance.toFixed(2)}">
                         </div>
-                        <div class.="form-group" style="flex: 1; margin-bottom: 0;">
+                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
                             <select class="payout-type-select">
                                 <option value="cash">Готівка</option>
                                 <option value="card">Картка</option>
