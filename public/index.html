@@ -827,21 +827,37 @@
         };
     }
 
-    async function handleCalculatePayouts(event) {
+    // ЗНАЙДІТЬ ЦЮ ФУНКЦІЮ У ВАШОМУ ФАЙЛІ "Final HTML.txt"
+async function handleCalculatePayouts(event) {
     event.preventDefault();
     const container = document.getElementById('payouts-container');
     container.innerHTML = '<p>Розрахунок... Це може зайняти деякий час.</p>';
-    const startDate = document.getElementById('payout-start-date').value;
-    const endDate = document.getElementById('payout-end-date').value;
-    if (!startDate || !endDate) {
+
+    // --- ПОЧАТОК ВИПРАВЛЕННЯ ---
+    // Отримуємо дати як рядки, а не одразу перетворюємо на об'єкти
+    const startDateString = document.getElementById('payout-start-date').value;
+    const endDateString = document.getElementById('payout-end-date').value;
+
+    // Перевіряємо, що обидві дати вибрані
+    if (!startDateString || !endDateString) {
         return showNotification("Будь ласка, оберіть період.", "error");
     }
 
+    // Створюємо об'єкти Date та коректно встановлюємо час для повного діапазону
+    const localStart = new Date(startDateString);
+    localStart.setHours(0, 0, 0, 0); // Встановлюємо на початок дня
+
+    const localEnd = new Date(endDateString);
+    localEnd.setHours(23, 59, 59, 999); // Встановлюємо на самий кінець дня
+    // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
+
     try {
         const calculateSalaries = httpsCallable(functions, 'calculateSalariesForPayout');
+        
+        // Передаємо на сервер дати у форматі ISO
         const result = await calculateSalaries({
-            startDate: new Date(startDate).toISOString(),
-            endDate: new Date(endDate).toISOString(),
+            startDate: localStart.toISOString(),
+            endDate: localEnd.toISOString(),
             salonId: 'all'
         });
         
@@ -849,20 +865,19 @@
         let html = '';
 
         for (const master of masterReports) {
+            // Змінено periodStart та periodEnd для відповідності вхідним даним
             const payoutsQuery = query(
                 collection(db, 'masters', master.masterId, 'payouts'),
-                where("periodStart", "==", startDate),
-                where("periodEnd", "==", endDate)
+                where("periodStart", "==", startDateString),
+                where("periodEnd", "==", endDateString)
             );
             const querySnapshot = await getDocs(payoutsQuery);
             let alreadyPaid = 0;
             querySnapshot.forEach(doc => {
                 alreadyPaid += doc.data().amount;
             });
-
             const balance = master.totalDue - alreadyPaid;
 
-            // --- ОСНОВНЕ ВИПРАВЛЕННЯ ТУТ: `class.` замінено на `class=` ---
             html += `
                 <div class="payout-card">
                     <h3>
@@ -870,8 +885,8 @@
                         <button class="btn btn-edit btn-payout-history"
                                 data-master-id="${master.masterId}"
                                 data-master-name="${master.name}"
-                                data-period-start="${startDate}"
-                                data-period-end="${endDate}">Історія</button>
+                                data-period-start="${startDateString}"
+                                data-period-end="${endDateString}">Історія</button>
                     </h3>
                     <div class="payout-card-details">
                         <p><span>Нараховано (від бази):</span> <strong>${master.calculatedSalary.toFixed(2)} zł</strong></p>
@@ -899,8 +914,8 @@
                         <button class="btn btn-issue-payout" style="flex: 1;"
                             data-master-id="${master.masterId}"
                             data-master-name="${master.name}"
-                            data-period-start="${startDate}"
-                            data-period-end="${endDate}"
+                            data-period-start="${startDateString}"
+                            data-period-end="${endDateString}"
                             data-balance="${balance.toFixed(2)}">Видати</button>
                     </div>
                 </div>
