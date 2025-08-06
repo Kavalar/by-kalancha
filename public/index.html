@@ -936,7 +936,7 @@ async function handleIssuePayout(dataset) {
     const cardElement = document.querySelector(`.btn-issue-payout[data-master-id="${masterId}"]`).closest('.payout-card');
     const amountInput = cardElement.querySelector('.payout-amount-input');
     const amount = parseFloat(amountInput.value);
-    
+
     if (isNaN(amount) || amount <= 0) {
         return showNotification("Введіть коректну суму.", "error");
     }
@@ -944,36 +944,24 @@ async function handleIssuePayout(dataset) {
         return showNotification("Сума видачі не може перевищувати залишок.", "error");
     }
 
+    // --- ПОЧАТОК ЗМІН ---
+    // Зчитуємо обраний метод оплати
     const paymentType = cardElement.querySelector('.payout-type-select').value;
     
-    // --- ПОЧАТОК ВИПРАВЛЕННЯ ---
-    // Додаємо поле salonId до об'єкта, який записується в базу даних
     const payoutData = {
         amount: amount,
         payoutDate: Timestamp.now(),
         periodStart: periodStart,
         periodEnd: periodEnd,
-        paymentType: paymentType,
-        authorEmail: state.user.email,
-        salonId: state.user.salonId // <-- ОСЬ ЦЕЙ РЯДОК ВСЕ ВИРІШИТЬ
+        paymentType: paymentType, // Додаємо метод оплати в об'єкт для збереження
+        authorEmail: state.user.email
     };
-    // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
-
-    // Змінюємо деталі логу, щоб вони включали ID салону
-    const logDetails = { 
-        masterName: masterName, 
-        amount: amount, 
-        period: `${periodStart} - ${periodEnd}`, 
-        type: paymentType,
-        salonId: state.user.salonId 
-    };
+    // --- КІНЕЦЬ ЗМІН ---
 
     const action = () => addDoc(collection(db, 'masters', masterId, 'payouts'), payoutData);
-    
     try {
-        await logAndExecute('Видача зарплати', logDetails, action);
+        await logAndExecute('Видача зарплати', { masterName: masterName, amount: amount, period: `${periodStart} - ${periodEnd}`, type: paymentType }, action);
         showNotification(`Суму ${amount.toFixed(2)} zł видано майстру ${masterName}.`, 'success');
-        // Примусово викликаємо перерахунок даних на сторінці
         document.getElementById('calculate-payouts-form').dispatchEvent(new Event('submit', { cancelable: true }));
     } catch (e) {
         showNotification('Не вдалося провести виплату.', 'error');
